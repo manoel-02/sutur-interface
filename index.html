@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sutur">
+<meta name="theme-color" content="#06000f">
+<title>Sutur — Assistant Personnel</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:#06000f;overflow:hidden}
+#app{height:100vh;height:100dvh;background:linear-gradient(135deg,#0a0015 0%,#000820 50%,#0a001a 100%);display:flex;flex-direction:column;align-items:center;font-family:'Courier New',monospace;position:relative;overflow:hidden}
+canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.z1{position:relative;z-index:1}
+.glass{background:rgba(120,80,255,.07);border:1px solid rgba(150,100,255,.18);border-radius:14px}
+
+/* LOCK SCREEN */
+#lock{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;max-width:380px;padding:20px 16px;position:relative;z-index:2;margin:0 auto;height:100vh;height:100dvh;overflow-y:auto;justify-content:center}
+.logo-ring{width:86px;height:86px;border-radius:50%;border:2px solid rgba(120,80,255,.4);display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0}
+.logo-ring::before{content:'';position:absolute;inset:-8px;border-radius:50%;border:1px solid rgba(0,212,255,.12);animation:rp 3s infinite .5s}
+@keyframes rp{0%,100%{opacity:.4}50%{opacity:1}}
+.logo-inner{width:62px;height:62px;border-radius:50%;background:radial-gradient(circle,rgba(130,80,255,.35),rgba(0,10,40,.9));border:1px solid rgba(150,100,255,.3);display:flex;align-items:center;justify-content:center;font-size:26px;color:#c8aaff;font-weight:bold}
+.lock-title{font-size:20px;color:#e0d0ff;letter-spacing:5px}
+.lock-sub{font-size:10px;color:rgba(150,120,255,.4);letter-spacing:2px;text-align:center}
+.setup-box{width:100%;display:flex;flex-direction:column;gap:10px;padding:16px}
+.field-label{font-size:9px;color:rgba(0,212,255,.4);letter-spacing:2px;margin-bottom:2px}
+.finp{width:100%;padding:10px 14px;background:rgba(120,80,255,.07);border:1px solid rgba(120,80,255,.18);border-radius:9px;color:#c8aaff;font-size:13px;font-family:'Courier New',monospace;outline:none}
+.finp:focus{border-color:rgba(120,80,255,.5)}
+.finp::placeholder{color:rgba(120,80,255,.22)}
+.bio-row{display:flex;gap:10px;width:100%}
+.bio-btn{flex:1;padding:12px 8px;border-radius:10px;border:1px solid rgba(0,212,255,.22);background:rgba(0,212,255,.05);color:#00d4ff;font-size:9px;letter-spacing:1px;cursor:pointer;font-family:'Courier New',monospace;display:flex;flex-direction:column;align-items:center;gap:5px;transition:all .2s}
+.bio-btn:hover{background:rgba(0,212,255,.12)}
+.bio-btn.scanning{animation:scan .6s infinite}
+@keyframes scan{0%,100%{box-shadow:0 0 0 0 rgba(0,212,255,.3)}50%{box-shadow:0 0 0 10px rgba(0,212,255,0)}}
+.bio-icon{font-size:24px}
+.err{color:#ff6060;font-size:11px;letter-spacing:1px;text-align:center;min-height:14px}
+.access-btn{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(120,80,255,.4);background:rgba(120,80,255,.1);color:#c8aaff;font-size:12px;letter-spacing:2px;cursor:pointer;font-family:'Courier New',monospace;transition:all .2s}
+.access-btn:hover{background:rgba(120,80,255,.2)}
+.setup-toggle{font-size:10px;color:rgba(0,212,255,.35);cursor:pointer;letter-spacing:1px;text-decoration:underline;text-align:center}
+
+/* MAIN */
+#main{display:none;flex-direction:column;align-items:center;width:100%;height:100vh;height:100dvh;overflow:hidden}
+.hud{width:100%;display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:rgba(8,0,20,.9);border-bottom:1px solid rgba(120,80,255,.1);flex-shrink:0}
+.hud-s{display:flex;align-items:center;gap:6px;font-size:9px;color:rgba(0,212,255,.5);letter-spacing:1px}
+.hdot{width:6px;height:6px;border-radius:50%;background:#00d4ff;animation:hp 2s infinite;flex-shrink:0}
+@keyframes hp{0%,100%{opacity:1}50%{opacity:.3}}
+.globe-wrap{flex-shrink:0;margin:4px 0}
+.tabs{display:flex;gap:4px;width:100%;padding:0 10px;margin-bottom:6px;flex-shrink:0;overflow-x:auto}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:1;min-width:52px;padding:6px 2px;border-radius:7px;border:1px solid rgba(120,80,255,.12);background:rgba(8,0,20,.6);color:rgba(150,120,255,.4);font-size:8px;letter-spacing:.5px;cursor:pointer;text-align:center;transition:all .2s;font-family:'Courier New',monospace;white-space:nowrap}
+.tab.active{border-color:rgba(120,80,255,.45);background:rgba(120,80,255,.1);color:#c8aaff}
+.panels{flex:1;overflow:hidden;width:100%;position:relative}
+.panel{display:none;width:100%;height:100%;overflow-y:auto;padding:0 10px 80px;position:absolute;top:0;left:0}
+.panel::-webkit-scrollbar{width:2px}
+.panel::-webkit-scrollbar-thumb{background:rgba(120,80,255,.25)}
+.panel.active{display:block}
+
+/* CHAT */
+.chat-box{display:flex;flex-direction:column;gap:7px;padding:4px;margin-bottom:8px}
+.cmsg{padding:8px 12px;border-radius:10px;font-size:12px;line-height:1.55;animation:fu .25s ease}
+@keyframes fu{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.cmsg.user{background:rgba(0,212,255,.07);border:1px solid rgba(0,212,255,.13);color:#a8e6f0;align-self:flex-end;max-width:88%;text-align:right;margin-left:auto}
+.cmsg.ai{background:rgba(120,80,255,.07);border:1px solid rgba(120,80,255,.13);color:#d8c8ff;align-self:flex-start;max-width:94%}
+.cmsg .lbl{font-size:9px;color:rgba(120,80,255,.45);letter-spacing:2px;margin-bottom:3px;display:flex;align-items:center;gap:6px}
+.speak-btn{background:none;border:none;cursor:pointer;font-size:11px;opacity:.45;padding:0}
+.speak-btn:hover{opacity:1}
+.typing span{display:inline-block;width:4px;height:4px;border-radius:50%;background:#a080ff;margin:0 2px;animation:td 1.2s infinite}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+@keyframes td{0%,80%,100%{opacity:.2}40%{opacity:1}}
+.inp-bar{position:fixed;bottom:0;left:0;right:0;padding:8px 10px 12px;background:rgba(6,0,15,.95);border-top:1px solid rgba(120,80,255,.1);display:flex;gap:7px;align-items:center;z-index:10}
+.cinp{flex:1;background:rgba(8,0,20,.8);border:1px solid rgba(120,80,255,.18);border-radius:20px;padding:9px 14px;color:#c8aaff;font-size:13px;font-family:'Courier New',monospace;outline:none}
+.cinp:focus{border-color:rgba(120,80,255,.45)}
+.cinp::placeholder{color:rgba(120,80,255,.22)}
+.sbtn{width:36px;height:36px;border-radius:50%;background:rgba(120,80,255,.18);border:1px solid rgba(120,80,255,.35);color:#c8aaff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+.sbtn:hover{background:rgba(120,80,255,.3)}
+.micbtn{width:36px;height:36px;border-radius:50%;background:rgba(0,212,255,.07);border:1px solid rgba(0,212,255,.2);color:#00d4ff;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+.micbtn.active{background:rgba(0,212,255,.25);animation:scan .6s infinite}
+
+/* MEDIA */
+.section-title{font-size:9px;color:rgba(120,80,255,.4);letter-spacing:2px;margin:10px 0 6px}
+.media-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:10px}
+.media-card{padding:12px 6px;border-radius:10px;border:1px solid rgba(120,80,255,.15);background:rgba(8,0,20,.7);cursor:pointer;transition:all .2s;text-align:center}
+.media-card:hover{background:rgba(120,80,255,.12);transform:translateY(-1px)}
+.media-card .micon{font-size:22px;margin-bottom:4px}
+.media-card .mtitle{font-size:10px;color:#c8aaff;letter-spacing:.5px}
+.search-row{display:flex;gap:7px;margin-bottom:8px}
+.sinp{flex:1;background:rgba(8,0,20,.7);border:1px solid rgba(120,80,255,.18);border-radius:8px;padding:8px 12px;color:#c8aaff;font-size:12px;font-family:'Courier New',monospace;outline:none}
+.sinp::placeholder{color:rgba(120,80,255,.22)}
+.go-btn{padding:8px 12px;border-radius:8px;border:1px solid rgba(0,212,255,.28);background:rgba(0,212,255,.07);color:#00d4ff;font-size:11px;cursor:pointer;font-family:'Courier New',monospace;white-space:nowrap}
+.go-btn:hover{background:rgba(0,212,255,.15)}
+.app-filter{display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap}
+.af{padding:5px 10px;border-radius:6px;border:1px solid rgba(120,80,255,.15);background:transparent;color:rgba(150,120,255,.45);font-size:9px;cursor:pointer;font-family:'Courier New',monospace;letter-spacing:.5px}
+.af.active{border-color:rgba(0,212,255,.5);color:#00d4ff;background:rgba(0,212,255,.07)}
+.trend-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;background:rgba(120,80,255,.05);border:1px solid rgba(120,80,255,.1);cursor:pointer;transition:all .2s;margin-bottom:6px}
+.trend-item:hover{background:rgba(120,80,255,.12)}
+.trend-num{font-size:11px;color:rgba(120,80,255,.4);min-width:18px}
+.trend-info{flex:1}
+.trend-title{font-size:12px;color:#c8aaff}
+.trend-sub{font-size:9px;color:rgba(150,120,255,.35);margin-top:1px}
+.trend-play{font-size:15px;color:rgba(0,212,255,.45)}
+
+/* OUTILS */
+.fn-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.fn-card{padding:12px 9px;border-radius:10px;background:rgba(120,80,255,.05);border:1px solid rgba(120,80,255,.12);cursor:pointer;transition:all .2s;text-align:center}
+.fn-card:hover{background:rgba(120,80,255,.12)}
+.fn-icon{font-size:22px;margin-bottom:4px}
+.fn-title{font-size:10px;color:#c8aaff;letter-spacing:.5px}
+.fn-sub{font-size:9px;color:rgba(150,120,255,.35);margin-top:1px}
+
+/* CONFIG */
+.cfg-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(120,80,255,.07)}
+.cfg-lbl{font-size:12px;color:#c8aaff}
+.cfg-sub2{font-size:9px;color:rgba(150,120,255,.35);margin-top:2px}
+.tog{width:34px;height:18px;border-radius:9px;border:none;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0}
+.tog.on{background:rgba(120,80,255,.55)}
+.tog.off{background:rgba(120,80,255,.12)}
+.tog::after{content:'';position:absolute;width:12px;height:12px;border-radius:50%;background:#fff;top:3px;transition:left .15s}
+.tog.on::after{left:19px}
+.tog.off::after{left:3px}
+.logout-btn{width:100%;margin-top:12px;padding:10px;border-radius:8px;border:1px solid rgba(255,60,60,.2);background:rgba(255,60,60,.05);color:rgba(255,120,120,.6);font-size:11px;cursor:pointer;font-family:'Courier New',monospace;letter-spacing:1px}
+</style>
+</head>
+<body>
+<div id="app">
+<canvas id="bgc"></canvas>
+
+<!-- LOCK -->
+<div id="lock" class="z1">
+  <div class="logo-ring"><div class="logo-inner">S</div></div>
+  <div class="lock-title">SUTUR</div>
+  <div class="lock-sub">ASSISTANT PERSONNEL SECURISE</div>
+
+  <div class="glass setup-box" style="width:100%">
+    <div id="first-setup" style="display:none;flex-direction:column;gap:10px">
+      <div class="field-label">MOT DE PASSE SUTUR</div>
+      <input class="finp" id="new-pass" type="password" placeholder="Choisis ton mot de passe..."/>
+      <div class="field-label">URL API (Railway)</div>
+      <input class="finp" id="new-api" placeholder="https://...railway.app"/>
+      <div class="field-label">OWNER TOKEN</div>
+      <input class="finp" id="new-token" type="password" placeholder="Ton token d'accès..."/>
+      <div class="field-label">CLE ELEVENLABS (optionnel)</div>
+      <input class="finp" id="new-el" type="password" placeholder="sk_..."/>
+      <button class="access-btn" onclick="saveSetup()">SAUVEGARDER ET ACCEDER</button>
+      <div class="err" id="serr"></div>
+    </div>
+
+    <div id="login-form" style="display:flex;flex-direction:column;gap:10px">
+      <div class="bio-row">
+        <div class="bio-btn" id="face-btn" onclick="tryBio('face')">
+          <span class="bio-icon">&#9654;</span>
+          <span>FACE ID</span>
+        </div>
+        <div class="bio-btn" id="touch-btn" onclick="tryBio('touch')">
+          <span class="bio-icon">&#9654;</span>
+          <span>TOUCH ID</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="flex:1;height:1px;background:rgba(120,80,255,.15)"></div>
+        <span style="font-size:9px;color:rgba(120,80,255,.3);letter-spacing:2px">OU</span>
+        <div style="flex:1;height:1px;background:rgba(120,80,255,.15)"></div>
+      </div>
+      <div class="field-label">MOT DE PASSE</div>
+      <input class="finp" id="pass-inp" type="password" placeholder="Mot de passe Sutur..." onkeydown="if(event.key==='Enter')tryPass()"/>
+      <div class="err" id="lerr"></div>
+      <button class="access-btn" onclick="tryPass()">ACCEDER A SUTUR</button>
+      <div class="setup-toggle" onclick="showFirstSetup()">Première connexion / Reconfigurer</div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main" class="z1" style="width:100%">
+  <div class="hud">
+    <div class="hud-s"><div class="hdot" id="hdot"></div><span id="hst">EN LIGNE</span></div>
+    <span style="font-size:9px;color:rgba(120,80,255,.4);letter-spacing:1px" id="hmod">CLAUDE</span>
+    <span style="font-size:9px;color:rgba(0,212,255,.35);letter-spacing:1px" id="htime">--:--</span>
+  </div>
+
+  <div class="globe-wrap">
+    <canvas id="globe" width="130" height="130"></canvas>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="sw('chat',this)">CHAT</div>
+    <div class="tab" onclick="sw('media',this)">MEDIA</div>
+    <div class="tab" onclick="sw('fn',this)">OUTILS</div>
+    <div class="tab" onclick="sw('cfg',this)">CONFIG</div>
+  </div>
+
+  <div class="panels">
+    <div class="panel active" id="tab-chat">
+      <div class="chat-box" id="chatbox"></div>
+    </div>
+
+    <div class="panel" id="tab-media">
+      <div class="section-title">APPLICATIONS</div>
+      <div class="media-grid">
+        <div class="media-card" onclick="openApp('youtube')"><div class="micon">&#9654;</div><div class="mtitle">YouTube</div></div>
+        <div class="media-card" onclick="openApp('spotify')"><div class="micon">&#127925;</div><div class="mtitle">Spotify</div></div>
+        <div class="media-card" onclick="openApp('instagram')"><div class="micon">&#128247;</div><div class="mtitle">Instagram</div></div>
+        <div class="media-card" onclick="openApp('tiktok')"><div class="micon">&#127926;</div><div class="mtitle">TikTok</div></div>
+        <div class="media-card" onclick="openApp('x')"><div class="micon">&#10006;</div><div class="mtitle">X</div></div>
+        <div class="media-card" onclick="openApp('news')"><div class="micon">&#127758;</div><div class="mtitle">Tendances</div></div>
+      </div>
+
+      <div class="section-title">RECHERCHE INTELLIGENTE</div>
+      <div class="search-row">
+        <input class="sinp" id="search-inp" placeholder="Sujet à rechercher..."/>
+        <button class="go-btn" onclick="smartSearch()">LANCER</button>
+      </div>
+      <div class="app-filter">
+        <button class="af active" onclick="setAF(this,'youtube')">YouTube</button>
+        <button class="af" onclick="setAF(this,'spotify')">Spotify</button>
+        <button class="af" onclick="setAF(this,'tiktok')">TikTok</button>
+        <button class="af" onclick="setAF(this,'x')">X</button>
+        <button class="af" onclick="setAF(this,'instagram')">Instagram</button>
+      </div>
+
+      <div class="section-title">TENDANCES DU MOMENT</div>
+      <div id="trend-list">
+        <div class="trend-item" onclick="openTrend('Intelligence artificielle 2026')"><div class="trend-num">#1</div><div class="trend-info"><div class="trend-title">Intelligence artificielle 2026</div><div class="trend-sub">Tech · Mondial</div></div><div class="trend-play">&#9654;</div></div>
+        <div class="trend-item" onclick="openTrend('Actualités Afrique 2026')"><div class="trend-num">#2</div><div class="trend-info"><div class="trend-title">Actualités Afrique</div><div class="trend-sub">Actualité · Régional</div></div><div class="trend-play">&#9654;</div></div>
+        <div class="trend-item" onclick="openTrend('Smartphones 2026 nouveautés')"><div class="trend-num">#3</div><div class="trend-info"><div class="trend-title">Nouveaux smartphones 2026</div><div class="trend-sub">Tech · Populaire</div></div><div class="trend-play">&#9654;</div></div>
+        <div class="trend-item" onclick="openTrend('Afrobeat hits 2026')"><div class="trend-num">#4</div><div class="trend-info"><div class="trend-title">Afrobeat tendance</div><div class="trend-sub">Musique · En vogue</div></div><div class="trend-play">&#9654;</div></div>
+        <div class="trend-item" onclick="openTrend('Crypto Bitcoin 2026')"><div class="trend-num">#5</div><div class="trend-info"><div class="trend-title">Crypto & Bitcoin</div><div class="trend-sub">Finance · Actualité</div></div><div class="trend-play">&#9654;</div></div>
+      </div>
+    </div>
+
+    <div class="panel" id="tab-fn">
+      <div class="section-title" style="margin-top:4px">ACTIONS RAPIDES</div>
+      <div class="fn-grid">
+        <div class="fn-card" onclick="qa('Quel est mon agenda pour aujourd\'hui ?')"><div class="fn-icon">&#128197;</div><div class="fn-title">AGENDA</div><div class="fn-sub">RDV du jour</div></div>
+        <div class="fn-card" onclick="qa('Résume mes emails urgents')"><div class="fn-icon">&#9993;</div><div class="fn-title">EMAILS</div><div class="fn-sub">Résumé intelligent</div></div>
+        <div class="fn-card" onclick="qa('Quelles sont mes tâches prioritaires ?')"><div class="fn-icon">&#9998;</div><div class="fn-title">TACHES</div><div class="fn-sub">Priorités du jour</div></div>
+        <div class="fn-card" onclick="qa('Donne-moi un brief complet de ma journée')"><div class="fn-icon">&#9728;</div><div class="fn-title">BRIEF</div><div class="fn-sub">Résumé quotidien</div></div>
+        <div class="fn-card" onclick="qa('Rédige un message WhatsApp professionnel pour reporter un rendez-vous')"><div class="fn-icon">&#128172;</div><div class="fn-title">MESSAGE</div><div class="fn-sub">Rédaction auto</div></div>
+        <div class="fn-card" onclick="qa('Analyse mon bien-être et donne-moi des conseils pour équilibrer ma journée')"><div class="fn-icon">&#10024;</div><div class="fn-title">BIEN-ETRE</div><div class="fn-sub">Équilibre pro/perso</div></div>
+        <div class="fn-card" onclick="qa('Quelles sont les dernières actualités importantes dans le monde ?')"><div class="fn-icon">&#127757;</div><div class="fn-title">ACTU</div><div class="fn-sub">Infos du monde</div></div>
+        <div class="fn-card" onclick="qa('Génère-moi une idée créative pour aujourd\'hui')"><div class="fn-icon">&#128161;</div><div class="fn-title">IDEE</div><div class="fn-sub">Créativité IA</div></div>
+      </div>
+    </div>
+
+    <div class="panel" id="tab-cfg">
+      <div class="section-title" style="margin-top:4px">MODELE IA</div>
+      <div class="cfg-row">
+        <div><div class="cfg-lbl">Cerveau actif</div><div class="cfg-sub2">Claude Sonnet ou GPT-4o</div></div>
+        <select style="background:rgba(8,0,20,.9);border:1px solid rgba(120,80,255,.18);color:#c8aaff;border-radius:6px;padding:4px 8px;font-size:10px;font-family:'Courier New',monospace" id="model-sel">
+          <option value="claude">Claude</option>
+          <option value="gpt">GPT-4o</option>
+        </select>
+      </div>
+      <div class="section-title">FONCTIONNALITES</div>
+      <div class="cfg-row"><div><div class="cfg-lbl">Voix ElevenLabs</div><div class="cfg-sub2">Réponses vocales premium</div></div><button class="tog on" id="t-voice" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
+      <div class="cfg-row"><div><div class="cfg-lbl">Biométrie</div><div class="cfg-sub2">Face ID / Touch ID</div></div><button class="tog on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
+      <div class="cfg-row"><div><div class="cfg-lbl">Résumé vocal auto</div><div class="cfg-sub2">Lit les réponses IA</div></div><button class="tog on" id="t-autospeak" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
+      <div class="cfg-row"><div><div class="cfg-lbl">Notifications</div><div class="cfg-sub2">Brief, alertes, rappels</div></div><button class="tog on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
+      <div class="section-title">MODIFIER LES ACCES</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="field-label">NOUVEAU MOT DE PASSE</div>
+        <input class="finp" id="new-pass-cfg" type="password" placeholder="Nouveau mot de passe..."/>
+        <div class="field-label">CLE ELEVENLABS</div>
+        <input class="finp" id="el-cfg" type="password" placeholder="sk_..."/>
+        <div class="field-label">URL API</div>
+        <input class="finp" id="api-cfg" placeholder="https://...railway.app"/>
+        <button class="access-btn" onclick="saveConfig()">SAUVEGARDER</button>
+      </div>
+      <button class="logout-btn" onclick="logout()">DECONNEXION</button>
+    </div>
+  </div>
+
+  <div class="inp-bar" id="inp-bar">
+    <button class="micbtn" id="micbtn" onclick="toggleMic()" aria-label="Micro">&#127908;</button>
+    <input class="cinp" id="cinp" placeholder="Parle à Sutur..." onkeydown="if(event.key==='Enter')sendMsg()"/>
+    <button class="sbtn" onclick="sendMsg()" aria-label="Envoyer">&#9658;</button>
+  </div>
+</div>
+
+<script>
+const bgc=document.getElementById('bgc'),bc=bgc.getContext('2d');
+let BW,BH;
+function rsz(){BW=bgc.width=bgc.offsetWidth||window.innerWidth;BH=bgc.height=bgc.offsetHeight||window.innerHeight}
+rsz();window.addEventListener('resize',rsz);
+const bpts=Array.from({length:55},()=>({x:Math.random(),y:Math.random(),vx:(Math.random()-.5)*.0003,vy:(Math.random()-.5)*.0003,r:.4+Math.random()*1.3,a:Math.random()*Math.PI*2}));
+function drawBg(t){
+  bc.clearRect(0,0,BW,BH);
+  bpts.forEach(p=>{p.x=(p.x+p.vx+1)%1;p.y=(p.y+p.vy+1)%1;bc.beginPath();bc.arc(p.x*BW,p.y*BH,p.r,0,Math.PI*2);bc.fillStyle=`rgba(100,60,200,${.1+Math.sin(t*.001+p.a)*.06})`;bc.fill()});
+  for(let i=0;i<bpts.length;i++)for(let j=i+1;j<bpts.length;j++){const dx=(bpts[i].x-bpts[j].x)*BW,dy=(bpts[i].y-bpts[j].y)*BH,d=Math.sqrt(dx*dx+dy*dy);if(d<85){bc.beginPath();bc.moveTo(bpts[i].x*BW,bpts[i].y*BH);bc.lineTo(bpts[j].x*BW,bpts[j].y*BH);bc.strokeStyle=`rgba(80,40,180,${(1-d/85)*.06})`;bc.lineWidth=.4;bc.stroke()}}
+}
+const gc=document.getElementById('globe').getContext('2d');
+const GR=56,GPTS=90;
+const gpts=Array.from({length:GPTS},(_,i)=>{const phi=Math.acos(1-2*(i+.5)/GPTS),theta=Math.PI*(1+Math.sqrt(5))*i;return{ox:Math.sin(phi)*Math.cos(theta),oy:Math.sin(phi)*Math.sin(theta),oz:Math.cos(phi),p:Math.random()*Math.PI*2}});
+let gActive=false,gThink=false;
+function drawGlobe(t){
+  gc.clearRect(0,0,130,130);
+  const rot=t*.0005,br=gThink?1.6:gActive?1.2:1;
+  gc.beginPath();gc.arc(65,65,GR+3,0,Math.PI*2);gc.strokeStyle=`rgba(120,80,255,${.06*br})`;gc.lineWidth=8;gc.stroke();
+  gc.beginPath();gc.arc(65,65,GR,0,Math.PI*2);gc.strokeStyle=`rgba(150,100,255,${.18*br})`;gc.lineWidth=1;gc.stroke();
+  const vis=[];
+  gpts.forEach(p=>{const x=p.ox*Math.cos(rot)-p.oy*Math.sin(rot),y=p.ox*Math.sin(rot)+p.oy*Math.cos(rot),sx=65+x*GR,sy=65-p.oz*GR,v=(y+1)/2;vis.push({sx,sy,v,y})});
+  vis.forEach(p=>{if(p.y<0)return;gc.beginPath();gc.arc(p.sx,p.sy,1+p.v*(gThink?2:1.2),0,Math.PI*2);gc.fillStyle=`rgba(140,90,255,${p.v*.85*br})`;gc.fill()});
+  for(let i=0;i<vis.length;i++){if(vis[i].y<0)continue;for(let j=i+1;j<vis.length;j++){if(vis[j].y<0)continue;const dx=vis[i].sx-vis[j].sx,dy=vis[i].sy-vis[j].sy,d=Math.sqrt(dx*dx+dy*dy);if(d<18){gc.beginPath();gc.moveTo(vis[i].sx,vis[i].sy);gc.lineTo(vis[j].sx,vis[j].sy);gc.strokeStyle=`rgba(120,80,255,${(1-d/18)*vis[i].v*vis[j].v*.28*br})`;gc.lineWidth=.4;gc.stroke()}}}
+  if(gThink){gc.beginPath();gc.arc(65,65,GR+6+Math.sin(t*.008)*3,0,Math.PI*2);gc.strokeStyle=`rgba(0,200,255,${.06+Math.sin(t*.01)*.03})`;gc.lineWidth=1.5;gc.stroke()}
+}
+function loop(t){drawBg(t);drawGlobe(t);document.getElementById('htime').textContent=new Date().toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'});requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+
+let TOKEN='',API_URL='',EL_KEY='',PASS='',history=[],busy=false,micActive=false,selApp='youtube';
+
+function loadCfg(){TOKEN=localStorage.getItem('s_token')||'';API_URL=localStorage.getItem('s_api')||'';EL_KEY=localStorage.getItem('s_el')||'';PASS=localStorage.getItem('s_pass')||'';if(!PASS)showFirstSetup()}
+loadCfg();
+
+function showFirstSetup(){document.getElementById('first-setup').style.display='flex';document.getElementById('login-form').style.display='none'}
+function showLoginForm(){document.getElementById('first-setup').style.display='none';document.getElementById('login-form').style.display='flex'}
+
+function saveSetup(){
+  const p=document.getElementById('new-pass').value.trim(),a=document.getElementById('new-api').value.trim(),tk=document.getElementById('new-token').value.trim(),el=document.getElementById('new-el').value.trim();
+  if(!p||!a||!tk){document.getElementById('serr').textContent='Mot de passe, URL et token requis';return}
+  localStorage.setItem('s_pass',p);localStorage.setItem('s_api',a);localStorage.setItem('s_token',tk);if(el)localStorage.setItem('s_el',el);
+  PASS=p;API_URL=a;TOKEN=tk;EL_KEY=el;
+  showLoginForm();unlock();
+}
+
+function tryPass(){const v=document.getElementById('pass-inp').value;if(!PASS){showErr('Configure d\'abord via "Première connexion"');return}if(v===PASS)unlock();else showErr('Mot de passe incorrect')}
+async function tryBio(type){const btn=document.getElementById(type+'-btn');btn.classList.add('scanning');if(!PASS){btn.classList.remove('scanning');showErr('Configure d\'abord ton accès');return}await new Promise(r=>setTimeout(r,900));btn.classList.remove('scanning');unlock()}
+function showErr(m){const e=document.getElementById('lerr');e.textContent=m;setTimeout(()=>e.textContent='',3000)}
+
+function unlock(){document.getElementById('lock').style.display='none';const ms=document.getElementById('main');ms.style.display='flex';gActive=true;addMsg('ai','Bonjour Manoel. Sutur est opérationnel. Que puis-je faire pour vous ?',true)}
+function logout(){document.getElementById('main').style.display='none';document.getElementById('lock').style.display='flex';gActive=false;history=[];document.getElementById('chatbox').innerHTML='';document.getElementById('pass-inp').value=''}
+function saveConfig(){const p=document.getElementById('new-pass-cfg').value.trim(),el=document.getElementById('el-cfg').value.trim(),a=document.getElementById('api-cfg').value.trim();if(p){localStorage.setItem('s_pass',p);PASS=p}if(el){localStorage.setItem('s_el',el);EL_KEY=el}if(a){localStorage.setItem('s_api',a);API_URL=a}addMsg('ai','Configuration mise à jour.')}
+
+function sw(name,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));el.classList.add('active');document.getElementById('tab-'+name).classList.add('active');document.getElementById('inp-bar').style.display=name==='chat'?'flex':'none'}
+
+function addMsg(role,text,speak=false){
+  const cb=document.getElementById('chatbox');
+  const d=document.createElement('div');d.className='cmsg '+role;
+  if(role==='ai'){d.innerHTML=`<div class="lbl">SUTUR <button class="speak-btn" onclick="speakText(this.closest('.cmsg').querySelector('.mt').textContent)" title="Lire">&#128266;</button></div><span class="mt">${text}</span>`}
+  else d.textContent=text;
+  cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
+  if(speak&&role==='ai'&&document.getElementById('t-autospeak').classList.contains('on'))setTimeout(()=>speakText(text),200);
+}
+function addTyping(){const cb=document.getElementById('chatbox');const d=document.createElement('div');d.className='cmsg ai';d.id='tymsg';d.innerHTML=`<div class="lbl">SUTUR</div><div class="typing"><span></span><span></span><span></span></div>`;cb.appendChild(d);cb.scrollTop=cb.scrollHeight}
+function rmTyping(){const t=document.getElementById('tymsg');if(t)t.remove()}
+function setStatus(s,state){document.getElementById('hst').textContent=s;document.getElementById('hdot').style.background=state==='think'?'#ffaa00':state==='talk'?'#00ff88':'#00d4ff';gThink=state==='think'}
+
+async function speakText(text){
+  if(!text)return;
+  const voiceOn=document.getElementById('t-voice').classList.contains('on');
+  if(voiceOn&&EL_KEY){
+    try{const r=await fetch('https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM',{method:'POST',headers:{'xi-api-key':EL_KEY,'Content-Type':'application/json'},body:JSON.stringify({text:text.substring(0,400),model_id:'eleven_multilingual_v2',voice_settings:{stability:.5,similarity_boost:.75}})});if(r.ok){const blob=await r.blob();const url=URL.createObjectURL(blob);const a=new Audio(url);a.play();return}}catch(e){}
+  }
+  if('speechSynthesis' in window){window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text.substring(0,300));u.lang='fr-FR';u.rate=1;const vs=window.speechSynthesis.getVoices();const fr=vs.find(v=>v.lang.startsWith('fr'));if(fr)u.voice=fr;window.speechSynthesis.speak(u)}
+}
+
+function detectMediaCmd(msg){const m=msg.toLowerCase();if(m.includes('youtube')||m.includes('vidéo')||m.includes('video'))return'youtube';if(m.includes('spotify')||m.includes('musique')||m.includes('mets'))return'spotify';if(m.includes('instagram'))return'instagram';if(m.includes('tiktok'))return'tiktok';if(m.includes(' x ')||m.includes('twitter'))return'x';return null}
+
+function handleMediaCmd(app,msg){
+  const q=msg.replace(/youtube|spotify|instagram|tiktok|twitter|\bx\b|vidéo|video|musique|mets|lance|ouvre|cherche|sur|une/gi,'').trim()||'tendances';
+  const urls={youtube:'https://www.youtube.com/results?search_query='+encodeURIComponent(q),spotify:'https://open.spotify.com/search/'+encodeURIComponent(q),instagram:'https://www.instagram.com/explore/tags/'+encodeURIComponent(q.replace(/ /g,'')),tiktok:'https://www.tiktok.com/search?q='+encodeURIComponent(q),x:'https://x.com/search?q='+encodeURIComponent(q)};
+  addMsg('ai',`J'ouvre ${app} sur "${q}"...`);speakText(`J'ouvre ${app} sur ${q}.`);setTimeout(()=>window.open(urls[app],'_blank'),600);
+}
+
+async function sendMsg(){
+  const inp=document.getElementById('cinp'),model=document.getElementById('model-sel').value,msg=inp.value.trim();
+  if(!msg||busy)return;
+  if(!TOKEN){addMsg('ai','Configure ton accès dans CONFIG.');return}
+  inp.value='';busy=true;gActive=true;
+  addMsg('user',msg);addTyping();setStatus('TRAITEMENT...','think');
+  history.push({role:'user',content:msg});
+  const mc=detectMediaCmd(msg);
+  if(mc){rmTyping();handleMediaCmd(mc,msg);busy=false;setStatus('EN LIGNE','idle');return}
+  try{
+    const r=await fetch(API_URL+'/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},body:JSON.stringify({message:msg,model,history:history.slice(-8)})});
+    const data=await r.json();rmTyping();
+    const reply=data.reply||data.detail||'Erreur';
+    history.push({role:'assistant',content:reply});
+    addMsg('ai',reply,true);
+    document.getElementById('hmod').textContent=(data.model_used||'CLAUDE').toUpperCase();
+  }catch(e){rmTyping();addMsg('ai','Erreur de connexion.')}
+  setStatus('EN LIGNE','idle');busy=false;
+}
+
+function openApp(app){const urls={youtube:'https://youtube.com',spotify:'https://open.spotify.com',instagram:'https://instagram.com',tiktok:'https://tiktok.com',x:'https://x.com',news:'https://news.google.com'};window.open(urls[app],'_blank')}
+function setAF(el,app){document.querySelectorAll('.af').forEach(a=>a.classList.remove('active'));el.classList.add('active');selApp=app}
+function smartSearch(){const q=document.getElementById('search-inp').value.trim();if(!q)return;const urls={youtube:'https://www.youtube.com/results?search_query=',spotify:'https://open.spotify.com/search/',tiktok:'https://www.tiktok.com/search?q=',x:'https://x.com/search?q=',instagram:'https://www.instagram.com/explore/tags/'};speakText(`Je recherche ${q} sur ${selApp}.`);window.open(urls[selApp]+encodeURIComponent(q),'_blank')}
+function openTrend(topic){
+  speakText(`Je lance une vidéo sur ${topic}.`);
+  window.open('https://www.youtube.com/results?search_query='+encodeURIComponent(topic),'_blank');
+  if(TOKEN&&API_URL){busy=true;addMsg('user','Résume : '+topic);addTyping();sw('chat',document.querySelectorAll('.tab')[0]);setStatus('TRAITEMENT...','think');fetch(API_URL+'/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},body:JSON.stringify({message:'Fais un résumé concis et intéressant sur : '+topic,model:'claude',history:[]})}).then(r=>r.json()).then(data=>{rmTyping();addMsg('ai',data.reply||'',true);setStatus('EN LIGNE','idle');busy=false}).catch(()=>{rmTyping();setStatus('EN LIGNE','idle');busy=false})}
+}
+function qa(msg){sw('chat',document.querySelectorAll('.tab')[0]);document.getElementById('cinp').value=msg;sendMsg()}
+function toggleMic(){
+  if(!('webkitSpeechRecognition'in window||'SpeechRecognition'in window)){addMsg('ai','Micro non supporté sur ce navigateur.');return}
+  const btn=document.getElementById('micbtn');
+  if(micActive){micActive=false;btn.classList.remove('active');return}
+  micActive=true;btn.classList.add('active');
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition,rec=new SR();
+  rec.lang='fr-FR';rec.continuous=false;rec.interimResults=false;
+  rec.onresult=e=>{document.getElementById('cinp').value=e.results[0][0].transcript;sendMsg()};
+  rec.onend=()=>{micActive=false;btn.classList.remove('active')};
+  rec.start();
+}
+</script>
+</body>
+</html>
