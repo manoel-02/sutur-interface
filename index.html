@@ -16,7 +16,7 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
 .z1{position:relative;z-index:1}
 .glass{background:rgba(120,80,255,.07);border:1px solid rgba(150,100,255,.18);border-radius:14px}
 
-/* LOCK SCREEN */
+/* LOCK */
 #lock{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;max-width:380px;padding:20px 16px;position:relative;z-index:2;margin:0 auto;height:100vh;height:100dvh;overflow-y:auto;justify-content:center}
 .logo-ring{width:86px;height:86px;border-radius:50%;border:2px solid rgba(120,80,255,.4);display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0}
 .logo-ring::before{content:'';position:absolute;inset:-8px;border-radius:50%;border:1px solid rgba(0,212,255,.12);animation:rp 3s infinite .5s}
@@ -34,7 +34,6 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
 .bio-btn:hover{background:rgba(0,212,255,.12)}
 .bio-btn.scanning{animation:scan .6s infinite}
 @keyframes scan{0%,100%{box-shadow:0 0 0 0 rgba(0,212,255,.3)}50%{box-shadow:0 0 0 10px rgba(0,212,255,0)}}
-.bio-icon{font-size:24px}
 .err{color:#ff6060;font-size:11px;letter-spacing:1px;text-align:center;min-height:14px}
 .access-btn{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(120,80,255,.4);background:rgba(120,80,255,.1);color:#c8aaff;font-size:12px;letter-spacing:2px;cursor:pointer;font-family:'Courier New',monospace;transition:all .2s}
 .access-btn:hover{background:rgba(120,80,255,.2)}
@@ -42,17 +41,17 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
 
 /* MAIN */
 #main{display:none;flex-direction:column;align-items:center;width:100%;height:100vh;height:100dvh;overflow:hidden}
-.hud{width:100%;display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:rgba(8,0,20,.9);border-bottom:1px solid rgba(120,80,255,.1);flex-shrink:0}
+.hud{width:100%;display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:rgba(8,0,20,.9);border-bottom:1px solid rgba(120,80,255,.1);flex-shrink:0}
 .hud-s{display:flex;align-items:center;gap:6px;font-size:9px;color:rgba(0,212,255,.5);letter-spacing:1px}
 .hdot{width:6px;height:6px;border-radius:50%;background:#00d4ff;animation:hp 2s infinite;flex-shrink:0}
 @keyframes hp{0%,100%{opacity:1}50%{opacity:.3}}
-.globe-wrap{flex-shrink:0;margin:4px 0}
-.tabs{display:flex;gap:4px;width:100%;padding:0 10px;margin-bottom:6px;flex-shrink:0;overflow-x:auto}
+.globe-wrap{flex-shrink:0;margin:2px 0}
+.tabs{display:flex;gap:3px;width:100%;padding:0 8px;margin-bottom:4px;flex-shrink:0;overflow-x:auto}
 .tabs::-webkit-scrollbar{display:none}
-.tab{flex:1;min-width:52px;padding:6px 2px;border-radius:7px;border:1px solid rgba(120,80,255,.12);background:rgba(8,0,20,.6);color:rgba(150,120,255,.4);font-size:8px;letter-spacing:.5px;cursor:pointer;text-align:center;transition:all .2s;font-family:'Courier New',monospace;white-space:nowrap}
+.tab{flex:1;min-width:44px;padding:5px 2px;border-radius:7px;border:1px solid rgba(120,80,255,.12);background:rgba(8,0,20,.6);color:rgba(150,120,255,.4);font-size:8px;letter-spacing:.5px;cursor:pointer;text-align:center;transition:all .2s;font-family:'Courier New',monospace;white-space:nowrap}
 .tab.active{border-color:rgba(120,80,255,.45);background:rgba(120,80,255,.1);color:#c8aaff}
 .panels{flex:1;overflow:hidden;width:100%;position:relative}
-.panel{display:none;width:100%;height:100%;overflow-y:auto;padding:0 10px 80px;position:absolute;top:0;left:0}
+.panel{display:none;width:100%;height:100%;overflow-y:auto;padding:0 8px 80px;position:absolute;top:0;left:0}
 .panel::-webkit-scrollbar{width:2px}
 .panel::-webkit-scrollbar-thumb{background:rgba(120,80,255,.25)}
 .panel.active{display:block}
@@ -65,7 +64,6 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
 .cmsg.ai{background:rgba(120,80,255,.07);border:1px solid rgba(120,80,255,.13);color:#d8c8ff;align-self:flex-start;max-width:94%}
 .cmsg .lbl{font-size:9px;color:rgba(120,80,255,.45);letter-spacing:2px;margin-bottom:3px;display:flex;align-items:center;gap:6px}
 .speak-btn{background:none;border:none;cursor:pointer;font-size:11px;opacity:.45;padding:0}
-.speak-btn:hover{opacity:1}
 .typing span{display:inline-block;width:4px;height:4px;border-radius:50%;background:#a080ff;margin:0 2px;animation:td 1.2s infinite}
 .typing span:nth-child(2){animation-delay:.2s}
 .typing span:nth-child(3){animation-delay:.4s}
@@ -75,24 +73,27 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
 .cinp:focus{border-color:rgba(120,80,255,.45)}
 .cinp::placeholder{color:rgba(120,80,255,.22)}
 .sbtn{width:36px;height:36px;border-radius:50%;background:rgba(120,80,255,.18);border:1px solid rgba(120,80,255,.35);color:#c8aaff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
-.sbtn:hover{background:rgba(120,80,255,.3)}
-.micbtn{width:36px;height:36px;border-radius:50%;background:rgba(0,212,255,.07);border:1px solid rgba(0,212,255,.2);color:#00d4ff;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+.micbtn{width:36px;height:36px;border-radius:50%;background:rgba(0,212,255,.07);border:1px solid rgba(0,212,255,.2);color:#00d4ff;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .micbtn.active{background:rgba(0,212,255,.25);animation:scan .6s infinite}
+
+/* BRIEF */
+.brief-card{padding:14px;border-radius:12px;background:rgba(120,80,255,.06);border:1px solid rgba(120,80,255,.15);margin-bottom:10px;line-height:1.7;font-size:12px;color:#d8c8ff;white-space:pre-wrap}
+.brief-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.brief-date{font-size:9px;color:rgba(120,80,255,.4);letter-spacing:1px}
 
 /* MEDIA */
 .section-title{font-size:9px;color:rgba(120,80,255,.4);letter-spacing:2px;margin:10px 0 6px}
-.media-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:10px}
-.media-card{padding:12px 6px;border-radius:10px;border:1px solid rgba(120,80,255,.15);background:rgba(8,0,20,.7);cursor:pointer;transition:all .2s;text-align:center}
+.media-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
+.media-card{padding:10px 6px;border-radius:10px;border:1px solid rgba(120,80,255,.15);background:rgba(8,0,20,.7);cursor:pointer;transition:all .2s;text-align:center}
 .media-card:hover{background:rgba(120,80,255,.12);transform:translateY(-1px)}
-.media-card .micon{font-size:22px;margin-bottom:4px}
-.media-card .mtitle{font-size:10px;color:#c8aaff;letter-spacing:.5px}
+.media-card .micon{font-size:20px;margin-bottom:3px}
+.media-card .mtitle{font-size:9px;color:#c8aaff}
 .search-row{display:flex;gap:7px;margin-bottom:8px}
 .sinp{flex:1;background:rgba(8,0,20,.7);border:1px solid rgba(120,80,255,.18);border-radius:8px;padding:8px 12px;color:#c8aaff;font-size:12px;font-family:'Courier New',monospace;outline:none}
 .sinp::placeholder{color:rgba(120,80,255,.22)}
-.go-btn{padding:8px 12px;border-radius:8px;border:1px solid rgba(0,212,255,.28);background:rgba(0,212,255,.07);color:#00d4ff;font-size:11px;cursor:pointer;font-family:'Courier New',monospace;white-space:nowrap}
-.go-btn:hover{background:rgba(0,212,255,.15)}
+.go-btn{padding:8px 12px;border-radius:8px;border:1px solid rgba(0,212,255,.28);background:rgba(0,212,255,.07);color:#00d4ff;font-size:11px;cursor:pointer;font-family:'Courier New',monospace}
 .app-filter{display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap}
-.af{padding:5px 10px;border-radius:6px;border:1px solid rgba(120,80,255,.15);background:transparent;color:rgba(150,120,255,.45);font-size:9px;cursor:pointer;font-family:'Courier New',monospace;letter-spacing:.5px}
+.af{padding:4px 9px;border-radius:6px;border:1px solid rgba(120,80,255,.15);background:transparent;color:rgba(150,120,255,.45);font-size:9px;cursor:pointer;font-family:'Courier New',monospace}
 .af.active{border-color:rgba(0,212,255,.5);color:#00d4ff;background:rgba(0,212,255,.07)}
 .trend-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;background:rgba(120,80,255,.05);border:1px solid rgba(120,80,255,.1);cursor:pointer;transition:all .2s;margin-bottom:6px}
 .trend-item:hover{background:rgba(120,80,255,.12)}
@@ -104,14 +105,46 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
 
 /* OUTILS */
 .fn-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-.fn-card{padding:12px 9px;border-radius:10px;background:rgba(120,80,255,.05);border:1px solid rgba(120,80,255,.12);cursor:pointer;transition:all .2s;text-align:center}
+.fn-card{padding:11px 9px;border-radius:10px;background:rgba(120,80,255,.05);border:1px solid rgba(120,80,255,.12);cursor:pointer;transition:all .2s;text-align:center}
 .fn-card:hover{background:rgba(120,80,255,.12)}
-.fn-icon{font-size:22px;margin-bottom:4px}
+.fn-icon{font-size:20px;margin-bottom:3px}
 .fn-title{font-size:10px;color:#c8aaff;letter-spacing:.5px}
 .fn-sub{font-size:9px;color:rgba(150,120,255,.35);margin-top:1px}
 
+/* MEMOIRE */
+.mem-item{display:flex;justify-content:space-between;align-items:flex-start;padding:9px 12px;border-radius:9px;background:rgba(120,80,255,.05);border:1px solid rgba(120,80,255,.1);margin-bottom:6px;gap:8px}
+.mem-cat{font-size:9px;color:rgba(0,212,255,.5);letter-spacing:1px;margin-bottom:2px}
+.mem-key{font-size:11px;color:#c8aaff;font-weight:500}
+.mem-val{font-size:11px;color:rgba(150,120,255,.6);margin-top:2px}
+.mem-del{background:none;border:none;color:rgba(255,80,80,.4);cursor:pointer;font-size:14px;flex-shrink:0;padding:2px}
+.mem-del:hover{color:rgba(255,80,80,.8)}
+
+/* AGENTS */
+.agent-card{padding:12px;border-radius:10px;background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.12);margin-bottom:8px}
+.agent-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.agent-name{font-size:12px;color:#a8e6f0;font-weight:500}
+.agent-type{font-size:9px;color:rgba(0,212,255,.4);letter-spacing:1px}
+.agent-last{font-size:9px;color:rgba(150,120,255,.35);margin-top:2px}
+.run-btn{padding:4px 12px;border-radius:6px;border:1px solid rgba(0,212,255,.3);background:rgba(0,212,255,.06);color:#00d4ff;font-size:10px;cursor:pointer;font-family:'Courier New',monospace}
+.run-btn:hover{background:rgba(0,212,255,.15)}
+.agent-result{margin-top:8px;padding:8px;border-radius:8px;background:rgba(0,0,0,.3);font-size:11px;color:#d8c8ff;line-height:1.5;display:none}
+
+/* MESSAGERIE */
+.msg-item{padding:10px 12px;border-radius:10px;background:rgba(120,80,255,.06);border:1px solid rgba(120,80,255,.15);margin-bottom:7px}
+.msg-from{font-size:9px;color:rgba(0,212,255,.5);letter-spacing:1px;margin-bottom:3px}
+.msg-body{font-size:12px;color:#d8c8ff;line-height:1.5}
+.msg-time{font-size:9px;color:rgba(120,80,255,.3);margin-top:3px}
+.send-msg-area{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:10px;background:rgba(120,80,255,.05);border:1px solid rgba(120,80,255,.12);margin-bottom:10px}
+
+/* PROFIL */
+.prof-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(120,80,255,.07)}
+.prof-lbl{font-size:11px;color:#c8aaff}
+.prof-val{font-size:11px;color:rgba(150,120,255,.5);text-align:right;max-width:55%}
+.tag-list{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.tag{padding:3px 8px;border-radius:99px;background:rgba(120,80,255,.12);border:1px solid rgba(120,80,255,.2);font-size:10px;color:#c8aaff}
+
 /* CONFIG */
-.cfg-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(120,80,255,.07)}
+.cfg-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(120,80,255,.07)}
 .cfg-lbl{font-size:12px;color:#c8aaff}
 .cfg-sub2{font-size:9px;color:rgba(150,120,255,.35);margin-top:2px}
 .tog{width:34px;height:18px;border-radius:9px;border:none;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0}
@@ -120,7 +153,10 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
 .tog::after{content:'';position:absolute;width:12px;height:12px;border-radius:50%;background:#fff;top:3px;transition:left .15s}
 .tog.on::after{left:19px}
 .tog.off::after{left:3px}
-.logout-btn{width:100%;margin-top:12px;padding:10px;border-radius:8px;border:1px solid rgba(255,60,60,.2);background:rgba(255,60,60,.05);color:rgba(255,120,120,.6);font-size:11px;cursor:pointer;font-family:'Courier New',monospace;letter-spacing:1px}
+.logout-btn{width:100%;margin-top:10px;padding:9px;border-radius:8px;border:1px solid rgba(255,60,60,.2);background:rgba(255,60,60,.05);color:rgba(255,120,120,.6);font-size:11px;cursor:pointer;font-family:'Courier New',monospace}
+.badge{display:inline-block;padding:2px 7px;border-radius:99px;font-size:9px;font-weight:500}
+.badge-new{background:#EAF3DE;color:#3B6D11}
+.notif-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff4444;vertical-align:middle;margin-left:3px}
 </style>
 </head>
 <body>
@@ -132,7 +168,6 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
   <div class="logo-ring"><div class="logo-inner">S</div></div>
   <div class="lock-title">SUTUR</div>
   <div class="lock-sub">ASSISTANT PERSONNEL SECURISE</div>
-
   <div class="glass setup-box" style="width:100%">
     <div id="first-setup" style="display:none;flex-direction:column;gap:10px">
       <div class="field-label">MOT DE PASSE SUTUR</div>
@@ -140,23 +175,16 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
       <div class="field-label">URL API (Railway)</div>
       <input class="finp" id="new-api" placeholder="https://...railway.app"/>
       <div class="field-label">OWNER TOKEN</div>
-      <input class="finp" id="new-token" type="password" placeholder="Ton token d'accès..."/>
+      <input class="finp" id="new-token" type="password" placeholder="Ton token d'acces..."/>
       <div class="field-label">CLE ELEVENLABS (optionnel)</div>
       <input class="finp" id="new-el" type="password" placeholder="sk_..."/>
       <button class="access-btn" onclick="saveSetup()">SAUVEGARDER ET ACCEDER</button>
       <div class="err" id="serr"></div>
     </div>
-
     <div id="login-form" style="display:flex;flex-direction:column;gap:10px">
       <div class="bio-row">
-        <div class="bio-btn" id="face-btn" onclick="tryBio('face')">
-          <span class="bio-icon">&#9654;</span>
-          <span>FACE ID</span>
-        </div>
-        <div class="bio-btn" id="touch-btn" onclick="tryBio('touch')">
-          <span class="bio-icon">&#9654;</span>
-          <span>TOUCH ID</span>
-        </div>
+        <div class="bio-btn" id="face-btn" onclick="tryBio('face')"><span style="font-size:22px">&#9654;</span><span>FACE ID</span></div>
+        <div class="bio-btn" id="touch-btn" onclick="tryBio('touch')"><span style="font-size:22px">&#9654;</span><span>TOUCH ID</span></div>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
         <div style="flex:1;height:1px;background:rgba(120,80,255,.15)"></div>
@@ -167,7 +195,7 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
       <input class="finp" id="pass-inp" type="password" placeholder="Mot de passe Sutur..." onkeydown="if(event.key==='Enter')tryPass()"/>
       <div class="err" id="lerr"></div>
       <button class="access-btn" onclick="tryPass()">ACCEDER A SUTUR</button>
-      <div class="setup-toggle" onclick="showFirstSetup()">Première connexion / Reconfigurer</div>
+      <div class="setup-toggle" onclick="showFirstSetup()">Premiere connexion / Reconfigurer</div>
     </div>
   </div>
 </div>
@@ -179,23 +207,36 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
     <span style="font-size:9px;color:rgba(120,80,255,.4);letter-spacing:1px" id="hmod">CLAUDE</span>
     <span style="font-size:9px;color:rgba(0,212,255,.35);letter-spacing:1px" id="htime">--:--</span>
   </div>
-
-  <div class="globe-wrap">
-    <canvas id="globe" width="130" height="130"></canvas>
-  </div>
+  <div class="globe-wrap"><canvas id="globe" width="120" height="120"></canvas></div>
 
   <div class="tabs">
     <div class="tab active" onclick="sw('chat',this)">CHAT</div>
+    <div class="tab" onclick="sw('brief',this)" id="tab-brief-btn">BRIEF</div>
     <div class="tab" onclick="sw('media',this)">MEDIA</div>
     <div class="tab" onclick="sw('fn',this)">OUTILS</div>
+    <div class="tab" onclick="sw('mem',this)">MEMOIRE</div>
+    <div class="tab" onclick="sw('agents',this)">AGENTS</div>
+    <div class="tab" onclick="sw('msgs',this)" id="tab-msgs-btn">MSGS</div>
+    <div class="tab" onclick="sw('profil',this)">PROFIL</div>
     <div class="tab" onclick="sw('cfg',this)">CONFIG</div>
   </div>
 
   <div class="panels">
+    <!-- CHAT -->
     <div class="panel active" id="tab-chat">
       <div class="chat-box" id="chatbox"></div>
     </div>
 
+    <!-- BRIEF -->
+    <div class="panel" id="tab-brief">
+      <div style="display:flex;gap:8px;margin:8px 0">
+        <button class="go-btn" style="flex:1" onclick="loadBrief()">&#9728; Generer mon brief du jour</button>
+        <button class="go-btn" onclick="speakText(currentBrief)">&#128266; Lire</button>
+      </div>
+      <div id="brief-content" style="color:rgba(120,80,255,.35);font-size:12px;text-align:center;padding:20px">Appuie sur "Generer" pour ton brief personnalise</div>
+    </div>
+
+    <!-- MEDIA -->
     <div class="panel" id="tab-media">
       <div class="section-title">APPLICATIONS</div>
       <div class="media-grid">
@@ -204,12 +245,11 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
         <div class="media-card" onclick="openApp('instagram')"><div class="micon">&#128247;</div><div class="mtitle">Instagram</div></div>
         <div class="media-card" onclick="openApp('tiktok')"><div class="micon">&#127926;</div><div class="mtitle">TikTok</div></div>
         <div class="media-card" onclick="openApp('x')"><div class="micon">&#10006;</div><div class="mtitle">X</div></div>
-        <div class="media-card" onclick="openApp('news')"><div class="micon">&#127758;</div><div class="mtitle">Tendances</div></div>
+        <div class="media-card" onclick="openApp('news')"><div class="micon">&#127757;</div><div class="mtitle">Actu</div></div>
       </div>
-
-      <div class="section-title">RECHERCHE INTELLIGENTE</div>
+      <div class="section-title">RECHERCHE</div>
       <div class="search-row">
-        <input class="sinp" id="search-inp" placeholder="Sujet à rechercher..."/>
+        <input class="sinp" id="search-inp" placeholder="Sujet a rechercher..."/>
         <button class="go-btn" onclick="smartSearch()">LANCER</button>
       </div>
       <div class="app-filter">
@@ -219,46 +259,119 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
         <button class="af" onclick="setAF(this,'x')">X</button>
         <button class="af" onclick="setAF(this,'instagram')">Instagram</button>
       </div>
-
-      <div class="section-title">TENDANCES DU MOMENT</div>
+      <div class="section-title">TENDANCES</div>
       <div id="trend-list">
-        <div class="trend-item" onclick="openTrend('Intelligence artificielle 2026')"><div class="trend-num">#1</div><div class="trend-info"><div class="trend-title">Intelligence artificielle 2026</div><div class="trend-sub">Tech · Mondial</div></div><div class="trend-play">&#9654;</div></div>
-        <div class="trend-item" onclick="openTrend('Actualités Afrique 2026')"><div class="trend-num">#2</div><div class="trend-info"><div class="trend-title">Actualités Afrique</div><div class="trend-sub">Actualité · Régional</div></div><div class="trend-play">&#9654;</div></div>
-        <div class="trend-item" onclick="openTrend('Smartphones 2026 nouveautés')"><div class="trend-num">#3</div><div class="trend-info"><div class="trend-title">Nouveaux smartphones 2026</div><div class="trend-sub">Tech · Populaire</div></div><div class="trend-play">&#9654;</div></div>
-        <div class="trend-item" onclick="openTrend('Afrobeat hits 2026')"><div class="trend-num">#4</div><div class="trend-info"><div class="trend-title">Afrobeat tendance</div><div class="trend-sub">Musique · En vogue</div></div><div class="trend-play">&#9654;</div></div>
-        <div class="trend-item" onclick="openTrend('Crypto Bitcoin 2026')"><div class="trend-num">#5</div><div class="trend-info"><div class="trend-title">Crypto & Bitcoin</div><div class="trend-sub">Finance · Actualité</div></div><div class="trend-play">&#9654;</div></div>
+        <div class="trend-item" onclick="openTrend('Intelligence artificielle Afrique 2026')"><div class="trend-num">#1</div><div class="trend-info"><div class="trend-title">IA en Afrique 2026</div><div class="trend-sub">Tech · Tendance</div></div><div class="trend-play">&#9654;</div></div>
+        <div class="trend-item" onclick="openTrend('Actualites Benin 2026')"><div class="trend-num">#2</div><div class="trend-info"><div class="trend-title">Actualites Benin</div><div class="trend-sub">Actualite · Local</div></div><div class="trend-play">&#9654;</div></div>
+        <div class="trend-item" onclick="openTrend('Afrobeat nouveautes 2026')"><div class="trend-num">#3</div><div class="trend-info"><div class="trend-title">Afrobeat 2026</div><div class="trend-sub">Musique · En vogue</div></div><div class="trend-play">&#9654;</div></div>
+        <div class="trend-item" onclick="openTrend('Crypto Bitcoin juin 2026')"><div class="trend-num">#4</div><div class="trend-info"><div class="trend-title">Crypto & Bitcoin</div><div class="trend-sub">Finance · Marche</div></div><div class="trend-play">&#9654;</div></div>
+        <div class="trend-item" onclick="openTrend('Startups Tech West Africa 2026')"><div class="trend-num">#5</div><div class="trend-info"><div class="trend-title">Startups Afrique de l'Ouest</div><div class="trend-sub">Entrepreneuriat · Financement</div></div><div class="trend-play">&#9654;</div></div>
       </div>
     </div>
 
+    <!-- OUTILS -->
     <div class="panel" id="tab-fn">
       <div class="section-title" style="margin-top:4px">ACTIONS RAPIDES</div>
       <div class="fn-grid">
         <div class="fn-card" onclick="qa('Quel est mon agenda pour aujourd\'hui ?')"><div class="fn-icon">&#128197;</div><div class="fn-title">AGENDA</div><div class="fn-sub">RDV du jour</div></div>
-        <div class="fn-card" onclick="qa('Résume mes emails urgents')"><div class="fn-icon">&#9993;</div><div class="fn-title">EMAILS</div><div class="fn-sub">Résumé intelligent</div></div>
-        <div class="fn-card" onclick="qa('Quelles sont mes tâches prioritaires ?')"><div class="fn-icon">&#9998;</div><div class="fn-title">TACHES</div><div class="fn-sub">Priorités du jour</div></div>
-        <div class="fn-card" onclick="qa('Donne-moi un brief complet de ma journée')"><div class="fn-icon">&#9728;</div><div class="fn-title">BRIEF</div><div class="fn-sub">Résumé quotidien</div></div>
-        <div class="fn-card" onclick="qa('Rédige un message WhatsApp professionnel pour reporter un rendez-vous')"><div class="fn-icon">&#128172;</div><div class="fn-title">MESSAGE</div><div class="fn-sub">Rédaction auto</div></div>
-        <div class="fn-card" onclick="qa('Analyse mon bien-être et donne-moi des conseils pour équilibrer ma journée')"><div class="fn-icon">&#10024;</div><div class="fn-title">BIEN-ETRE</div><div class="fn-sub">Équilibre pro/perso</div></div>
-        <div class="fn-card" onclick="qa('Quelles sont les dernières actualités importantes dans le monde ?')"><div class="fn-icon">&#127757;</div><div class="fn-title">ACTU</div><div class="fn-sub">Infos du monde</div></div>
-        <div class="fn-card" onclick="qa('Génère-moi une idée créative pour aujourd\'hui')"><div class="fn-icon">&#128161;</div><div class="fn-title">IDEE</div><div class="fn-sub">Créativité IA</div></div>
+        <div class="fn-card" onclick="qa('Resume mes emails urgents')"><div class="fn-icon">&#9993;</div><div class="fn-title">EMAILS</div><div class="fn-sub">Resume intelligent</div></div>
+        <div class="fn-card" onclick="qa('Quelles sont mes taches prioritaires ?')"><div class="fn-icon">&#9998;</div><div class="fn-title">TACHES</div><div class="fn-sub">Priorites</div></div>
+        <div class="fn-card" onclick="sw('brief',document.querySelectorAll('.tab')[1]);loadBrief()"><div class="fn-icon">&#9728;</div><div class="fn-title">BRIEF</div><div class="fn-sub">Resume quotidien</div></div>
+        <div class="fn-card" onclick="qa('Redige un message WhatsApp pour reporter un rendez-vous')"><div class="fn-icon">&#128172;</div><div class="fn-title">MESSAGE</div><div class="fn-sub">Redaction auto</div></div>
+        <div class="fn-card" onclick="qa('Analyse mon bien-etre et donne-moi des conseils pour ma journee')"><div class="fn-icon">&#10024;</div><div class="fn-title">BIEN-ETRE</div><div class="fn-sub">Equilibre pro/perso</div></div>
+        <div class="fn-card" onclick="qa('Quelles sont les dernieres actualites importantes dans mon domaine ?')"><div class="fn-icon">&#127757;</div><div class="fn-title">ACTU</div><div class="fn-sub">Mon secteur</div></div>
+        <div class="fn-card" onclick="qa('Donne-moi une idee creative et innovante pour aujourd\'hui')"><div class="fn-icon">&#128161;</div><div class="fn-title">IDEE</div><div class="fn-sub">Creativite IA</div></div>
       </div>
     </div>
 
+    <!-- MEMOIRE -->
+    <div class="panel" id="tab-mem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0">
+        <div class="section-title" style="margin:0">CE QUE SUTUR SAIT DE TOI</div>
+        <button class="go-btn" onclick="loadMemories()">&#8635; Actualiser</button>
+      </div>
+      <div id="mem-list" style="color:rgba(120,80,255,.35);font-size:12px;text-align:center;padding:20px">Chargement...</div>
+    </div>
+
+    <!-- AGENTS -->
+    <div class="panel" id="tab-agents">
+      <div style="margin:8px 0">
+        <div class="section-title">MES AGENTS DE VEILLE</div>
+        <div class="glass" style="padding:12px;margin-bottom:10px">
+          <div class="field-label">NOM DE L'AGENT</div>
+          <input class="finp" id="ag-name" placeholder="Ex: Agent Bourse" style="margin-bottom:8px"/>
+          <div class="field-label">TYPE</div>
+          <select class="finp" id="ag-type" style="margin-bottom:8px">
+            <option value="marche">Marche financier / Bourse</option>
+            <option value="emploi">Offres d'emploi</option>
+            <option value="tech">Actualites tech</option>
+            <option value="musique">Nouveautes musicales</option>
+            <option value="crypto">Crypto / Bitcoin</option>
+            <option value="startup">Startups / Entrepreneuriat</option>
+            <option value="custom">Personnalise</option>
+          </select>
+          <div class="field-label">SUJET SPECIFIQUE</div>
+          <input class="finp" id="ag-topic" placeholder="Ex: CAC40, offres Cotonou, afrobeat..." style="margin-bottom:8px"/>
+          <button class="access-btn" onclick="createAgent()">CREER L'AGENT</button>
+        </div>
+        <div id="agents-list" style="color:rgba(120,80,255,.35);font-size:12px;text-align:center;padding:10px">Chargement...</div>
+      </div>
+    </div>
+
+    <!-- MESSAGES -->
+    <div class="panel" id="tab-msgs">
+      <div class="section-title" style="margin-top:8px">MESSAGES RECUS</div>
+      <div id="msgs-list" style="color:rgba(120,80,255,.35);font-size:12px;text-align:center;padding:10px">Chargement...</div>
+      <div class="section-title" id="send-section" style="display:none">ENVOYER UN MESSAGE (ADMIN)</div>
+      <div class="send-msg-area" id="send-area" style="display:none">
+        <div class="field-label">TOKEN DESTINATAIRE</div>
+        <input class="finp" id="msg-to" placeholder="Token de l'utilisateur..."/>
+        <div class="field-label">MESSAGE</div>
+        <textarea class="finp" id="msg-body" placeholder="Ton message..." style="resize:none;height:70px"></textarea>
+        <button class="access-btn" onclick="sendAdminMsg()">ENVOYER</button>
+      </div>
+    </div>
+
+    <!-- PROFIL -->
+    <div class="panel" id="tab-profil">
+      <div class="section-title" style="margin-top:8px">MON PROFIL</div>
+      <div class="glass" style="padding:12px;margin-bottom:10px" id="profile-display">
+        <div style="color:rgba(120,80,255,.35);font-size:12px;text-align:center;padding:10px">Chargement...</div>
+      </div>
+      <div class="section-title">MODIFIER MON PROFIL</div>
+      <div class="glass" style="padding:12px">
+        <div class="field-label">PROFESSION</div>
+        <input class="finp" id="prof-job" placeholder="Entrepreneur, Etudiant, Ingenieur..." style="margin-bottom:8px"/>
+        <div class="field-label">INTERETS (separes par virgule)</div>
+        <input class="finp" id="prof-interests" placeholder="IA, musique, finance, sport..." style="margin-bottom:8px"/>
+        <div class="field-label">VILLE</div>
+        <input class="finp" id="prof-city" placeholder="Cotonou, Paris, Abidjan..." style="margin-bottom:8px"/>
+        <div class="field-label">HEURE BRIEF QUOTIDIEN</div>
+        <select class="finp" id="prof-hour" style="margin-bottom:8px">
+          <option value="6">6h00</option>
+          <option value="7">7h00</option>
+          <option value="8" selected>8h00</option>
+          <option value="9">9h00</option>
+          <option value="10">10h00</option>
+        </select>
+        <button class="access-btn" onclick="saveProfile()">SAUVEGARDER LE PROFIL</button>
+      </div>
+    </div>
+
+    <!-- CONFIG -->
     <div class="panel" id="tab-cfg">
       <div class="section-title" style="margin-top:4px">MODELE IA</div>
       <div class="cfg-row">
-        <div><div class="cfg-lbl">Cerveau actif</div><div class="cfg-sub2">Claude Sonnet ou GPT-4o</div></div>
+        <div><div class="cfg-lbl">Cerveau actif</div><div class="cfg-sub2">Claude ou GPT-4o</div></div>
         <select style="background:rgba(8,0,20,.9);border:1px solid rgba(120,80,255,.18);color:#c8aaff;border-radius:6px;padding:4px 8px;font-size:10px;font-family:'Courier New',monospace" id="model-sel">
           <option value="claude">Claude</option>
           <option value="gpt">GPT-4o</option>
         </select>
       </div>
-      <div class="section-title">FONCTIONNALITES</div>
-      <div class="cfg-row"><div><div class="cfg-lbl">Voix ElevenLabs</div><div class="cfg-sub2">Réponses vocales premium</div></div><button class="tog on" id="t-voice" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
-      <div class="cfg-row"><div><div class="cfg-lbl">Biométrie</div><div class="cfg-sub2">Face ID / Touch ID</div></div><button class="tog on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
-      <div class="cfg-row"><div><div class="cfg-lbl">Résumé vocal auto</div><div class="cfg-sub2">Lit les réponses IA</div></div><button class="tog on" id="t-autospeak" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
-      <div class="cfg-row"><div><div class="cfg-lbl">Notifications</div><div class="cfg-sub2">Brief, alertes, rappels</div></div><button class="tog on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
-      <div class="section-title">MODIFIER LES ACCES</div>
+      <div class="cfg-row"><div><div class="cfg-lbl">Voix ElevenLabs</div><div class="cfg-sub2">Reponses vocales premium</div></div><button class="tog on" id="t-voice" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
+      <div class="cfg-row"><div><div class="cfg-lbl">Lecture auto des reponses</div><div class="cfg-sub2">Sutur lit chaque reponse</div></div><button class="tog on" id="t-autospeak" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
+      <div class="cfg-row"><div><div class="cfg-lbl">Geolocalisation</div><div class="cfg-sub2">Reponses adaptees a ta position</div></div><button class="tog on" id="t-geo" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
+      <div class="section-title">SECURITE</div>
       <div style="display:flex;flex-direction:column;gap:8px">
         <div class="field-label">NOUVEAU MOT DE PASSE</div>
         <input class="finp" id="new-pass-cfg" type="password" placeholder="Nouveau mot de passe..."/>
@@ -273,13 +386,14 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
   </div>
 
   <div class="inp-bar" id="inp-bar">
-    <button class="micbtn" id="micbtn" onclick="toggleMic()" aria-label="Micro">&#127908;</button>
-    <input class="cinp" id="cinp" placeholder="Parle à Sutur..." onkeydown="if(event.key==='Enter')sendMsg()"/>
-    <button class="sbtn" onclick="sendMsg()" aria-label="Envoyer">&#9658;</button>
+    <button class="micbtn" id="micbtn" onclick="toggleMic()">&#127908;</button>
+    <input class="cinp" id="cinp" placeholder="Parle a Sutur..." onkeydown="if(event.key==='Enter')sendMsg()"/>
+    <button class="sbtn" onclick="sendMsg()">&#9658;</button>
   </div>
 </div>
 
 <script>
+// Canvas BG
 const bgc=document.getElementById('bgc'),bc=bgc.getContext('2d');
 let BW,BH;
 function rsz(){BW=bgc.width=bgc.offsetWidth||window.innerWidth;BH=bgc.height=bgc.offsetHeight||window.innerHeight}
@@ -290,25 +404,28 @@ function drawBg(t){
   bpts.forEach(p=>{p.x=(p.x+p.vx+1)%1;p.y=(p.y+p.vy+1)%1;bc.beginPath();bc.arc(p.x*BW,p.y*BH,p.r,0,Math.PI*2);bc.fillStyle=`rgba(100,60,200,${.1+Math.sin(t*.001+p.a)*.06})`;bc.fill()});
   for(let i=0;i<bpts.length;i++)for(let j=i+1;j<bpts.length;j++){const dx=(bpts[i].x-bpts[j].x)*BW,dy=(bpts[i].y-bpts[j].y)*BH,d=Math.sqrt(dx*dx+dy*dy);if(d<85){bc.beginPath();bc.moveTo(bpts[i].x*BW,bpts[i].y*BH);bc.lineTo(bpts[j].x*BW,bpts[j].y*BH);bc.strokeStyle=`rgba(80,40,180,${(1-d/85)*.06})`;bc.lineWidth=.4;bc.stroke()}}
 }
+
+// Globe
 const gc=document.getElementById('globe').getContext('2d');
-const GR=56,GPTS=90;
-const gpts=Array.from({length:GPTS},(_,i)=>{const phi=Math.acos(1-2*(i+.5)/GPTS),theta=Math.PI*(1+Math.sqrt(5))*i;return{ox:Math.sin(phi)*Math.cos(theta),oy:Math.sin(phi)*Math.sin(theta),oz:Math.cos(phi),p:Math.random()*Math.PI*2}});
+const GR=52,GPTS=90;
+const gpts=Array.from({length:GPTS},(_,i)=>{const phi=Math.acos(1-2*(i+.5)/GPTS),theta=Math.PI*(1+Math.sqrt(5))*i;return{ox:Math.sin(phi)*Math.cos(theta),oy:Math.sin(phi)*Math.sin(theta),oz:Math.cos(phi)}});
 let gActive=false,gThink=false;
 function drawGlobe(t){
-  gc.clearRect(0,0,130,130);
+  gc.clearRect(0,0,120,120);
   const rot=t*.0005,br=gThink?1.6:gActive?1.2:1;
-  gc.beginPath();gc.arc(65,65,GR+3,0,Math.PI*2);gc.strokeStyle=`rgba(120,80,255,${.06*br})`;gc.lineWidth=8;gc.stroke();
-  gc.beginPath();gc.arc(65,65,GR,0,Math.PI*2);gc.strokeStyle=`rgba(150,100,255,${.18*br})`;gc.lineWidth=1;gc.stroke();
+  gc.beginPath();gc.arc(60,60,GR+3,0,Math.PI*2);gc.strokeStyle=`rgba(120,80,255,${.06*br})`;gc.lineWidth=8;gc.stroke();
+  gc.beginPath();gc.arc(60,60,GR,0,Math.PI*2);gc.strokeStyle=`rgba(150,100,255,${.18*br})`;gc.lineWidth=1;gc.stroke();
   const vis=[];
-  gpts.forEach(p=>{const x=p.ox*Math.cos(rot)-p.oy*Math.sin(rot),y=p.ox*Math.sin(rot)+p.oy*Math.cos(rot),sx=65+x*GR,sy=65-p.oz*GR,v=(y+1)/2;vis.push({sx,sy,v,y})});
+  gpts.forEach(p=>{const x=p.ox*Math.cos(rot)-p.oy*Math.sin(rot),y=p.ox*Math.sin(rot)+p.oy*Math.cos(rot),sx=60+x*GR,sy=60-p.oz*GR,v=(y+1)/2;vis.push({sx,sy,v,y})});
   vis.forEach(p=>{if(p.y<0)return;gc.beginPath();gc.arc(p.sx,p.sy,1+p.v*(gThink?2:1.2),0,Math.PI*2);gc.fillStyle=`rgba(140,90,255,${p.v*.85*br})`;gc.fill()});
   for(let i=0;i<vis.length;i++){if(vis[i].y<0)continue;for(let j=i+1;j<vis.length;j++){if(vis[j].y<0)continue;const dx=vis[i].sx-vis[j].sx,dy=vis[i].sy-vis[j].sy,d=Math.sqrt(dx*dx+dy*dy);if(d<18){gc.beginPath();gc.moveTo(vis[i].sx,vis[i].sy);gc.lineTo(vis[j].sx,vis[j].sy);gc.strokeStyle=`rgba(120,80,255,${(1-d/18)*vis[i].v*vis[j].v*.28*br})`;gc.lineWidth=.4;gc.stroke()}}}
-  if(gThink){gc.beginPath();gc.arc(65,65,GR+6+Math.sin(t*.008)*3,0,Math.PI*2);gc.strokeStyle=`rgba(0,200,255,${.06+Math.sin(t*.01)*.03})`;gc.lineWidth=1.5;gc.stroke()}
+  if(gThink){gc.beginPath();gc.arc(60,60,GR+5+Math.sin(t*.008)*3,0,Math.PI*2);gc.strokeStyle=`rgba(0,200,255,${.06+Math.sin(t*.01)*.03})`;gc.lineWidth=1.5;gc.stroke()}
 }
 function loop(t){drawBg(t);drawGlobe(t);document.getElementById('htime').textContent=new Date().toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'});requestAnimationFrame(loop)}
 requestAnimationFrame(loop);
 
-let TOKEN='',API_URL='',EL_KEY='',PASS='',history=[],busy=false,micActive=false,selApp='youtube';
+// State
+let TOKEN='',API_URL='',EL_KEY='',PASS='',history=[],busy=false,micActive=false,selApp='youtube',currentBrief='',userIsOwner=false,userLocation=null;
 
 function loadCfg(){TOKEN=localStorage.getItem('s_token')||'';API_URL=localStorage.getItem('s_api')||'';EL_KEY=localStorage.getItem('s_el')||'';PASS=localStorage.getItem('s_pass')||'';if(!PASS)showFirstSetup()}
 loadCfg();
@@ -320,28 +437,52 @@ function saveSetup(){
   const p=document.getElementById('new-pass').value.trim(),a=document.getElementById('new-api').value.trim(),tk=document.getElementById('new-token').value.trim(),el=document.getElementById('new-el').value.trim();
   if(!p||!a||!tk){document.getElementById('serr').textContent='Mot de passe, URL et token requis';return}
   localStorage.setItem('s_pass',p);localStorage.setItem('s_api',a);localStorage.setItem('s_token',tk);if(el)localStorage.setItem('s_el',el);
-  PASS=p;API_URL=a;TOKEN=tk;EL_KEY=el;
-  showLoginForm();unlock();
+  PASS=p;API_URL=a;TOKEN=tk;EL_KEY=el;showLoginForm();unlock();
 }
 
-function tryPass(){const v=document.getElementById('pass-inp').value;if(!PASS){showErr('Configure d\'abord via "Première connexion"');return}if(v===PASS)unlock();else showErr('Mot de passe incorrect')}
-async function tryBio(type){const btn=document.getElementById(type+'-btn');btn.classList.add('scanning');if(!PASS){btn.classList.remove('scanning');showErr('Configure d\'abord ton accès');return}await new Promise(r=>setTimeout(r,900));btn.classList.remove('scanning');unlock()}
+function tryPass(){const v=document.getElementById('pass-inp').value;if(!PASS){showErr('Configure via "Premiere connexion"');return}if(v===PASS)unlock();else showErr('Mot de passe incorrect')}
+async function tryBio(type){const btn=document.getElementById(type+'-btn');btn.classList.add('scanning');if(!PASS){btn.classList.remove('scanning');showErr('Configure ton acces');return}await new Promise(r=>setTimeout(r,900));btn.classList.remove('scanning');unlock()}
 function showErr(m){const e=document.getElementById('lerr');e.textContent=m;setTimeout(()=>e.textContent='',3000)}
 
-function unlock(){document.getElementById('lock').style.display='none';const ms=document.getElementById('main');ms.style.display='flex';gActive=true;addMsg('ai','Bonjour Manoel. Sutur est opérationnel. Que puis-je faire pour vous ?',true)}
-function logout(){document.getElementById('main').style.display='none';document.getElementById('lock').style.display='flex';gActive=false;history=[];document.getElementById('chatbox').innerHTML='';document.getElementById('pass-inp').value=''}
-function saveConfig(){const p=document.getElementById('new-pass-cfg').value.trim(),el=document.getElementById('el-cfg').value.trim(),a=document.getElementById('api-cfg').value.trim();if(p){localStorage.setItem('s_pass',p);PASS=p}if(el){localStorage.setItem('s_el',el);EL_KEY=el}if(a){localStorage.setItem('s_api',a);API_URL=a}addMsg('ai','Configuration mise à jour.')}
+function getLocation(){
+  if(navigator.geolocation&&document.getElementById('t-geo').classList.contains('on')){
+    navigator.geolocation.getCurrentPosition(pos=>{userLocation={lat:pos.coords.latitude,lng:pos.coords.longitude}},()=>{})
+  }
+}
 
-function sw(name,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));el.classList.add('active');document.getElementById('tab-'+name).classList.add('active');document.getElementById('inp-bar').style.display=name==='chat'?'flex':'none'}
+function unlock(){
+  document.getElementById('lock').style.display='none';
+  const ms=document.getElementById('main');ms.style.display='flex';
+  gActive=true;
+  getLocation();
+  loadProfile();
+  loadMessages();
+  addMsg('ai','Bonjour Manoel. Sutur est operationnel. Que puis-je faire pour vous ?',true);
+}
+
+function logout(){document.getElementById('main').style.display='none';document.getElementById('lock').style.display='flex';gActive=false;history=[];document.getElementById('chatbox').innerHTML='';document.getElementById('pass-inp').value=''}
+
+function sw(name,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  if(el)el.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('inp-bar').style.display=name==='chat'?'flex':'none';
+  if(name==='mem')loadMemories();
+  if(name==='agents')loadAgents();
+  if(name==='msgs')loadMessages();
+  if(name==='profil')loadProfile();
+}
 
 function addMsg(role,text,speak=false){
   const cb=document.getElementById('chatbox');
   const d=document.createElement('div');d.className='cmsg '+role;
-  if(role==='ai'){d.innerHTML=`<div class="lbl">SUTUR <button class="speak-btn" onclick="speakText(this.closest('.cmsg').querySelector('.mt').textContent)" title="Lire">&#128266;</button></div><span class="mt">${text}</span>`}
+  if(role==='ai'){d.innerHTML=`<div class="lbl">SUTUR <button class="speak-btn" onclick="speakText(this.closest('.cmsg').querySelector('.mt').textContent)">&#128266;</button></div><span class="mt">${text}</span>`}
   else d.textContent=text;
   cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
   if(speak&&role==='ai'&&document.getElementById('t-autospeak').classList.contains('on'))setTimeout(()=>speakText(text),200);
 }
+
 function addTyping(){const cb=document.getElementById('chatbox');const d=document.createElement('div');d.className='cmsg ai';d.id='tymsg';d.innerHTML=`<div class="lbl">SUTUR</div><div class="typing"><span></span><span></span><span></span></div>`;cb.appendChild(d);cb.scrollTop=cb.scrollHeight}
 function rmTyping(){const t=document.getElementById('tymsg');if(t)t.remove()}
 function setStatus(s,state){document.getElementById('hst').textContent=s;document.getElementById('hdot').style.background=state==='think'?'#ffaa00':state==='talk'?'#00ff88':'#00d4ff';gThink=state==='think'}
@@ -350,32 +491,46 @@ async function speakText(text){
   if(!text)return;
   const voiceOn=document.getElementById('t-voice').classList.contains('on');
   if(voiceOn&&EL_KEY){
-    try{const r=await fetch('https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM',{method:'POST',headers:{'xi-api-key':EL_KEY,'Content-Type':'application/json'},body:JSON.stringify({text:text.substring(0,400),model_id:'eleven_multilingual_v2',voice_settings:{stability:.5,similarity_boost:.75}})});if(r.ok){const blob=await r.blob();const url=URL.createObjectURL(blob);const a=new Audio(url);a.play();return}}catch(e){}
+    try{const r=await fetch('https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM',{method:'POST',headers:{'xi-api-key':EL_KEY,'Content-Type':'application/json'},body:JSON.stringify({text:text.substring(0,400),model_id:'eleven_multilingual_v2',voice_settings:{stability:.5,similarity_boost:.75}})});if(r.ok){const blob=await r.blob();new Audio(URL.createObjectURL(blob)).play();return}}catch(e){}
   }
-  if('speechSynthesis' in window){window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text.substring(0,300));u.lang='fr-FR';u.rate=1;const vs=window.speechSynthesis.getVoices();const fr=vs.find(v=>v.lang.startsWith('fr'));if(fr)u.voice=fr;window.speechSynthesis.speak(u)}
+  if('speechSynthesis'in window){window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text.substring(0,300));u.lang='fr-FR';const vs=window.speechSynthesis.getVoices();const fr=vs.find(v=>v.lang.startsWith('fr'));if(fr)u.voice=fr;window.speechSynthesis.speak(u)}
 }
 
-function detectMediaCmd(msg){const m=msg.toLowerCase();if(m.includes('youtube')||m.includes('vidéo')||m.includes('video'))return'youtube';if(m.includes('spotify')||m.includes('musique')||m.includes('mets'))return'spotify';if(m.includes('instagram'))return'instagram';if(m.includes('tiktok'))return'tiktok';if(m.includes(' x ')||m.includes('twitter'))return'x';return null}
+async function apiCall(path,method='GET',body=null){
+  const opts={method,headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN}};
+  if(body)opts.body=JSON.stringify(body);
+  const r=await fetch(API_URL+path,opts);
+  return r.json();
+}
+
+function detectMediaCmd(msg){
+  const m=msg.toLowerCase();
+  if(m.includes('youtube')||m.includes('video')||m.includes('vid'))return'youtube';
+  if(m.includes('spotify')||m.includes('musique')||m.includes('mets'))return'spotify';
+  if(m.includes('instagram'))return'instagram';
+  if(m.includes('tiktok'))return'tiktok';
+  if(m.includes(' x ')||m.includes('twitter'))return'x';
+  return null;
+}
 
 function handleMediaCmd(app,msg){
-  const q=msg.replace(/youtube|spotify|instagram|tiktok|twitter|\bx\b|vidéo|video|musique|mets|lance|ouvre|cherche|sur|une/gi,'').trim()||'tendances';
-  const urls={youtube:'https://www.youtube.com/results?search_query='+encodeURIComponent(q),spotify:'https://open.spotify.com/search/'+encodeURIComponent(q),instagram:'https://www.instagram.com/explore/tags/'+encodeURIComponent(q.replace(/ /g,'')),tiktok:'https://www.tiktok.com/search?q='+encodeURIComponent(q),x:'https://x.com/search?q='+encodeURIComponent(q)};
-  addMsg('ai',`J'ouvre ${app} sur "${q}"...`);speakText(`J'ouvre ${app} sur ${q}.`);setTimeout(()=>window.open(urls[app],'_blank'),600);
+  const q=msg.replace(/youtube|spotify|instagram|tiktok|twitter|\bx\b|video|musique|mets|lance|ouvre|cherche|sur|une/gi,'').trim()||'tendances';
+  const urls={youtube:'https://www.youtube.com/results?search_query=',spotify:'https://open.spotify.com/search/',instagram:'https://www.instagram.com/explore/tags/',tiktok:'https://www.tiktok.com/search?q=',x:'https://x.com/search?q='};
+  addMsg('ai',`J'ouvre ${app} sur "${q}"...`);speakText(`J'ouvre ${app} sur ${q}.`);setTimeout(()=>window.open(urls[app]+encodeURIComponent(q),'_blank'),600);
 }
 
 async function sendMsg(){
   const inp=document.getElementById('cinp'),model=document.getElementById('model-sel').value,msg=inp.value.trim();
   if(!msg||busy)return;
-  if(!TOKEN){addMsg('ai','Configure ton accès dans CONFIG.');return}
+  if(!TOKEN){addMsg('ai','Configure ton acces dans CONFIG.');return}
   inp.value='';busy=true;gActive=true;
   addMsg('user',msg);addTyping();setStatus('TRAITEMENT...','think');
   history.push({role:'user',content:msg});
   const mc=detectMediaCmd(msg);
   if(mc){rmTyping();handleMediaCmd(mc,msg);busy=false;setStatus('EN LIGNE','idle');return}
   try{
-    const r=await fetch(API_URL+'/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},body:JSON.stringify({message:msg,model,history:history.slice(-8)})});
-    const data=await r.json();rmTyping();
-    const reply=data.reply||data.detail||'Erreur';
+    const data=await apiCall('/chat','POST',{message:msg,model,history:history.slice(-8),location:userLocation});
+    rmTyping();const reply=data.reply||data.detail||'Erreur';
     history.push({role:'assistant',content:reply});
     addMsg('ai',reply,true);
     document.getElementById('hmod').textContent=(data.model_used||'CLAUDE').toUpperCase();
@@ -383,26 +538,147 @@ async function sendMsg(){
   setStatus('EN LIGNE','idle');busy=false;
 }
 
+async function loadBrief(){
+  document.getElementById('brief-content').innerHTML='<div style="color:rgba(120,80,255,.4);text-align:center;padding:20px">Generation de votre brief...<br><div class="typing" style="justify-content:center;margin-top:10px"><span></span><span></span><span></span></div></div>';
+  try{
+    const data=await apiCall('/brief');
+    currentBrief=data.brief||'';
+    const html=currentBrief.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>').replace(/#{1,3} /g,'');
+    document.getElementById('brief-content').innerHTML=`<div class="brief-card"><div class="brief-header"><span style="font-size:10px;color:rgba(0,212,255,.5);letter-spacing:1px">BRIEF DU JOUR</span><button class="go-btn" onclick="speakText(currentBrief)" style="font-size:9px;padding:4px 8px">&#128266; LIRE</button></div>${html}</div>`;
+  }catch(e){document.getElementById('brief-content').innerHTML='<div style="color:#ff6060;text-align:center;padding:20px">Erreur lors de la generation</div>'}
+}
+
+async function loadMemories(){
+  document.getElementById('mem-list').innerHTML='<div style="color:rgba(120,80,255,.35);text-align:center;padding:10px">Chargement...</div>';
+  try{
+    const data=await apiCall('/memories');
+    if(!data.memories||data.memories.length===0){document.getElementById('mem-list').innerHTML='<div style="color:rgba(120,80,255,.35);text-align:center;padding:20px">Aucune memorisation encore.<br>Sutur apprend au fil de vos conversations.</div>';return}
+    document.getElementById('mem-list').innerHTML=data.memories.map(m=>`
+      <div class="mem-item">
+        <div style="flex:1">
+          <div class="mem-cat">${m.category}</div>
+          <div class="mem-key">${m.key}</div>
+          <div class="mem-val">${m.value}</div>
+        </div>
+        <button class="mem-del" onclick="deleteMemory('${m.key}')">&#10005;</button>
+      </div>`).join('');
+  }catch(e){document.getElementById('mem-list').innerHTML='<div style="color:#ff6060;text-align:center;padding:10px">Erreur de chargement</div>'}
+}
+
+async function deleteMemory(key){
+  try{await apiCall('/memories/'+encodeURIComponent(key),'DELETE');loadMemories()}catch(e){}
+}
+
+async function loadAgents(){
+  document.getElementById('agents-list').innerHTML='<div style="color:rgba(120,80,255,.35);text-align:center;padding:10px">Chargement...</div>';
+  try{
+    const data=await apiCall('/agents');
+    if(!data.agents||data.agents.length===0){document.getElementById('agents-list').innerHTML='<div style="color:rgba(120,80,255,.35);text-align:center;padding:10px">Aucun agent. Cree ton premier agent ci-dessus.</div>';return}
+    document.getElementById('agents-list').innerHTML=data.agents.map(a=>`
+      <div class="agent-card">
+        <div class="agent-header">
+          <div><div class="agent-name">${a.name}</div><div class="agent-type">${a.type.toUpperCase()}</div></div>
+          <button class="run-btn" onclick="runAgent('${a.id}','${a.name}')">&#9654; LANCER</button>
+        </div>
+        <div class="agent-last">${a.last_run?'Derniere execution: '+new Date(a.last_run).toLocaleString('fr'):'Jamais execute'}</div>
+        <div class="agent-result" id="ar-${a.id}"></div>
+      </div>`).join('');
+  }catch(e){document.getElementById('agents-list').innerHTML='<div style="color:#ff6060;text-align:center;padding:10px">Erreur</div>'}
+}
+
+async function createAgent(){
+  const name=document.getElementById('ag-name').value.trim(),type=document.getElementById('ag-type').value,topic=document.getElementById('ag-topic').value.trim();
+  if(!name){return}
+  try{
+    await apiCall('/agents','POST',{name,type,config:{topic:topic||type,sujet:topic}});
+    document.getElementById('ag-name').value='';document.getElementById('ag-topic').value='';
+    loadAgents();
+  }catch(e){alert('Erreur creation agent')}
+}
+
+async function runAgent(id,name){
+  const el=document.getElementById('ar-'+id);
+  el.style.display='block';el.innerHTML='<div class="typing"><span></span><span></span><span></span></div>';
+  try{
+    const data=await apiCall('/agents/'+id+'/run','POST');
+    el.innerHTML=data.result||'Erreur';
+    speakText(`Rapport de l'agent ${name}: ${(data.result||'').substring(0,200)}`);
+  }catch(e){el.innerHTML='Erreur execution'}
+}
+
+async function loadMessages(){
+  try{
+    const data=await apiCall('/messages');
+    const msgs=data.messages||[];
+    const tabBtn=document.getElementById('tab-msgs-btn');
+    if(msgs.length>0)tabBtn.innerHTML='MSGS<span class="notif-dot"></span>';
+    else tabBtn.innerHTML='MSGS';
+    if(msgs.length===0){document.getElementById('msgs-list').innerHTML='<div style="color:rgba(120,80,255,.35);text-align:center;padding:10px">Aucun message</div>';return}
+    document.getElementById('msgs-list').innerHTML=msgs.map(m=>`
+      <div class="msg-item">
+        <div class="msg-from">DE: MANOEL</div>
+        <div class="msg-body">${m.content}</div>
+        <div class="msg-time">${new Date(m.created_at).toLocaleString('fr')}</div>
+      </div>`).join('');
+    if(userIsOwner){document.getElementById('send-section').style.display='block';document.getElementById('send-area').style.display='flex'}
+  }catch(e){}
+}
+
+async function sendAdminMsg(){
+  const to=document.getElementById('msg-to').value.trim(),body=document.getElementById('msg-body').value.trim();
+  if(!to||!body)return;
+  try{
+    await apiCall('/admin/message','POST',{to_token:to,content:body});
+    document.getElementById('msg-to').value='';document.getElementById('msg-body').value='';
+    addMsg('ai','Message envoye avec succes.');
+  }catch(e){addMsg('ai','Erreur envoi message.')}
+}
+
+async function loadProfile(){
+  try{
+    const data=await apiCall('/profile');
+    if(data.is_owner)userIsOwner=true;
+    const interests=data.interests||[];
+    document.getElementById('profile-display').innerHTML=`
+      <div class="prof-row"><div class="prof-lbl">Nom</div><div class="prof-val">${data.name||'-'}</div></div>
+      <div class="prof-row"><div class="prof-lbl">Profession</div><div class="prof-val">${data.profession||'-'}</div></div>
+      <div class="prof-row"><div class="prof-lbl">Localisation</div><div class="prof-val">${data.location_city||'-'}</div></div>
+      <div class="prof-row"><div class="prof-lbl">Brief quotidien</div><div class="prof-val">${data.brief_enabled?'Actif a '+data.daily_brief_hour+'h':'Desactive'}</div></div>
+      <div class="prof-row" style="border:none"><div class="prof-lbl">Interets</div></div>
+      <div class="tag-list">${interests.map(i=>`<span class="tag">${i}</span>`).join('')||'<span style="color:rgba(120,80,255,.35);font-size:11px">Aucun</span>'}</div>`;
+    if(data.profession)document.getElementById('prof-job').value=data.profession;
+    if(interests.length)document.getElementById('prof-interests').value=interests.join(', ');
+    if(data.location_city)document.getElementById('prof-city').value=data.location_city;
+    if(data.daily_brief_hour)document.getElementById('prof-hour').value=data.daily_brief_hour;
+  }catch(e){}
+}
+
+async function saveProfile(){
+  const profession=document.getElementById('prof-job').value.trim();
+  const interestsRaw=document.getElementById('prof-interests').value.trim();
+  const interests=interestsRaw?interestsRaw.split(',').map(s=>s.trim()).filter(Boolean):null;
+  const location_city=document.getElementById('prof-city').value.trim();
+  const daily_brief_hour=parseInt(document.getElementById('prof-hour').value);
+  try{
+    await apiCall('/profile','PUT',{profession:profession||null,interests,location_city:location_city||null,daily_brief_hour});
+    addMsg('ai','Profil mis a jour. Sutur adaptera ses reponses a ton nouveau profil.');sw('chat',document.querySelectorAll('.tab')[0]);
+  }catch(e){addMsg('ai','Erreur mise a jour profil.')}
+}
+
+function saveConfig(){
+  const p=document.getElementById('new-pass-cfg').value.trim(),el=document.getElementById('el-cfg').value.trim(),a=document.getElementById('api-cfg').value.trim();
+  if(p){localStorage.setItem('s_pass',p);PASS=p}
+  if(el){localStorage.setItem('s_el',el);EL_KEY=el}
+  if(a){localStorage.setItem('s_api',a);API_URL=a}
+  addMsg('ai','Configuration mise a jour.');
+}
+
 function openApp(app){const urls={youtube:'https://youtube.com',spotify:'https://open.spotify.com',instagram:'https://instagram.com',tiktok:'https://tiktok.com',x:'https://x.com',news:'https://news.google.com'};window.open(urls[app],'_blank')}
 function setAF(el,app){document.querySelectorAll('.af').forEach(a=>a.classList.remove('active'));el.classList.add('active');selApp=app}
 function smartSearch(){const q=document.getElementById('search-inp').value.trim();if(!q)return;const urls={youtube:'https://www.youtube.com/results?search_query=',spotify:'https://open.spotify.com/search/',tiktok:'https://www.tiktok.com/search?q=',x:'https://x.com/search?q=',instagram:'https://www.instagram.com/explore/tags/'};speakText(`Je recherche ${q} sur ${selApp}.`);window.open(urls[selApp]+encodeURIComponent(q),'_blank')}
-function openTrend(topic){
-  speakText(`Je lance une vidéo sur ${topic}.`);
-  window.open('https://www.youtube.com/results?search_query='+encodeURIComponent(topic),'_blank');
-  if(TOKEN&&API_URL){busy=true;addMsg('user','Résume : '+topic);addTyping();sw('chat',document.querySelectorAll('.tab')[0]);setStatus('TRAITEMENT...','think');fetch(API_URL+'/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},body:JSON.stringify({message:'Fais un résumé concis et intéressant sur : '+topic,model:'claude',history:[]})}).then(r=>r.json()).then(data=>{rmTyping();addMsg('ai',data.reply||'',true);setStatus('EN LIGNE','idle');busy=false}).catch(()=>{rmTyping();setStatus('EN LIGNE','idle');busy=false})}
-}
+function openTrend(topic){speakText(`Je lance une recherche sur ${topic}.`);window.open('https://www.youtube.com/results?search_query='+encodeURIComponent(topic),'_blank');if(TOKEN&&API_URL){busy=true;addMsg('user','Resume: '+topic);addTyping();sw('chat',document.querySelectorAll('.tab')[0]);setStatus('TRAITEMENT...','think');apiCall('/chat','POST',{message:'Resume concis et interessant: '+topic,model:'claude',history:[]}).then(data=>{rmTyping();addMsg('ai',data.reply||'',true);setStatus('EN LIGNE','idle');busy=false}).catch(()=>{rmTyping();setStatus('EN LIGNE','idle');busy=false})}}
 function qa(msg){sw('chat',document.querySelectorAll('.tab')[0]);document.getElementById('cinp').value=msg;sendMsg()}
-function toggleMic(){
-  if(!('webkitSpeechRecognition'in window||'SpeechRecognition'in window)){addMsg('ai','Micro non supporté sur ce navigateur.');return}
-  const btn=document.getElementById('micbtn');
-  if(micActive){micActive=false;btn.classList.remove('active');return}
-  micActive=true;btn.classList.add('active');
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition,rec=new SR();
-  rec.lang='fr-FR';rec.continuous=false;rec.interimResults=false;
-  rec.onresult=e=>{document.getElementById('cinp').value=e.results[0][0].transcript;sendMsg()};
-  rec.onend=()=>{micActive=false;btn.classList.remove('active')};
-  rec.start();
-}
+function toggleMic(){if(!('webkitSpeechRecognition'in window||'SpeechRecognition'in window)){addMsg('ai','Micro non supporte.');return}const btn=document.getElementById('micbtn');if(micActive){micActive=false;btn.classList.remove('active');return}micActive=true;btn.classList.add('active');const SR=window.SpeechRecognition||window.webkitSpeechRecognition,rec=new SR();rec.lang='fr-FR';rec.continuous=false;rec.interimResults=false;rec.onresult=e=>{document.getElementById('cinp').value=e.results[0][0].transcript;sendMsg()};rec.onend=()=>{micActive=false;btn.classList.remove('active')};rec.start()}
 </script>
 </body>
 </html>
