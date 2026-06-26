@@ -157,6 +157,20 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
 .badge{display:inline-block;padding:2px 7px;border-radius:99px;font-size:9px;font-weight:500}
 .badge-new{background:#EAF3DE;color:#3B6D11}
 .notif-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff4444;vertical-align:middle;margin-left:3px}
+
+/* CONNEXIONS */
+.conn-card{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:10px;background:rgba(120,80,255,.05);border:1px solid rgba(120,80,255,.12);margin-bottom:7px}
+.conn-info{display:flex;align-items:center;gap:10px}
+.conn-icon{font-size:20px;width:32px;text-align:center;flex-shrink:0}
+.conn-name{font-size:12px;color:#c8aaff;font-weight:500}
+.conn-status{font-size:9px;letter-spacing:1px;margin-top:2px}
+.conn-status.ok{color:rgba(0,212,255,.7)}
+.conn-status.ko{color:rgba(255,100,100,.5)}
+.conn-btn{padding:5px 12px;border-radius:7px;font-size:9px;cursor:pointer;font-family:'Courier New',monospace;letter-spacing:1px;border:none;transition:all .2s;white-space:nowrap}
+.conn-btn.connect{background:rgba(120,80,255,.18);border:1px solid rgba(120,80,255,.35);color:#c8aaff}
+.conn-btn.connect:hover{background:rgba(120,80,255,.32)}
+.conn-btn.connected{background:rgba(255,80,80,.08);border:1px solid rgba(255,80,80,.2);color:rgba(255,120,120,.6)}
+.conn-btn.connected:hover{background:rgba(255,80,80,.15)}
 </style>
 </head>
 <body>
@@ -371,6 +385,59 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
       <div class="cfg-row"><div><div class="cfg-lbl">Voix ElevenLabs</div><div class="cfg-sub2">Reponses vocales premium</div></div><button class="tog on" id="t-voice" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
       <div class="cfg-row"><div><div class="cfg-lbl">Lecture auto des reponses</div><div class="cfg-sub2">Sutur lit chaque reponse</div></div><button class="tog on" id="t-autospeak" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
       <div class="cfg-row"><div><div class="cfg-lbl">Geolocalisation</div><div class="cfg-sub2">Reponses adaptees a ta position</div></div><button class="tog on" id="t-geo" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
+      <div class="section-title">CONNEXIONS</div>
+      <div id="conn-list">
+        <div class="conn-card">
+          <div class="conn-info">
+            <div class="conn-icon">📅</div>
+            <div>
+              <div class="conn-name">Google Calendar</div>
+              <div class="conn-status ko" id="goog-cal-status">Non connecté</div>
+            </div>
+          </div>
+          <button class="conn-btn connect" id="goog-cal-btn" onclick="connectGoogle()">CONNECTER</button>
+        </div>
+        <div class="conn-card">
+          <div class="conn-info">
+            <div class="conn-icon">✉️</div>
+            <div>
+              <div class="conn-name">Gmail</div>
+              <div class="conn-status ko" id="goog-gmail-status">Non connecté</div>
+            </div>
+          </div>
+          <button class="conn-btn connect" id="goog-gmail-btn" onclick="connectGoogle()">CONNECTER</button>
+        </div>
+        <div class="conn-card">
+          <div class="conn-info">
+            <div class="conn-icon">🎵</div>
+            <div>
+              <div class="conn-name">Spotify</div>
+              <div class="conn-status ko" id="spotify-status">Bientôt disponible</div>
+            </div>
+          </div>
+          <button class="conn-btn connect" onclick="addMsg('ai','Spotify sera disponible dans la prochaine mise a jour. Tu pourras controler ta musique directement depuis Sutur.');sw('chat',document.querySelectorAll(\'.tab\')[0])">BIENTÔT</button>
+        </div>
+        <div class="conn-card">
+          <div class="conn-info">
+            <div class="conn-icon">📱</div>
+            <div>
+              <div class="conn-name">WhatsApp</div>
+              <div class="conn-status ko" id="wa-status">Bientôt disponible</div>
+            </div>
+          </div>
+          <button class="conn-btn connect" onclick="addMsg('ai','WhatsApp sera disponible dans la prochaine mise a jour.');sw('chat',document.querySelectorAll(\'.tab\')[0])">BIENTÔT</button>
+        </div>
+        <div class="conn-card">
+          <div class="conn-info">
+            <div class="conn-icon">📊</div>
+            <div>
+              <div class="conn-name">Notion</div>
+              <div class="conn-status ko" id="notion-status">Bientôt disponible</div>
+            </div>
+          </div>
+          <button class="conn-btn connect" onclick="addMsg('ai','Notion sera disponible dans la prochaine mise a jour.');sw('chat',document.querySelectorAll(\'.tab\')[0])">BIENTÔT</button>
+        </div>
+      </div>
       <div class="section-title">SECURITE</div>
       <div style="display:flex;flex-direction:column;gap:8px">
         <div class="field-label">NOUVEAU MOT DE PASSE</div>
@@ -457,7 +524,17 @@ function unlock(){
   getLocation();
   loadProfile();
   loadMessages();
-  addMsg('ai','Bonjour Manoel. Sutur est operationnel. Que puis-je faire pour vous ?',true);
+  checkGoogleStatus();
+  // Détecte retour OAuth Google
+  if(window.location.search.includes('google=connected')){
+    setTimeout(()=>{
+      addMsg('ai','✅ Google Calendar et Gmail connectés ! Demande-moi ton agenda ou tes emails.',true);
+      checkGoogleStatus();
+      window.history.replaceState({},'',window.location.pathname);
+    },800);
+  } else {
+    addMsg('ai','Bonjour. Sutur est operationnel. Que puis-je faire pour vous ?',true);
+  }
 }
 
 function logout(){document.getElementById('main').style.display='none';document.getElementById('lock').style.display='flex';gActive=false;history=[];document.getElementById('chatbox').innerHTML='';document.getElementById('pass-inp').value=''}
@@ -671,6 +748,48 @@ function saveConfig(){
   if(el){localStorage.setItem('s_el',el);EL_KEY=el}
   if(a){localStorage.setItem('s_api',a);API_URL=a}
   addMsg('ai','Configuration mise a jour.');
+}
+
+async function connectGoogle(){
+  if(!TOKEN||!API_URL){addMsg('ai','Configure ton token et URL API dabord.');return}
+  try{
+    const data=await apiCall('/google/auth','GET');
+    if(data.auth_url){
+      addMsg('ai','Ouverture de la page d\'autorisation Google. Autorise l\'accès à ton Calendar et Gmail.');
+      window.open(data.auth_url,'_blank');
+      // Vérifie le statut après 10 secondes
+      setTimeout(()=>checkGoogleStatus(),10000);
+    }
+  }catch(e){addMsg('ai','Erreur: '+( e.message||'Connexion Google impossible'));}
+}
+
+async function checkGoogleStatus(){
+  if(!TOKEN||!API_URL)return;
+  try{
+    const data=await apiCall('/google/status','GET');
+    const calSt=document.getElementById('goog-cal-status');
+    const calBtn=document.getElementById('goog-cal-btn');
+    const gmailSt=document.getElementById('goog-gmail-status');
+    const gmailBtn=document.getElementById('goog-gmail-btn');
+    if(data.connected){
+      const since=data.updated_at?new Date(data.updated_at).toLocaleDateString('fr'):'';
+      calSt.textContent='✓ Connecté' + (since?' · '+since:'');
+      calSt.className='conn-status ok';
+      calBtn.textContent='DÉCONNECTER';
+      calBtn.className='conn-btn connected';
+      calBtn.onclick=()=>addMsg('ai','Pour déconnecter Google, va dans Supabase et supprime ta ligne dans la table google_tokens.');
+      gmailSt.textContent='✓ Connecté' + (since?' · '+since:'');
+      gmailSt.className='conn-status ok';
+      gmailBtn.textContent='DÉCONNECTER';
+      gmailBtn.className='conn-btn connected';
+      gmailBtn.onclick=()=>addMsg('ai','Pour déconnecter Google, va dans Supabase et supprime ta ligne dans la table google_tokens.');
+    }else{
+      calSt.textContent='Non connecté';calSt.className='conn-status ko';
+      calBtn.textContent='CONNECTER';calBtn.className='conn-btn connect';calBtn.onclick=connectGoogle;
+      gmailSt.textContent='Non connecté';gmailSt.className='conn-status ko';
+      gmailBtn.textContent='CONNECTER';gmailBtn.className='conn-btn connect';gmailBtn.onclick=connectGoogle;
+    }
+  }catch(e){}
 }
 
 function openApp(app){const urls={youtube:'https://youtube.com',spotify:'https://open.spotify.com',instagram:'https://instagram.com',tiktok:'https://tiktok.com',x:'https://x.com',news:'https://news.google.com'};window.open(urls[app],'_blank')}
