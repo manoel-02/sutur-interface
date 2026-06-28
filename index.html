@@ -492,7 +492,7 @@ function loop(t){drawBg(t);drawGlobe(t);document.getElementById('htime').textCon
 requestAnimationFrame(loop);
 
 // State
-let TOKEN='',API_URL='',EL_KEY='',PASS='',history=[],busy=false,micActive=false,selApp='youtube',currentBrief='',userIsOwner=false,userLocation=null;
+let TOKEN='',API_URL='',EL_KEY='',PASS='',history=[],busy=false,micActive=false,selApp='youtube',currentBrief='',userIsOwner=false,userLocation=null,currentUserName='',onboarding=false,onboardingStep='';
 
 function loadCfg(){TOKEN=localStorage.getItem('s_token')||'';API_URL=localStorage.getItem('s_api')||'';EL_KEY=localStorage.getItem('s_el')||'';PASS=localStorage.getItem('s_pass')||'';if(!PASS)showFirstSetup()}
 loadCfg();
@@ -516,13 +516,11 @@ function getLocation(){
     navigator.geolocation.getCurrentPosition(pos=>{userLocation={lat:pos.coords.latitude,lng:pos.coords.longitude}},()=>{})
   }
 }
-
 function unlock(){
   document.getElementById('lock').style.display='none';
   const ms=document.getElementById('main');ms.style.display='flex';
   gActive=true;
   getLocation();
-  loadProfile();
   loadMessages();
   checkGoogleStatus();
   checkSpotifyStatus();
@@ -530,25 +528,46 @@ function unlock(){
   // Détecte retour OAuth
   const q=window.location.search;
   if(q.includes('google=connected')){
-    setTimeout(()=>{
+    loadProfile().then(()=>{
       addMsg('ai','✅ Google Calendar et Gmail connectés ! Demande-moi ton agenda ou tes emails.',true);
       checkGoogleStatus();
       window.history.replaceState({},'',window.location.pathname);
-    },800);
+    });
   } else if(q.includes('spotify=connected')){
-    setTimeout(()=>{
+    loadProfile().then(()=>{
       addMsg('ai','✅ Spotify connecté ! Dis-moi "mets de la musique" ou "qu\'est-ce qui joue ?"',true);
       checkSpotifyStatus();
       window.history.replaceState({},'',window.location.pathname);
-    },800);
+    });
   } else if(q.includes('notion=connected')){
-    setTimeout(()=>{
+    loadProfile().then(()=>{
       addMsg('ai','✅ Notion connecté ! Je peux maintenant accéder à tes pages et créer des notes.',true);
       checkNotionStatus();
       window.history.replaceState({},'',window.location.pathname);
-    },800);
+    });
   } else {
-    addMsg('ai','Bonjour. Sutur est operationnel. Que puis-je faire pour vous ?',true);
+    loadProfile().then(userName => {
+      greetUser(userName);
+    });
+  }
+}
+
+async function greetUser(userName){
+  // Nouvel utilisateur — pas de nom ou profil vide
+  if(!userName || userName === 'Utilisateur'){
+    // Lancer l'onboarding via le chat
+    setTimeout(()=>{
+      addMsg('ai', 'Bonjour ! Je suis Sutur, ton assistant personnel. Je ne te connais pas encore — comment tu t\'appelles ?', true);
+      onboarding = true;
+      onboardingStep = 'name';
+    }, 400);
+  } else {
+    // Utilisateur connu — salutation personnalisée
+    const hour = new Date().getHours();
+    const salut = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
+    setTimeout(()=>{
+      addMsg('ai', `${salut} ${userName}. Sutur est opérationnel. Que puis-je faire pour toi ?`, true);
+    }, 400);
   }
 }
 
@@ -616,7 +635,53 @@ async function sendMsg(){
   if(!msg||busy)return;
   if(!TOKEN){addMsg('ai','Configure ton acces dans CONFIG.');return}
   inp.value='';busy=true;gActive=true;
-  addMsg('user',msg);addTyping();setStatus('TRAITEMENT...','think');
+  addMsg('user',msg);
+
+  // ── ONBOARDING ──────────────────────────────────────────────────────────
+  if(onboarding){
+    busy=false;
+    if(onboardingStep==='name'){
+      // Extraire le prénom du message
+      const prenom=msg.trim().split(' ')[0];
+      currentUserName=prenom;
+      await apiCall('/profile','PUT',{name:prenom});
+      onboardingStep='profession';
+      setTimeout(()=>{
+        addMsg('ai',`Enchanté ${prenom} ! Pour mieux t'aider, quelle est ta profession ou ton activité principale ?`,true);
+      },300);
+      return;
+    }
+    if(onboardingStep==='profession'){
+      await apiCall('/profile','PUT',{profession:msg.trim()});
+      onboardingStep='interests';
+      setTimeout(()=>{
+        addMsg('ai',`Super. Et quels sont tes centres d'intérêt ? (ex: technologie, musique, sport, finance...)`,true);
+      },300);
+      return;
+    }
+    if(onboardingStep==='interests'){
+      const interests=msg.split(',').map(s=>s.trim()).filter(Boolean);
+      await apiCall('/profile','PUT',{interests});
+      onboardingStep='city';
+      setTimeout(()=>{
+        addMsg('ai',`Parfait. Dans quelle ville es-tu basé ?`,true);
+      },300);
+      return;
+    }
+    if(onboardingStep==='city'){
+      await apiCall('/profile','PUT',{location_city:msg.trim()});
+      onboarding=false;
+      onboardingStep='';
+      loadProfile();
+      setTimeout(()=>{
+        addMsg('ai',`Merci ${currentUserName} ! Je te connais maintenant. Je suis prêt à t'assister. Que puis-je faire pour toi ?`,true);
+      },300);
+      return;
+    }
+  }
+  // ── FIN ONBOARDING ───────────────────────────────────────────────────────
+
+  addTyping();setStatus('TRAITEMENT...','think');
   history.push({role:'user',content:msg});
   const mc=detectMediaCmd(msg);
   if(mc){rmTyping();handleMediaCmd(mc,msg);busy=false;setStatus('EN LIGNE','idle');return}
@@ -731,6 +796,8 @@ async function loadProfile(){
     const data=await apiCall('/profile');
     if(data.is_owner)userIsOwner=true;
     const interests=data.interests||[];
+    // Stocker le nom globalement
+    currentUserName = data.name || '';
     document.getElementById('profile-display').innerHTML=`
       <div class="prof-row"><div class="prof-lbl">Nom</div><div class="prof-val">${data.name||'-'}</div></div>
       <div class="prof-row"><div class="prof-lbl">Profession</div><div class="prof-val">${data.profession||'-'}</div></div>
@@ -742,6 +809,9 @@ async function loadProfile(){
     if(interests.length)document.getElementById('prof-interests').value=interests.join(', ');
     if(data.location_city)document.getElementById('prof-city').value=data.location_city;
     if(data.daily_brief_hour)document.getElementById('prof-hour').value=data.daily_brief_hour;
+    return data.name || '';
+  }catch(e){ return ''; }
+}
   }catch(e){}
 }
 
