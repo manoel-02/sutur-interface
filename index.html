@@ -412,10 +412,10 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
             <div class="conn-icon">🎵</div>
             <div>
               <div class="conn-name">Spotify</div>
-              <div class="conn-status ko" id="spotify-status">Bientôt disponible</div>
+              <div class="conn-status ko" id="spotify-status">Non connecté</div>
             </div>
           </div>
-          <button class="conn-btn connect" onclick="addMsg('ai','Spotify sera disponible dans la prochaine mise a jour. Tu pourras controler ta musique directement depuis Sutur.');sw('chat',document.querySelectorAll(\'.tab\')[0])">BIENTÔT</button>
+          <button class="conn-btn connect" id="spotify-btn" onclick="connectSpotify()">CONNECTER</button>
         </div>
         <div class="conn-card">
           <div class="conn-info">
@@ -432,10 +432,10 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
             <div class="conn-icon">📊</div>
             <div>
               <div class="conn-name">Notion</div>
-              <div class="conn-status ko" id="notion-status">Bientôt disponible</div>
+              <div class="conn-status ko" id="notion-status">Non connecté</div>
             </div>
           </div>
-          <button class="conn-btn connect" onclick="addMsg('ai','Notion sera disponible dans la prochaine mise a jour.');sw('chat',document.querySelectorAll(\'.tab\')[0])">BIENTÔT</button>
+          <button class="conn-btn connect" id="notion-btn" onclick="connectNotion()">CONNECTER</button>
         </div>
       </div>
       <div class="section-title">SECURITE</div>
@@ -525,11 +525,26 @@ function unlock(){
   loadProfile();
   loadMessages();
   checkGoogleStatus();
-  // Détecte retour OAuth Google
-  if(window.location.search.includes('google=connected')){
+  checkSpotifyStatus();
+  checkNotionStatus();
+  // Détecte retour OAuth
+  const q=window.location.search;
+  if(q.includes('google=connected')){
     setTimeout(()=>{
       addMsg('ai','✅ Google Calendar et Gmail connectés ! Demande-moi ton agenda ou tes emails.',true);
       checkGoogleStatus();
+      window.history.replaceState({},'',window.location.pathname);
+    },800);
+  } else if(q.includes('spotify=connected')){
+    setTimeout(()=>{
+      addMsg('ai','✅ Spotify connecté ! Dis-moi "mets de la musique" ou "qu\'est-ce qui joue ?"',true);
+      checkSpotifyStatus();
+      window.history.replaceState({},'',window.location.pathname);
+    },800);
+  } else if(q.includes('notion=connected')){
+    setTimeout(()=>{
+      addMsg('ai','✅ Notion connecté ! Je peux maintenant accéder à tes pages et créer des notes.',true);
+      checkNotionStatus();
       window.history.replaceState({},'',window.location.pathname);
     },800);
   } else {
@@ -788,6 +803,70 @@ async function checkGoogleStatus(){
       calBtn.textContent='CONNECTER';calBtn.className='conn-btn connect';calBtn.onclick=connectGoogle;
       gmailSt.textContent='Non connecté';gmailSt.className='conn-status ko';
       gmailBtn.textContent='CONNECTER';gmailBtn.className='conn-btn connect';gmailBtn.onclick=connectGoogle;
+    }
+  }catch(e){}
+}
+
+async function connectSpotify(){
+  if(!TOKEN||!API_URL){addMsg('ai','Configure ton token et URL API dabord.');return}
+  try{
+    const data=await apiCall('/spotify/auth','GET');
+    if(data.auth_url){
+      addMsg('ai','Ouverture de Spotify. Autorise l\'accès à ton compte.');
+      window.open(data.auth_url,'_blank');
+      setTimeout(()=>checkSpotifyStatus(),10000);
+    }
+  }catch(e){addMsg('ai','Erreur connexion Spotify: '+(e.message||''));}
+}
+
+async function checkSpotifyStatus(){
+  if(!TOKEN||!API_URL)return;
+  try{
+    const data=await apiCall('/spotify/status','GET');
+    const st=document.getElementById('spotify-status');
+    const btn=document.getElementById('spotify-btn');
+    if(data.connected){
+      const since=data.updated_at?new Date(data.updated_at).toLocaleDateString('fr'):'';
+      st.textContent='✓ Connecté'+(since?' · '+since:'');
+      st.className='conn-status ok';
+      btn.textContent='DÉCONNECTER';
+      btn.className='conn-btn connected';
+      btn.onclick=()=>addMsg('ai','Pour déconnecter Spotify, supprime ta ligne dans la table spotify_tokens sur Supabase.');
+    }else{
+      st.textContent='Non connecté';st.className='conn-status ko';
+      btn.textContent='CONNECTER';btn.className='conn-btn connect';btn.onclick=connectSpotify;
+    }
+  }catch(e){}
+}
+
+async function connectNotion(){
+  if(!TOKEN||!API_URL){addMsg('ai','Configure ton token et URL API dabord.');return}
+  try{
+    const data=await apiCall('/notion/auth','GET');
+    if(data.auth_url){
+      addMsg('ai','Ouverture de Notion. Autorise l\'accès à ton workspace.');
+      window.open(data.auth_url,'_blank');
+      setTimeout(()=>checkNotionStatus(),10000);
+    }
+  }catch(e){addMsg('ai','Notion pas encore configuré côté serveur. Ajoute NOTION_CLIENT_ID et NOTION_CLIENT_SECRET dans Railway.');}
+}
+
+async function checkNotionStatus(){
+  if(!TOKEN||!API_URL)return;
+  try{
+    const data=await apiCall('/notion/status','GET');
+    const st=document.getElementById('notion-status');
+    const btn=document.getElementById('notion-btn');
+    if(data.connected){
+      const since=data.updated_at?new Date(data.updated_at).toLocaleDateString('fr'):'';
+      st.textContent='✓ Connecté'+(since?' · '+since:'');
+      st.className='conn-status ok';
+      btn.textContent='DÉCONNECTER';
+      btn.className='conn-btn connected';
+      btn.onclick=()=>addMsg('ai','Pour déconnecter Notion, supprime ta ligne dans la table notion_tokens sur Supabase.');
+    }else{
+      st.textContent='Non connecté';st.className='conn-status ko';
+      btn.textContent='CONNECTER';btn.className='conn-btn connect';btn.onclick=connectNotion;
     }
   }catch(e){}
 }
