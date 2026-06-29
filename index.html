@@ -188,16 +188,13 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
   <div class="lock-sub">ASSISTANT PERSONNEL SECURISE</div>
   <div class="glass setup-box" style="width:100%">
     <div id="first-setup" style="display:none;flex-direction:column;gap:10px">
-      <div class="field-label">MOT DE PASSE SUTUR</div>
-      <input class="finp" id="new-pass" type="password" placeholder="Choisis ton mot de passe..."/>
-      <div class="field-label">URL API (Railway)</div>
-      <input class="finp" id="new-api" placeholder="https://...railway.app"/>
-      <div class="field-label">OWNER TOKEN</div>
+      <div class="field-label">TON TOKEN SUTUR</div>
       <input class="finp" id="new-token" type="password" placeholder="Ton token d'acces..."/>
-      <div class="field-label">CLE ELEVENLABS (optionnel)</div>
-      <input class="finp" id="new-el" type="password" placeholder="sk_..."/>
-      <button class="access-btn" onclick="saveSetup()">SAUVEGARDER ET ACCEDER</button>
+      <div class="field-label">MOT DE PASSE</div>
+      <input class="finp" id="new-pass" type="password" placeholder="Choisis ton mot de passe..."/>
+      <button class="access-btn" onclick="saveSetup()">ACCEDER A SUTUR</button>
       <div class="err" id="serr"></div>
+    </div>
     </div>
     <div id="login-form" style="display:flex;flex-direction:column;gap:10px">
       <div class="bio-row">
@@ -500,21 +497,19 @@ requestAnimationFrame(loop);
 let TOKEN='',API_URL='',EL_KEY='',PASS='',history=[],busy=false,micActive=false,selApp='youtube',currentBrief='',userIsOwner=false,userLocation=null,currentUserName='',onboarding=false,onboardingStep='';
 
 function loadCfg(){
-  // Lecture du lien magique ?autosetup=1
   const p=new URLSearchParams(window.location.search);
   if(p.get('autosetup')){
-    const tk=p.get('token'),ps=p.get('pass'),api=p.get('api'),nm=p.get('name');
+    const tk=p.get('token'),ps=p.get('pass');
     if(tk)localStorage.setItem('s_token',tk);
     if(ps)localStorage.setItem('s_pass',ps);
-    if(api)localStorage.setItem('s_api',api);
-    if(nm)localStorage.setItem('s_name',nm);
     window.history.replaceState({},'',window.location.pathname);
   }
   TOKEN=localStorage.getItem('s_token')||'';
-  API_URL=localStorage.getItem('s_api')||'';
-  EL_KEY=localStorage.getItem('s_el')||'';
   PASS=localStorage.getItem('s_pass')||'';
-  if(!PASS||!TOKEN||!API_URL)showFirstSetup();else showLoginForm();
+  // API URL fixe — plus besoin de la configurer
+  API_URL='https://uvicorn-appmain-production-95d3.up.railway.app';
+  EL_KEY=localStorage.getItem('s_el')||'';
+  if(!TOKEN||!PASS)showFirstSetup();else showLoginForm();
 }
 loadCfg();
 
@@ -522,13 +517,29 @@ function showFirstSetup(){document.getElementById('first-setup').style.display='
 function showLoginForm(){document.getElementById('first-setup').style.display='none';document.getElementById('login-form').style.display='flex'}
 
 function saveSetup(){
-  const p=document.getElementById('new-pass').value.trim(),a=document.getElementById('new-api').value.trim(),tk=document.getElementById('new-token').value.trim(),el=document.getElementById('new-el').value.trim();
-  if(!p||!a||!tk){document.getElementById('serr').textContent='Mot de passe, URL et token requis';return}
-  localStorage.setItem('s_pass',p);localStorage.setItem('s_api',a);localStorage.setItem('s_token',tk);if(el)localStorage.setItem('s_el',el);
-  PASS=p;API_URL=a;TOKEN=tk;EL_KEY=el;showLoginForm();unlock();
+  const p=document.getElementById('new-pass').value.trim(),tk=document.getElementById('new-token').value.trim();
+  if(!p||!tk){document.getElementById('serr').textContent='Token et mot de passe requis';return}
+  localStorage.setItem('s_pass',p);
+  localStorage.setItem('s_token',tk);
+  PASS=p;TOKEN=tk;
+  API_URL='https://uvicorn-appmain-production-95d3.up.railway.app';
+  showLoginForm();unlock();
 }
 
-function tryPass(){const v=document.getElementById('pass-inp').value;if(!PASS){showErr('Configure via "Premiere connexion"');return}if(v===PASS)unlock();else showErr('Mot de passe incorrect')}
+function tryPass(){
+  const v=document.getElementById('pass-inp').value;
+  if(!PASS||!TOKEN){showErr('Configure ton accès dabord');showFirstSetup();return}
+  if(v===PASS)unlock();else showErr('Mot de passe incorrect')
+}
+async function tryBio(type){
+  const btn=document.getElementById(type+'-btn');
+  btn.classList.add('scanning');
+  if(!PASS||!TOKEN){btn.classList.remove('scanning');showErr('Configure ton acces');showFirstSetup();return}
+  await new Promise(r=>setTimeout(r,900));
+  btn.classList.remove('scanning');
+  unlock()
+}
+function showErr(m){const e=document.getElementById('lerr');e.textContent=m;setTimeout(()=>e.textContent='',3000)}
 async function tryBio(type){const btn=document.getElementById(type+'-btn');btn.classList.add('scanning');if(!PASS){btn.classList.remove('scanning');showErr('Configure ton acces');return}await new Promise(r=>setTimeout(r,900));btn.classList.remove('scanning');unlock()}
 function showErr(m){const e=document.getElementById('lerr');e.textContent=m;setTimeout(()=>e.textContent='',3000)}
 
