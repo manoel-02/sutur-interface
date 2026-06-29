@@ -7,6 +7,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Sutur">
 <meta name="theme-color" content="#06000f">
+<meta name="description" content="Sutur — Ton assistant personnel intelligent">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>Sutur — Assistant Personnel</title>
 <title>Sutur — Assistant Personnel</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -495,7 +499,7 @@ requestAnimationFrame(loop);
 // State
 let TOKEN='',API_URL='',EL_KEY='',PASS='',history=[],busy=false,micActive=false,selApp='youtube',currentBrief='',userIsOwner=false,userLocation=null,currentUserName='',onboarding=false,onboardingStep='';
 
-function loadCfg(){TOKEN=localStorage.getItem('s_token')||'';API_URL=localStorage.getItem('s_api')||'';EL_KEY=localStorage.getItem('s_el')||'';PASS=localStorage.getItem('s_pass')||'';if(!PASS)showFirstSetup()}
+function loadCfg(){TOKEN=localStorage.getItem('s_token')||'';API_URL=localStorage.getItem('s_api')||'';EL_KEY=localStorage.getItem('s_el')||'';PASS=localStorage.getItem('s_pass')||'';if(!PASS||!TOKEN||!API_URL)showFirstSetup();else showLoginForm()}
 loadCfg();
 
 function showFirstSetup(){document.getElementById('first-setup').style.display='flex';document.getElementById('login-form').style.display='none'}
@@ -994,5 +998,11 @@ function openTrend(topic){speakText(`Je lance une recherche sur ${topic}.`);wind
 function qa(msg){sw('chat',document.querySelectorAll('.tab')[0]);document.getElementById('cinp').value=msg;sendMsg()}
 function toggleMic(){if(!('webkitSpeechRecognition'in window||'SpeechRecognition'in window)){addMsg('ai','Micro non supporte.');return}const btn=document.getElementById('micbtn');if(micActive){micActive=false;btn.classList.remove('active');return}micActive=true;btn.classList.add('active');const SR=window.SpeechRecognition||window.webkitSpeechRecognition,rec=new SR();rec.lang='fr-FR';rec.continuous=false;rec.interimResults=false;rec.onresult=e=>{document.getElementById('cinp').value=e.results[0][0].transcript;sendMsg()};rec.onend=()=>{micActive=false;btn.classList.remove('active')};rec.start()}
 </script>
-</body>
-</html>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  });
+}
+</script>
+</body></html>
