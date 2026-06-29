@@ -1,28 +1,10 @@
-const CACHE = 'sutur-v1';
-const ASSETS = ['/', '/index.html', '/manifest.json', '/icon-192.png', '/icon-512.png'];
-
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(ASSETS)).catch(() => {})
-  );
-  self.skipWaiting();
-});
-
+// Service Worker minimal — pas de cache agressif
+self.addEventListener('install', e => self.skipWaiting());
 self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    )
-  );
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))));
   self.clients.claim();
 });
-
+// Toujours aller chercher le réseau — pas de cache
 self.addEventListener('fetch', e => {
-  // Ne pas cacher les appels API
-  if (e.request.url.includes('railway.app') || e.request.url.includes('supabase.co')) {
-    return;
-  }
-  e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).catch(() => caches.match('/index.html')))
-  );
+  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
 });
