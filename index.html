@@ -499,7 +499,23 @@ requestAnimationFrame(loop);
 // State
 let TOKEN='',API_URL='',EL_KEY='',PASS='',history=[],busy=false,micActive=false,selApp='youtube',currentBrief='',userIsOwner=false,userLocation=null,currentUserName='',onboarding=false,onboardingStep='';
 
-function loadCfg(){TOKEN=localStorage.getItem('s_token')||'';API_URL=localStorage.getItem('s_api')||'';EL_KEY=localStorage.getItem('s_el')||'';PASS=localStorage.getItem('s_pass')||'';if(!PASS||!TOKEN||!API_URL)showFirstSetup();else showLoginForm()}
+function loadCfg(){
+  // Lecture du lien magique ?autosetup=1
+  const p=new URLSearchParams(window.location.search);
+  if(p.get('autosetup')){
+    const tk=p.get('token'),ps=p.get('pass'),api=p.get('api'),nm=p.get('name');
+    if(tk)localStorage.setItem('s_token',tk);
+    if(ps)localStorage.setItem('s_pass',ps);
+    if(api)localStorage.setItem('s_api',api);
+    if(nm)localStorage.setItem('s_name',nm);
+    window.history.replaceState({},'',window.location.pathname);
+  }
+  TOKEN=localStorage.getItem('s_token')||'';
+  API_URL=localStorage.getItem('s_api')||'';
+  EL_KEY=localStorage.getItem('s_el')||'';
+  PASS=localStorage.getItem('s_pass')||'';
+  if(!PASS||!TOKEN||!API_URL)showFirstSetup();else showLoginForm();
+}
 loadCfg();
 
 function showFirstSetup(){document.getElementById('first-setup').style.display='flex';document.getElementById('login-form').style.display='none'}
