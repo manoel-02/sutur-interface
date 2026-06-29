@@ -219,6 +219,7 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
   <div class="hud">
     <div class="hud-s"><div class="hdot" id="hdot"></div><span id="hst">EN LIGNE</span></div>
     <span style="font-size:9px;color:rgba(120,80,255,.4);letter-spacing:1px" id="hmod">CLAUDE</span>
+    <span style="font-size:9px;letter-spacing:1px" id="hemot" title="État émotionnel détecté"></span>
     <span style="font-size:9px;color:rgba(0,212,255,.35);letter-spacing:1px" id="htime">--:--</span>
   </div>
   <div class="globe-wrap"><canvas id="globe" width="120" height="120"></canvas></div>
@@ -691,6 +692,11 @@ async function sendMsg(){
     history.push({role:'assistant',content:reply});
     addMsg('ai',reply,true);
     document.getElementById('hmod').textContent=(data.model_used||'CLAUDE').toUpperCase();
+    // Indicateur émotionnel
+    const emotIcons={stress:'😤',joie:'😊',fatigue:'😴',motivation:'🔥',tristesse:'😔',colere:'😠',anxiete:'😰',neutre:''};
+    const emot=data.emotion||'neutre';
+    const hemot=document.getElementById('hemot');
+    if(hemot)hemot.textContent=emotIcons[emot]||'';
   }catch(e){rmTyping();addMsg('ai','Erreur de connexion.')}
   setStatus('EN LIGNE','idle');busy=false;
 }
