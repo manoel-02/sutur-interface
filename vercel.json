@@ -1,0 +1,29 @@
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://vercel.live; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://uvicorn-appmain-production-95d3.up.railway.app https://*.supabase.co https://api.elevenlabs.io https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com https://accounts.spotify.com https://api.spotify.com https://api.notion.com https://vercel.live wss://vercel.live; frame-src https://accounts.google.com; font-src 'self' data:;"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "geolocation=(self), microphone=(self), camera=()"
+        }
+      ]
+    }
+  ]
+}
