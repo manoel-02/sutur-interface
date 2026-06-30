@@ -14,14 +14,14 @@
 <title>Sutur — Assistant Personnel</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;background:#06000f;overflow:hidden}
-#app{height:100vh;height:100dvh;background:linear-gradient(135deg,#0a0015 0%,#000820 50%,#0a001a 100%);display:flex;flex-direction:column;align-items:center;font-family:'Courier New',monospace;position:relative;overflow:hidden}
-canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+html,body{height:100%;width:100%;background:#06000f;overflow:hidden;position:fixed;inset:0}
+#app{position:fixed;inset:0;height:100%;width:100%;background:linear-gradient(135deg,#0a0015 0%,#000820 50%,#0a001a 100%);font-family:'Courier New',monospace;overflow:hidden}
+canvas#bgc{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
 .z1{position:relative;z-index:1}
 .glass{background:rgba(120,80,255,.07);border:1px solid rgba(150,100,255,.18);border-radius:14px}
 
 /* LOCK */
-#lock{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;max-width:380px;padding:20px 16px;position:relative;z-index:2;margin:0 auto;height:100vh;height:100dvh;overflow-y:auto;justify-content:center}
+#lock{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;max-width:380px;padding:20px 16px;position:fixed;inset:0;z-index:2;margin:0 auto;overflow-y:auto;justify-content:center}
 .logo-ring{width:86px;height:86px;border-radius:50%;border:2px solid rgba(120,80,255,.4);display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0}
 .logo-ring::before{content:'';position:absolute;inset:-8px;border-radius:50%;border:1px solid rgba(0,212,255,.12);animation:rp 3s infinite .5s}
 @keyframes rp{0%,100%{opacity:.4}50%{opacity:1}}
@@ -44,7 +44,7 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
 .setup-toggle{font-size:10px;color:rgba(0,212,255,.35);cursor:pointer;letter-spacing:1px;text-decoration:underline;text-align:center}
 
 /* MAIN */
-#main{display:none;flex-direction:column;align-items:center;width:100%;height:100vh;height:100dvh;overflow:hidden}
+#main{display:none;flex-direction:column;align-items:center;position:fixed;inset:0;width:100%;height:100%;overflow:hidden;z-index:1}
 .hud{width:100%;display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:rgba(8,0,20,.9);border-bottom:1px solid rgba(120,80,255,.1);flex-shrink:0}
 .hud-s{display:flex;align-items:center;gap:6px;font-size:9px;color:rgba(0,212,255,.5);letter-spacing:1px}
 .hdot{width:6px;height:6px;border-radius:50%;background:#00d4ff;animation:hp 2s infinite;flex-shrink:0}
