@@ -7,6 +7,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Sutur">
 <meta name="theme-color" content="#06000f">
+<meta name="description" content="Sutur — Ton assistant personnel intelligent">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>Sutur — Assistant Personnel</title>
 <title>Sutur — Assistant Personnel</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -184,16 +188,13 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
   <div class="lock-sub">ASSISTANT PERSONNEL SECURISE</div>
   <div class="glass setup-box" style="width:100%">
     <div id="first-setup" style="display:none;flex-direction:column;gap:10px">
-      <div class="field-label">MOT DE PASSE SUTUR</div>
-      <input class="finp" id="new-pass" type="password" placeholder="Choisis ton mot de passe..."/>
-      <div class="field-label">URL API (Railway)</div>
-      <input class="finp" id="new-api" placeholder="https://...railway.app"/>
-      <div class="field-label">OWNER TOKEN</div>
+      <div class="field-label">TON TOKEN SUTUR</div>
       <input class="finp" id="new-token" type="password" placeholder="Ton token d'acces..."/>
-      <div class="field-label">CLE ELEVENLABS (optionnel)</div>
-      <input class="finp" id="new-el" type="password" placeholder="sk_..."/>
-      <button class="access-btn" onclick="saveSetup()">SAUVEGARDER ET ACCEDER</button>
+      <div class="field-label">MOT DE PASSE</div>
+      <input class="finp" id="new-pass" type="password" placeholder="Choisis ton mot de passe..."/>
+      <button class="access-btn" onclick="saveSetup()">ACCEDER A SUTUR</button>
       <div class="err" id="serr"></div>
+    </div>
     </div>
     <div id="login-form" style="display:flex;flex-direction:column;gap:10px">
       <div class="bio-row">
@@ -219,6 +220,7 @@ canvas#bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-ev
   <div class="hud">
     <div class="hud-s"><div class="hdot" id="hdot"></div><span id="hst">EN LIGNE</span></div>
     <span style="font-size:9px;color:rgba(120,80,255,.4);letter-spacing:1px" id="hmod">CLAUDE</span>
+    <span style="font-size:9px;letter-spacing:1px" id="hemot" title="État émotionnel détecté"></span>
     <span style="font-size:9px;color:rgba(0,212,255,.35);letter-spacing:1px" id="htime">--:--</span>
   </div>
   <div class="globe-wrap"><canvas id="globe" width="120" height="120"></canvas></div>
@@ -494,20 +496,50 @@ requestAnimationFrame(loop);
 // State
 let TOKEN='',API_URL='',EL_KEY='',PASS='',history=[],busy=false,micActive=false,selApp='youtube',currentBrief='',userIsOwner=false,userLocation=null,currentUserName='',onboarding=false,onboardingStep='';
 
-function loadCfg(){TOKEN=localStorage.getItem('s_token')||'';API_URL=localStorage.getItem('s_api')||'';EL_KEY=localStorage.getItem('s_el')||'';PASS=localStorage.getItem('s_pass')||'';if(!PASS)showFirstSetup()}
+function loadCfg(){
+  const p=new URLSearchParams(window.location.search);
+  if(p.get('autosetup')){
+    const tk=p.get('token'),ps=p.get('pass');
+    if(tk)localStorage.setItem('s_token',tk);
+    if(ps)localStorage.setItem('s_pass',ps);
+    window.history.replaceState({},'',window.location.pathname);
+  }
+  TOKEN=localStorage.getItem('s_token')||'';
+  PASS=localStorage.getItem('s_pass')||'';
+  // API URL fixe — plus besoin de la configurer
+  API_URL='https://uvicorn-appmain-production-95d3.up.railway.app';
+  EL_KEY=localStorage.getItem('s_el')||'';
+  if(!TOKEN||!PASS)showFirstSetup();else showLoginForm();
+}
 loadCfg();
 
 function showFirstSetup(){document.getElementById('first-setup').style.display='flex';document.getElementById('login-form').style.display='none'}
 function showLoginForm(){document.getElementById('first-setup').style.display='none';document.getElementById('login-form').style.display='flex'}
 
 function saveSetup(){
-  const p=document.getElementById('new-pass').value.trim(),a=document.getElementById('new-api').value.trim(),tk=document.getElementById('new-token').value.trim(),el=document.getElementById('new-el').value.trim();
-  if(!p||!a||!tk){document.getElementById('serr').textContent='Mot de passe, URL et token requis';return}
-  localStorage.setItem('s_pass',p);localStorage.setItem('s_api',a);localStorage.setItem('s_token',tk);if(el)localStorage.setItem('s_el',el);
-  PASS=p;API_URL=a;TOKEN=tk;EL_KEY=el;showLoginForm();unlock();
+  const p=document.getElementById('new-pass').value.trim(),tk=document.getElementById('new-token').value.trim();
+  if(!p||!tk){document.getElementById('serr').textContent='Token et mot de passe requis';return}
+  localStorage.setItem('s_pass',p);
+  localStorage.setItem('s_token',tk);
+  PASS=p;TOKEN=tk;
+  API_URL='https://uvicorn-appmain-production-95d3.up.railway.app';
+  showLoginForm();unlock();
 }
 
-function tryPass(){const v=document.getElementById('pass-inp').value;if(!PASS){showErr('Configure via "Premiere connexion"');return}if(v===PASS)unlock();else showErr('Mot de passe incorrect')}
+function tryPass(){
+  const v=document.getElementById('pass-inp').value;
+  if(!PASS||!TOKEN){showErr('Configure ton accès dabord');showFirstSetup();return}
+  if(v===PASS)unlock();else showErr('Mot de passe incorrect')
+}
+async function tryBio(type){
+  const btn=document.getElementById(type+'-btn');
+  btn.classList.add('scanning');
+  if(!PASS||!TOKEN){btn.classList.remove('scanning');showErr('Configure ton acces');showFirstSetup();return}
+  await new Promise(r=>setTimeout(r,900));
+  btn.classList.remove('scanning');
+  unlock()
+}
+function showErr(m){const e=document.getElementById('lerr');e.textContent=m;setTimeout(()=>e.textContent='',3000)}
 async function tryBio(type){const btn=document.getElementById(type+'-btn');btn.classList.add('scanning');if(!PASS){btn.classList.remove('scanning');showErr('Configure ton acces');return}await new Promise(r=>setTimeout(r,900));btn.classList.remove('scanning');unlock()}
 function showErr(m){const e=document.getElementById('lerr');e.textContent=m;setTimeout(()=>e.textContent='',3000)}
 
@@ -601,17 +633,67 @@ function setStatus(s,state){document.getElementById('hst').textContent=s;documen
 async function speakText(text){
   if(!text)return;
   const voiceOn=document.getElementById('t-voice').classList.contains('on');
-  if(voiceOn&&EL_KEY){
-    try{const r=await fetch('https://api.elevenlabs.io/v1/text-to-speech/Myb1gsDenT3mlMlj7vib',{method:'POST',headers:{'xi-api-key':EL_KEY,'Content-Type':'application/json'},body:JSON.stringify({text:text.substring(0,400),model_id:'eleven_multilingual_v2',voice_settings:{stability:.5,similarity_boost:.75}})});if(r.ok){const blob=await r.blob();new Audio(URL.createObjectURL(blob)).play();return}}catch(e){}
+  if(!voiceOn)return;
+  
+  // Option A — Backend Railway (clé partagée, prioritaire)
+  if(TOKEN&&API_URL){
+    try{
+      const r=await fetch(API_URL+'/tts',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},
+        body:JSON.stringify({text:text.substring(0,500)})
+      });
+      if(r.ok){
+        const data=await r.json();
+        if(data.audio){
+          const bytes=atob(data.audio);
+          const arr=new Uint8Array(bytes.length);
+          for(let i=0;i<bytes.length;i++)arr[i]=bytes.charCodeAt(i);
+          const blob=new Blob([arr],{type:'audio/mpeg'});
+          new Audio(URL.createObjectURL(blob)).play();
+          return;
+        }
+      }
+    }catch(e){}
   }
-  if('speechSynthesis'in window){window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text.substring(0,300));u.lang='fr-FR';const vs=window.speechSynthesis.getVoices();const fr=vs.find(v=>v.lang.startsWith('fr'));if(fr)u.voice=fr;window.speechSynthesis.speak(u)}
+  
+  // Option B — Clé ElevenLabs locale (fallback si pas de backend)
+  if(EL_KEY){
+    try{
+      const r=await fetch('https://api.elevenlabs.io/v1/text-to-speech/Myb1gsDenT3mlMlj7vib',{
+        method:'POST',
+        headers:{'xi-api-key':EL_KEY,'Content-Type':'application/json'},
+        body:JSON.stringify({text:text.substring(0,400),model_id:'eleven_multilingual_v2',voice_settings:{stability:.5,similarity_boost:.75}})
+      });
+      if(r.ok){const blob=await r.blob();new Audio(URL.createObjectURL(blob)).play();return}
+    }catch(e){}
+  }
+  
+  // Option C — Synthèse vocale navigateur (dernier recours)
+  if('speechSynthesis'in window){
+    window.speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(text.substring(0,300));
+    u.lang='fr-FR';
+    const vs=window.speechSynthesis.getVoices();
+    const fr=vs.find(v=>v.lang.startsWith('fr'));
+    if(fr)u.voice=fr;
+    window.speechSynthesis.speak(u);
+  }
 }
 
 async function apiCall(path,method='GET',body=null){
   const opts={method,headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN}};
   if(body)opts.body=JSON.stringify(body);
-  const r=await fetch(API_URL+path,opts);
-  return r.json();
+  try{
+    const r=await fetch(API_URL+path,opts);
+    if(!r.ok){
+      const errText=await r.text().catch(()=>'Erreur serveur');
+      throw new Error(errText);
+    }
+    return await r.json();
+  }catch(e){
+    throw e;
+  }
 }
 
 function detectMediaCmd(msg){
@@ -640,42 +722,63 @@ async function sendMsg(){
   // ── ONBOARDING ──────────────────────────────────────────────────────────
   if(onboarding){
     busy=false;
-    if(onboardingStep==='name'){
-      // Extraire le prénom du message
-      const prenom=msg.trim().split(' ')[0];
-      currentUserName=prenom;
-      await apiCall('/profile','PUT',{name:prenom});
-      onboardingStep='profession';
-      setTimeout(()=>{
-        addMsg('ai',`Enchanté ${prenom} ! Pour mieux t'aider, quelle est ta profession ou ton activité principale ?`,true);
-      },300);
-      return;
-    }
-    if(onboardingStep==='profession'){
-      await apiCall('/profile','PUT',{profession:msg.trim()});
-      onboardingStep='interests';
-      setTimeout(()=>{
-        addMsg('ai',`Super. Et quels sont tes centres d'intérêt ? (ex: technologie, musique, sport, finance...)`,true);
-      },300);
-      return;
-    }
-    if(onboardingStep==='interests'){
-      const interests=msg.split(',').map(s=>s.trim()).filter(Boolean);
-      await apiCall('/profile','PUT',{interests});
-      onboardingStep='city';
-      setTimeout(()=>{
-        addMsg('ai',`Parfait. Dans quelle ville es-tu basé ?`,true);
-      },300);
-      return;
-    }
-    if(onboardingStep==='city'){
-      await apiCall('/profile','PUT',{location_city:msg.trim()});
+    try{
+      if(onboardingStep==='name'){
+        const prenom=msg.trim().split(' ')[0];
+        currentUserName=prenom;
+        await apiCall('/profile','PUT',{name:prenom});
+        onboardingStep='profession';
+        setTimeout(()=>{
+          addMsg('ai',`Enchanté ${prenom} ! Pour mieux t'aider, quelle est ta profession ou ton activité principale ?`,true);
+        },300);
+        return;
+      }
+      if(onboardingStep==='profession'){
+        await apiCall('/profile','PUT',{profession:msg.trim()});
+        onboardingStep='interests';
+        setTimeout(()=>{
+          addMsg('ai',`Super. Et quels sont tes centres d'intérêt ? (ex: technologie, musique, sport, finance...)`,true);
+        },300);
+        return;
+      }
+      if(onboardingStep==='interests'){
+        const interests=msg.split(',').map(s=>s.trim()).filter(Boolean);
+        await apiCall('/profile','PUT',{interests});
+        onboardingStep='city';
+        setTimeout(()=>{
+          addMsg('ai',`Parfait. Dans quelle ville es-tu basé ?`,true);
+        },300);
+        return;
+      }
+      if(onboardingStep==='city'){
+        await apiCall('/profile','PUT',{location_city:msg.trim()});
+        onboardingStep='connections';
+        await loadProfile();
+        setTimeout(()=>{
+          addMsg('ai',`Merci ${currentUserName} ! Je te connais maintenant. 🎉\n\nUne dernière chose — veux-tu connecter tes outils (Google Calendar, Gmail, Spotify, Notion) pour que je puisse t'aider encore mieux ? Réponds "oui" pour aller dans Connexions, ou "plus tard" pour continuer sans.`,true);
+        },300);
+        return;
+      }
+      if(onboardingStep==='connections'){
+        onboarding=false;
+        onboardingStep='';
+        const wantsConn=/oui|ouais|ok|d'accord|connecter|yes/i.test(msg);
+        if(wantsConn){
+          setTimeout(()=>{
+            addMsg('ai',`Parfait ! Va dans l'onglet CONFIG ci-dessus, section Connexions, et clique sur CONNECTER pour chaque service que tu veux lier. Je suis prêt à t'assister en attendant !`,true);
+            sw('config',document.querySelectorAll('.tab')[7]);
+          },300);
+        }else{
+          setTimeout(()=>{
+            addMsg('ai',`Pas de souci, tu pourras les connecter plus tard dans CONFIG > Connexions. Je suis prêt à t'assister. Que puis-je faire pour toi ?`,true);
+          },300);
+        }
+        return;
+      }
+    }catch(e){
       onboarding=false;
       onboardingStep='';
-      loadProfile();
-      setTimeout(()=>{
-        addMsg('ai',`Merci ${currentUserName} ! Je te connais maintenant. Je suis prêt à t'assister. Que puis-je faire pour toi ?`,true);
-      },300);
+      addMsg('ai','Une erreur est survenue pendant la configuration. Tu peux continuer à me parler normalement, je vais apprendre à te connaître au fil de nos échanges.',true);
       return;
     }
   }
@@ -691,6 +794,11 @@ async function sendMsg(){
     history.push({role:'assistant',content:reply});
     addMsg('ai',reply,true);
     document.getElementById('hmod').textContent=(data.model_used||'CLAUDE').toUpperCase();
+    // Indicateur émotionnel
+    const emotIcons={stress:'😤',joie:'😊',fatigue:'😴',motivation:'🔥',tristesse:'😔',colere:'😠',anxiete:'😰',neutre:''};
+    const emot=data.emotion||'neutre';
+    const hemot=document.getElementById('hemot');
+    if(hemot)hemot.textContent=emotIcons[emot]||'';
   }catch(e){rmTyping();addMsg('ai','Erreur de connexion.')}
   setStatus('EN LIGNE','idle');busy=false;
 }
@@ -946,5 +1054,11 @@ function openTrend(topic){speakText(`Je lance une recherche sur ${topic}.`);wind
 function qa(msg){sw('chat',document.querySelectorAll('.tab')[0]);document.getElementById('cinp').value=msg;sendMsg()}
 function toggleMic(){if(!('webkitSpeechRecognition'in window||'SpeechRecognition'in window)){addMsg('ai','Micro non supporte.');return}const btn=document.getElementById('micbtn');if(micActive){micActive=false;btn.classList.remove('active');return}micActive=true;btn.classList.add('active');const SR=window.SpeechRecognition||window.webkitSpeechRecognition,rec=new SR();rec.lang='fr-FR';rec.continuous=false;rec.interimResults=false;rec.onresult=e=>{document.getElementById('cinp').value=e.results[0][0].transcript;sendMsg()};rec.onend=()=>{micActive=false;btn.classList.remove('active')};rec.start()}
 </script>
-</body>
-</html>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  });
+}
+</script>
+</body></html>
