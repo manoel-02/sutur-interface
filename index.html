@@ -766,7 +766,7 @@ async function sendMsg(){
         if(wantsConn){
           setTimeout(()=>{
             addMsg('ai',`Parfait ! Va dans l'onglet CONFIG ci-dessus, section Connexions, et clique sur CONNECTER pour chaque service que tu veux lier. Je suis prêt à t'assister en attendant !`,true);
-            sw('config',document.querySelectorAll('.tab')[7]);
+            sw('cfg',document.querySelectorAll('.tab')[7]);
           },300);
         }else{
           setTimeout(()=>{
