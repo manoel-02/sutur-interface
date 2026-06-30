@@ -387,6 +387,11 @@ canvas#bgc{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-
       <div class="cfg-row"><div><div class="cfg-lbl">Voix ElevenLabs</div><div class="cfg-sub2">Reponses vocales premium</div></div><button class="tog on" id="t-voice" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
       <div class="cfg-row"><div><div class="cfg-lbl">Lecture auto des reponses</div><div class="cfg-sub2">Sutur lit chaque reponse</div></div><button class="tog on" id="t-autospeak" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
       <div class="cfg-row"><div><div class="cfg-lbl">Geolocalisation</div><div class="cfg-sub2">Reponses adaptees a ta position</div></div><button class="tog on" id="t-geo" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
+      <div class="section-title">SÉCURITÉ AVANCÉE</div>
+      <div class="cfg-row">
+        <div><div class="cfg-lbl">Face ID / Touch ID</div><div class="cfg-sub2">Connexion biométrique réelle (WebAuthn)</div></div>
+        <button class="conn-btn connect" id="bio-enroll-btn" onclick="enrollBiometric()" style="font-size:9px;padding:6px 10px">ACTIVER FACE ID / TOUCH ID</button>
+      </div>
       <div class="section-title">CONNEXIONS</div>
       <div id="conn-list">
         <div class="conn-card">
@@ -531,16 +536,136 @@ function tryPass(){
   if(!PASS||!TOKEN){showErr('Configure ton accès dabord');showFirstSetup();return}
   if(v===PASS)unlock();else showErr('Mot de passe incorrect')
 }
+
+function webauthnSupported(){
+  return window.PublicKeyCredential !== undefined && navigator.credentials !== undefined;
+}
+
+function b64urlToBuf(b64url){
+  const pad='='.repeat((4-b64url.length%4)%4);
+  const b64=(b64url+pad).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(b64);
+  const buf=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++)buf[i]=raw.charCodeAt(i);
+  return buf.buffer;
+}
+function bufToB64url(buf){
+  const bytes=new Uint8Array(buf);
+  let str='';
+  for(let i=0;i<bytes.length;i++)str+=String.fromCharCode(bytes[i]);
+  return btoa(str).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+}
+
 async function tryBio(type){
   const btn=document.getElementById(type+'-btn');
+  if(!TOKEN){showErr('Configure ton accès dabord');showFirstSetup();return}
+  if(!webauthnSupported()){
+    showErr(type==='face'?'Face ID non disponible sur cet appareil':'Touch ID non disponible sur cet appareil');
+    return;
+  }
   btn.classList.add('scanning');
-  if(!PASS||!TOKEN){btn.classList.remove('scanning');showErr('Configure ton acces');showFirstSetup();return}
-  await new Promise(r=>setTimeout(r,900));
-  btn.classList.remove('scanning');
-  unlock()
+  try{
+    // Récupère les options de connexion depuis le backend
+    const optRes=await fetch(API_URL+'/webauthn/login/options?token='+encodeURIComponent(TOKEN));
+    if(!optRes.ok){
+      btn.classList.remove('scanning');
+      if(optRes.status===404){
+        showErr('Aucune biométrie enregistrée. Connecte-toi par mot de passe puis active-la dans CONFIG.');
+      }else{
+        showErr('Biométrie indisponible pour le moment');
+      }
+      return;
+    }
+    const options=await optRes.json();
+    options.challenge=b64urlToBuf(options.challenge);
+    if(options.allowCredentials){
+      options.allowCredentials=options.allowCredentials.map(c=>({...c,id:b64urlToBuf(c.id)}));
+    }
+    const credential=await navigator.credentials.get({publicKey:options});
+    const authResponse={
+      id:credential.id,
+      rawId:bufToB64url(credential.rawId),
+      type:credential.type,
+      response:{
+        authenticatorData:bufToB64url(credential.response.authenticatorData),
+        clientDataJSON:bufToB64url(credential.response.clientDataJSON),
+        signature:bufToB64url(credential.response.signature),
+        userHandle:credential.response.userHandle?bufToB64url(credential.response.userHandle):null,
+      },
+    };
+    const verifyRes=await fetch(API_URL+'/webauthn/login/verify',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({user_token:TOKEN,credential:authResponse})
+    });
+    btn.classList.remove('scanning');
+    if(verifyRes.ok){
+      unlock();
+    }else{
+      showErr('Échec de la vérification biométrique');
+    }
+  }catch(e){
+    btn.classList.remove('scanning');
+    if(e.name==='NotAllowedError'){
+      showErr('Authentification annulée');
+    }else{
+      showErr('Erreur biométrique — utilise ton mot de passe');
+    }
+  }
 }
-function showErr(m){const e=document.getElementById('lerr');e.textContent=m;setTimeout(()=>e.textContent='',3000)}
-async function tryBio(type){const btn=document.getElementById(type+'-btn');btn.classList.add('scanning');if(!PASS){btn.classList.remove('scanning');showErr('Configure ton acces');return}await new Promise(r=>setTimeout(r,900));btn.classList.remove('scanning');unlock()}
+
+async function enrollBiometric(){
+  if(!TOKEN){addMsg('ai','Connecte-toi dabord pour activer la biométrie.');return}
+  if(!webauthnSupported()){addMsg('ai','Ton appareil/navigateur ne supporte pas Face ID/Touch ID (WebAuthn).');return}
+  try{
+    const optRes=await apiCall('/webauthn/register/options','GET');
+    optRes.challenge=b64urlToBuf(optRes.challenge);
+    optRes.user.id=b64urlToBuf(optRes.user.id);
+    if(optRes.excludeCredentials){
+      optRes.excludeCredentials=optRes.excludeCredentials.map(c=>({...c,id:b64urlToBuf(c.id)}));
+    }
+    const credential=await navigator.credentials.create({publicKey:optRes});
+    const regResponse={
+      id:credential.id,
+      rawId:bufToB64url(credential.rawId),
+      type:credential.type,
+      response:{
+        attestationObject:bufToB64url(credential.response.attestationObject),
+        clientDataJSON:bufToB64url(credential.response.clientDataJSON),
+      },
+      device_name:navigator.userAgentData?.platform||navigator.platform||'Appareil',
+    };
+    const r=await fetch(API_URL+'/webauthn/register/verify',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},
+      body:JSON.stringify(regResponse)
+    });
+    if(r.ok){
+      addMsg('ai','✅ Biométrie activée ! Tu peux maintenant te connecter avec Face ID / Touch ID.');
+      checkWebauthnStatus();
+    }else{
+      addMsg('ai','Échec de l\'activation de la biométrie. Réessaie.');
+    }
+  }catch(e){
+    if(e.name==='NotAllowedError'){
+      addMsg('ai','Activation annulée.');
+    }else{
+      addMsg('ai','Erreur lors de l\'activation biométrique: '+(e.message||'inconnue'));
+    }
+  }
+}
+
+async function checkWebauthnStatus(){
+  if(!TOKEN||!API_URL)return;
+  try{
+    const data=await apiCall('/webauthn/status','GET');
+    const btn=document.getElementById('bio-enroll-btn');
+    if(btn){
+      btn.textContent=data.enrolled?'BIOMÉTRIE ACTIVÉE ✓':'ACTIVER FACE ID / TOUCH ID';
+    }
+  }catch(e){}
+}
+
 function showErr(m){const e=document.getElementById('lerr');e.textContent=m;setTimeout(()=>e.textContent='',3000)}
 
 function getLocation(){
@@ -557,6 +682,7 @@ function unlock(){
   checkGoogleStatus();
   checkSpotifyStatus();
   checkNotionStatus();
+  checkWebauthnStatus();
   // Détecte retour OAuth
   const q=window.location.search;
   if(q.includes('google=connected')){
