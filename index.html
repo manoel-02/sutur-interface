@@ -319,6 +319,7 @@ canvas#bgc{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-
     <div class="tab" onclick="sw('media',this)">MEDIA</div>
     <div class="tab" onclick="sw('fn',this)">OUTILS</div>
     <div class="tab" onclick="sw('finance',this);loadFinance()">FINANCE</div>
+    <div class="tab" onclick="sw('focus',this);loadReminders()">FOCUS</div>
     <div class="tab" onclick="sw('mem',this)">MEMOIRE</div>
     <div class="tab" onclick="sw('agents',this)">AGENTS</div>
     <div class="tab" onclick="sw('msgs',this)" id="tab-msgs-btn">MSGS</div>
@@ -390,6 +391,89 @@ canvas#bgc{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-
     </div>
 
     <!-- MEMOIRE -->
+    <!-- FOCUS -->
+    <div class="panel" id="tab-focus">
+
+      <!-- POMODORO -->
+      <div class="section-title">🎯 MODE FOCUS</div>
+      <div style="background:var(--surface);border:1px solid var(--border-gold);border-radius:14px;padding:16px;margin-bottom:14px;text-align:center">
+        <div id="focus-task-display" style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Aucune tâche en cours</div>
+        <div id="focus-timer" style="font-size:52px;font-weight:700;color:var(--text-primary);letter-spacing:2px;font-family:'Courier New',monospace">25:00</div>
+        <div id="focus-state" style="font-size:11px;color:var(--gold);letter-spacing:2px;margin:6px 0 14px">PRÊT</div>
+        <div style="display:flex;gap:8px;justify-content:center;margin-bottom:14px">
+          <button onclick="startFocus()" id="focus-start-btn" class="access-btn" style="flex:1;max-width:140px;padding:10px;font-size:13px">▶ DÉMARRER</button>
+          <button onclick="stopFocus()" class="go-btn" style="padding:10px 14px">■ STOP</button>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+          <button onclick="setFocusDuration(25)" class="af active" id="f25">25 min</button>
+          <button onclick="setFocusDuration(45)" class="af" id="f45">45 min</button>
+          <button onclick="setFocusDuration(90)" class="af" id="f90">90 min</button>
+        </div>
+        <div style="margin-top:12px">
+          <input id="focus-task-inp" class="finp" placeholder="Sur quoi tu travailles ? (optionnel)" style="font-size:13px"/>
+        </div>
+      </div>
+
+      <!-- RAPPELS -->
+      <div class="section-title">⏰ RAPPELS</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px">
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:10px">
+          <input id="reminder-msg" class="finp" placeholder="Message du rappel..."/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <div>
+            <div class="field-label">DATE & HEURE</div>
+            <input id="reminder-dt" class="finp" type="datetime-local"/>
+          </div>
+          <div>
+            <div class="field-label">RÉPÉTITION</div>
+            <select id="reminder-repeat" class="finp" style="cursor:pointer">
+              <option value="">Une fois</option>
+              <option value="daily">Chaque jour</option>
+              <option value="weekly">Chaque semaine</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="addReminder()" class="access-btn" style="width:100%;padding:10px;font-size:13px">+ AJOUTER UN RAPPEL</button>
+        <div id="reminder-msg-status" style="font-size:12px;text-align:center;margin-top:8px;min-height:16px"></div>
+      </div>
+      <div id="reminders-list" style="margin-bottom:14px"></div>
+
+      <!-- RÉSUMÉ DE RÉUNION -->
+      <div class="section-title">🎙 RÉSUMÉ DE RÉUNION</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px">
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button onclick="toggleMeetingRec()" id="meet-rec-btn" class="access-btn" style="flex:1;padding:10px;font-size:13px">🎙 DÉMARRER L'ENREGISTREMENT</button>
+          <button onclick="submitTranscript()" class="go-btn" style="padding:10px 14px">→</button>
+        </div>
+        <textarea id="meet-transcript" class="finp" placeholder="Ou colle ici une transcription texte à résumer..." style="height:90px;resize:none;font-size:13px"></textarea>
+        <div id="meet-status" style="font-size:11px;color:var(--gold);text-align:center;margin-top:6px;min-height:14px"></div>
+      </div>
+      <div id="meet-summary" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:14px;color:var(--text-primary);line-height:1.7;margin-bottom:14px"></div>
+
+      <!-- GÉNÉRATEUR DE DOCUMENTS -->
+      <div class="section-title">📄 GÉNÉRATEUR DE DOCUMENTS</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px">
+        <div style="margin-bottom:10px">
+          <div class="field-label">TYPE DE DOCUMENT</div>
+          <select id="doc-type" class="finp" style="cursor:pointer">
+            <option value="proposition">Proposition commerciale</option>
+            <option value="rapport">Rapport</option>
+            <option value="contrat">Contrat simple</option>
+            <option value="email">Email professionnel</option>
+            <option value="presentation">Structure de présentation</option>
+          </select>
+        </div>
+        <div style="margin-bottom:10px">
+          <div class="field-label">BRIEF (décris ce que tu veux)</div>
+          <textarea id="doc-brief" class="finp" placeholder="Ex: Proposition pour développer une app mobile pour la startup TechBenin, budget 500k FCFA, délai 3 mois..." style="height:80px;resize:none;font-size:13px"></textarea>
+        </div>
+        <button onclick="generateDoc()" class="access-btn" style="width:100%;padding:10px;font-size:13px">✨ GÉNÉRER LE DOCUMENT</button>
+        <div id="doc-status" style="font-size:11px;color:var(--gold);text-align:center;margin-top:6px;min-height:14px"></div>
+      </div>
+      <div id="doc-result" style="display:none;background:var(--surface);border:1px solid var(--border-gold);border-radius:12px;padding:14px;font-size:14px;color:var(--text-primary);line-height:1.7;margin-bottom:14px;white-space:pre-wrap"></div>
+    </div>
+
     <!-- FINANCE -->
     <div class="panel" id="tab-finance">
       <div class="section-title">💰 TABLEAU DE BORD FINANCIER</div>
@@ -1308,6 +1392,206 @@ async function sendDraftEmail(draft){
   }catch(e){
     addMsg('ai','❌ Échec de l\'envoi. Vérifie que Gmail est connecté dans Config > Connexions.',true);
   }
+}
+
+// ── PHASE 6 : FOCUS + RAPPELS + RÉUNION + DOCS ───────────────────────────────
+
+// --- POMODORO ---
+let focusTimer=null,focusSeconds=0,focusTotalSeconds=25*60,focusIsBreak=false,focusDuration=25;
+
+function setFocusDuration(min){
+  focusDuration=min;
+  focusTotalSeconds=min*60;
+  focusSeconds=0;
+  updateFocusDisplay(min*60);
+  document.querySelectorAll('[id^="f"]').forEach(b=>b.classList.remove('active'));
+  document.getElementById('f'+min)&&document.getElementById('f'+min).classList.add('active');
+}
+
+function updateFocusDisplay(secs){
+  const m=Math.floor(secs/60),s=secs%60;
+  document.getElementById('focus-timer').textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function startFocus(){
+  if(focusTimer)return;
+  const task=document.getElementById('focus-task-inp').value.trim();
+  document.getElementById('focus-task-display').textContent=task||'Session de focus';
+  document.getElementById('focus-state').textContent=focusIsBreak?'PAUSE ☕':'FOCUS 🎯';
+  document.getElementById('focus-state').style.color=focusIsBreak?'#4ade80':'var(--gold)';
+  focusSeconds=focusTotalSeconds;
+  if(task)speakText(`Session de focus démarrée. ${focusDuration} minutes pour : ${task}. Bonne concentration.`);
+  else speakText(`Session de focus de ${focusDuration} minutes. C'est parti.`);
+  focusTimer=setInterval(()=>{
+    focusSeconds--;
+    updateFocusDisplay(focusSeconds);
+    if(focusSeconds<=0){
+      clearInterval(focusTimer);focusTimer=null;
+      if(!focusIsBreak){
+        speakText(`Excellent travail ! Session de ${focusDuration} minutes terminée. Prends une pause de 5 minutes.`);
+        document.getElementById('focus-state').textContent='PAUSE ☕';
+        document.getElementById('focus-state').style.color='#4ade80';
+        focusIsBreak=true;focusSeconds=5*60;focusTotalSeconds=5*60;
+        startFocus();
+      }else{
+        speakText('Pause terminée. Prêt pour une nouvelle session ?');
+        document.getElementById('focus-state').textContent='PRÊT';
+        document.getElementById('focus-state').style.color='var(--gold)';
+        focusIsBreak=false;setFocusDuration(focusDuration);
+      }
+    }
+  },1000);
+}
+
+function stopFocus(){
+  if(focusTimer){clearInterval(focusTimer);focusTimer=null}
+  focusIsBreak=false;
+  setFocusDuration(focusDuration);
+  document.getElementById('focus-state').textContent='PRÊT';
+  document.getElementById('focus-state').style.color='var(--gold)';
+  document.getElementById('focus-task-display').textContent='Aucune tâche en cours';
+  speakText('Session arrêtée.');
+}
+
+// --- RAPPELS ---
+async function addReminder(){
+  const msg=document.getElementById('reminder-msg').value.trim();
+  const dt=document.getElementById('reminder-dt').value;
+  const repeat=document.getElementById('reminder-repeat').value||null;
+  const status=document.getElementById('reminder-msg-status');
+  if(!msg){status.style.color='#f87171';status.textContent='Ajoute un message';return}
+  if(!dt){status.style.color='#f87171';status.textContent='Choisis une date et heure';return}
+  try{
+    await apiCall('/reminders','POST',{message:msg,remind_at:dt,repeat});
+    status.style.color='#4ade80';status.textContent='⏰ Rappel créé !';
+    document.getElementById('reminder-msg').value='';
+    document.getElementById('reminder-dt').value='';
+    setTimeout(()=>{status.textContent='';loadReminders()},1200);
+  }catch(e){status.style.color='#f87171';status.textContent='Erreur'}
+}
+
+async function loadReminders(){
+  try{
+    const data=await apiCall('/reminders');
+    const list=document.getElementById('reminders-list');
+    const reminders=data.reminders||[];
+    if(!reminders.length){
+      list.innerHTML='<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:8px">Aucun rappel à venir</div>';
+      return;
+    }
+    list.innerHTML=reminders.map(r=>{
+      const dt=new Date(r.remind_at);
+      const fmt=dt.toLocaleDateString('fr',{day:'2-digit',month:'short'})+' à '+dt.toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'});
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:6px">
+        <div>
+          <div style="font-size:13px;color:var(--text-primary);font-weight:500">${r.message}</div>
+          <div style="font-size:11px;color:var(--gold);margin-top:2px">⏰ ${fmt}${r.repeat?' · '+r.repeat:''}</div>
+        </div>
+        <button onclick="deleteReminder('${r.id}')" style="background:none;border:none;color:rgba(248,113,113,.4);cursor:pointer;font-size:15px">✕</button>
+      </div>`;
+    }).join('');
+  }catch(e){}
+}
+
+async function deleteReminder(id){
+  try{await apiCall(`/reminders/${id}`,'DELETE');loadReminders()}catch(e){}
+}
+
+// Vérification des rappels dus toutes les 30s
+function checkDueReminders(){
+  if(!TOKEN||!API_URL)return;
+  apiCall('/reminders/due').then(data=>{
+    const due=data.due||[];
+    due.forEach(r=>{
+      speakText(`Rappel : ${r.message}`);
+      addMsg('ai',`⏰ **Rappel :** ${r.message}`,true);
+    });
+  }).catch(()=>{});
+}
+setInterval(checkDueReminders,30000);
+
+// --- RÉUNION ---
+let meetRecorder=null,meetChunks=[],meetStream=null;
+
+async function toggleMeetingRec(){
+  const btn=document.getElementById('meet-rec-btn');
+  const status=document.getElementById('meet-status');
+  if(meetRecorder&&meetRecorder.state==='recording'){
+    meetRecorder.stop();
+    meetStream&&meetStream.getTracks().forEach(t=>t.stop());
+    btn.textContent='🎙 DÉMARRER L\'ENREGISTREMENT';
+    btn.style.background='';
+    status.textContent='Transcription en cours...';
+    return;
+  }
+  try{
+    meetStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    meetChunks=[];
+    meetRecorder=new MediaRecorder(meetStream);
+    meetRecorder.ondataavailable=e=>meetChunks.push(e.data);
+    meetRecorder.onstop=()=>{
+      // Pas de transcription auto (nécessiterait Whisper) — on guide l'utilisateur
+      status.textContent='Enregistrement terminé. Transcris manuellement et colle dans la zone texte.';
+    };
+    meetRecorder.start();
+    btn.textContent='⏹ ARRÊTER';
+    btn.style.background='rgba(248,113,113,.2)';
+    status.textContent='🔴 Enregistrement en cours...';
+  }catch(e){
+    status.textContent='Micro non disponible — colle ta transcription texte.';
+  }
+}
+
+async function submitTranscript(){
+  const transcript=document.getElementById('meet-transcript').value.trim();
+  const status=document.getElementById('meet-status');
+  const result=document.getElementById('meet-summary');
+  if(!transcript){status.textContent='Ajoute une transcription d\'abord';return}
+  status.textContent='Analyse en cours...';result.style.display='none';
+  try{
+    const data=await apiCall('/meeting/summarize','POST',{transcript});
+    result.style.display='block';
+    result.innerHTML=data.summary.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+    status.textContent='✅ Résumé généré et sauvegardé dans ta mémoire';
+    speakText('Le résumé de ta réunion est prêt.');
+  }catch(e){status.textContent='Erreur lors de l\'analyse'}
+}
+
+// --- DOCUMENTS ---
+async function generateDoc(){
+  const type=document.getElementById('doc-type').value;
+  const brief=document.getElementById('doc-brief').value.trim();
+  const status=document.getElementById('doc-status');
+  const result=document.getElementById('doc-result');
+  if(!brief){status.textContent='Décris ce que tu veux générer';return}
+  status.textContent='Génération en cours...';result.style.display='none';
+  try{
+    const data=await apiCall('/document/generate','POST',{type,brief});
+    result.style.display='block';
+    result.innerHTML=data.document
+      .replace(/^### (.*)/gm,'<div style="font-size:13px;color:var(--gold);font-weight:700;margin:12px 0 4px;text-transform:uppercase;letter-spacing:1px">$1</div>')
+      .replace(/^## (.*)/gm,'<div style="font-size:15px;color:var(--text-primary);font-weight:700;margin:14px 0 6px;border-bottom:1px solid var(--border);padding-bottom:4px">$1</div>')
+      .replace(/^# (.*)/gm,'<div style="font-size:18px;color:var(--text-primary);font-weight:700;margin:0 0 10px">$1</div>')
+      .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+      .replace(/^- (.*)/gm,'<div style="padding:3px 0 3px 12px;border-left:2px solid var(--violet-light)">$1</div>')
+      .replace(/\n\n/g,'<br><br>')
+      .replace(/\n/g,'<br>');
+    // Bouton copier
+    result.innerHTML+=`<div style="margin-top:14px;display:flex;gap:8px">
+      <button onclick="copyDoc()" class="go-btn" style="flex:1">📋 COPIER</button>
+      <button onclick="document.getElementById('doc-result').style.display='none'" class="go-btn" style="padding:10px 14px">✕</button>
+    </div>`;
+    status.textContent='✅ Document généré !';
+    speakText('Ton document est prêt.');
+  }catch(e){status.textContent='Erreur lors de la génération'}
+}
+
+function copyDoc(){
+  const text=document.getElementById('doc-result').innerText;
+  navigator.clipboard.writeText(text).then(()=>{
+    addMsg('ai','📋 Document copié dans le presse-papier !',false);
+    sw('chat',document.querySelectorAll('.tab')[0]);
+  });
 }
 
 // ── FINANCE ───────────────────────────────────────────────────────────────────
