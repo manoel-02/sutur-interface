@@ -632,14 +632,43 @@ select.finp option,select.cinp option,select.sinp option{
       <!-- RÉSUMÉ DE RÉUNION -->
       <div class="section-title">🎙 RÉSUMÉ DE RÉUNION</div>
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px">
-        <div style="display:flex;gap:8px;margin-bottom:10px">
-          <button onclick="toggleMeetingRec()" id="meet-rec-btn" class="access-btn" style="flex:1;padding:10px;font-size:13px">🎙 DÉMARRER L'ENREGISTREMENT</button>
-          <button onclick="submitTranscript()" class="go-btn" style="padding:10px 14px">→</button>
+
+        <!-- Mode sélection -->
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <button onclick="setMeetMode('mic')" id="meet-mode-mic" class="af active" style="flex:1;padding:8px;font-size:12px">🎙 Microphone</button>
+          <button onclick="setMeetMode('screen')" id="meet-mode-screen" class="af" style="flex:1;padding:8px;font-size:12px">🖥 Audio système (Teams/Meet)</button>
         </div>
-        <textarea id="meet-transcript" class="finp" placeholder="Ou colle ici une transcription texte à résumer..." style="height:90px;resize:none;font-size:13px"></textarea>
-        <div id="meet-status" style="font-size:11px;color:var(--gold);text-align:center;margin-top:6px;min-height:14px"></div>
+
+        <div id="meet-mode-desc" style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+          Enregistre via ton micro. Idéal pour une réunion en présentiel.
+        </div>
+
+        <!-- Contrôles enregistrement -->
+        <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+          <button onclick="toggleMeetingRec()" id="meet-rec-btn" class="access-btn" style="flex:1;padding:10px;font-size:13px">🎙 DÉMARRER</button>
+          <div id="meet-timer" style="font-size:20px;font-weight:700;color:var(--text-primary);font-family:'Courier New',monospace;min-width:60px;text-align:center">00:00</div>
+        </div>
+
+        <!-- Barre de niveau audio -->
+        <div style="height:4px;background:rgba(255,255,255,.06);border-radius:2px;margin-bottom:12px;overflow:hidden">
+          <div id="meet-level" style="height:100%;width:0%;background:linear-gradient(90deg,var(--violet),var(--gold));border-radius:2px;transition:width .1s"></div>
+        </div>
+
+        <div id="meet-status" style="font-size:11px;color:var(--gold);text-align:center;margin-bottom:10px;min-height:14px"></div>
+
+        <!-- Transcription manuelle -->
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Ou colle directement une transcription texte :</div>
+        <textarea id="meet-transcript" class="finp" placeholder="Colle ici une transcription texte à résumer..." style="height:80px;resize:none;font-size:13px;margin-bottom:10px"></textarea>
+        <button onclick="submitTranscript()" class="go-btn" style="width:100%;padding:10px">→ RÉSUMER LE TEXTE</button>
       </div>
-      <div id="meet-summary" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:14px;color:var(--text-primary);line-height:1.7;margin-bottom:14px"></div>
+      <div id="meet-summary" style="display:none;background:var(--surface);border:1px solid var(--border-gold);border-radius:12px;padding:14px;font-size:14px;color:var(--text-primary);line-height:1.7;margin-bottom:14px">
+        <div style="font-size:10px;color:var(--gold);letter-spacing:2px;margin-bottom:10px">📋 RÉSUMÉ DE RÉUNION</div>
+        <div id="meet-summary-content"></div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button onclick="copyMeetSummary()" class="go-btn" style="flex:1">📋 COPIER</button>
+          <button onclick="document.getElementById('meet-summary').style.display='none'" class="go-btn" style="padding:10px 14px">✕</button>
+        </div>
+      </div>
 
       <!-- GÉNÉRATEUR DE DOCUMENTS -->
       <div class="section-title">📄 GÉNÉRATEUR DE DOCUMENTS</div>
@@ -1987,48 +2016,172 @@ function checkDueReminders(){
 }
 setInterval(checkDueReminders,30000);
 
-// --- RÉUNION ---
-let meetRecorder=null,meetChunks=[],meetStream=null;
+// --- RÉUNION AVEC WHISPER ---
+let meetRecorder=null,meetChunks=[],meetStream=null,meetMode='mic',meetTimerInterval=null,meetSeconds=0,meetAnalyser=null,meetAnimFrame=null;
+
+function setMeetMode(mode){
+  meetMode=mode;
+  document.getElementById('meet-mode-mic').classList.toggle('active',mode==='mic');
+  document.getElementById('meet-mode-screen').classList.toggle('active',mode==='screen');
+  document.getElementById('meet-mode-desc').textContent=mode==='mic'
+    ?'Enregistre via ton micro. Idéal pour une réunion en présentiel.'
+    :'Capture l\'audio de Teams, Meet ou Zoom. Partage ton écran avec audio quand demandé — Sutur enregistre en arrière-plan.';
+}
+
+function startMeetTimer(){
+  meetSeconds=0;
+  meetTimerInterval=setInterval(()=>{
+    meetSeconds++;
+    const m=Math.floor(meetSeconds/60),s=meetSeconds%60;
+    document.getElementById('meet-timer').textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  },1000);
+}
+
+function stopMeetTimer(){
+  if(meetTimerInterval){clearInterval(meetTimerInterval);meetTimerInterval=null}
+}
+
+function startAudioLevel(stream){
+  try{
+    const ctx=new AudioContext();
+    const src=ctx.createMediaStreamSource(stream);
+    meetAnalyser=ctx.createAnalyser();
+    meetAnalyser.fftSize=256;
+    src.connect(meetAnalyser);
+    const buf=new Uint8Array(meetAnalyser.frequencyBinCount);
+    const level=document.getElementById('meet-level');
+    function draw(){
+      meetAnimFrame=requestAnimationFrame(draw);
+      meetAnalyser.getByteFrequencyData(buf);
+      const avg=buf.reduce((a,b)=>a+b,0)/buf.length;
+      level.style.width=Math.min(100,avg*2.5)+'%';
+    }
+    draw();
+  }catch(e){}
+}
+
+function stopAudioLevel(){
+  if(meetAnimFrame){cancelAnimationFrame(meetAnimFrame);meetAnimFrame=null}
+  const level=document.getElementById('meet-level');
+  if(level)level.style.width='0%';
+}
 
 async function toggleMeetingRec(){
   const btn=document.getElementById('meet-rec-btn');
   const status=document.getElementById('meet-status');
+
   if(meetRecorder&&meetRecorder.state==='recording'){
+    // Arrêter l'enregistrement
     meetRecorder.stop();
+    stopMeetTimer();
+    stopAudioLevel();
     meetStream&&meetStream.getTracks().forEach(t=>t.stop());
-    btn.textContent='🎙 DÉMARRER L\'ENREGISTREMENT';
+    btn.textContent='🎙 DÉMARRER';
     btn.style.background='';
-    status.textContent='Transcription en cours...';
+    status.textContent='⏳ Transcription en cours via Whisper...';
     return;
   }
+
   try{
-    meetStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    // Démarrer l'enregistrement
+    if(meetMode==='screen'){
+      const displayStream=await navigator.mediaDevices.getDisplayMedia({
+        video:true,audio:{echoCancellation:false,noiseSuppression:false,sampleRate:44100}
+      });
+      // Vérifier que l'audio est bien capturé
+      const audioTracks=displayStream.getAudioTracks();
+      if(audioTracks.length===0){
+        displayStream.getTracks().forEach(t=>t.stop());
+        status.textContent='⚠ Pas d\'audio capturé — coche "Partager l\'audio du système" dans la popup Chrome';
+        return;
+      }
+      meetStream=displayStream;
+    }else{
+      meetStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+    }
+
     meetChunks=[];
-    meetRecorder=new MediaRecorder(meetStream);
-    meetRecorder.ondataavailable=e=>meetChunks.push(e.data);
-    meetRecorder.onstop=()=>{
-      // Pas de transcription auto (nécessiterait Whisper) — on guide l'utilisateur
-      status.textContent='Enregistrement terminé. Transcris manuellement et colle dans la zone texte.';
+    const mimeType=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':'audio/webm';
+    meetRecorder=new MediaRecorder(meetStream,{mimeType});
+    meetRecorder.ondataavailable=e=>{if(e.data.size>0)meetChunks.push(e.data)};
+    meetRecorder.onstop=async()=>{
+      const blob=new Blob(meetChunks,{type:'audio/webm'});
+      await transcribeWithWhisper(blob);
     };
-    meetRecorder.start();
-    btn.textContent='⏹ ARRÊTER';
+    meetRecorder.start(1000); // chunk toutes les secondes
+    startMeetTimer();
+    startAudioLevel(meetStream);
+    btn.textContent='⏹ ARRÊTER ET RÉSUMER';
     btn.style.background='rgba(248,113,113,.2)';
-    status.textContent='🔴 Enregistrement en cours...';
+    btn.style.borderColor='rgba(248,113,113,.4)';
+    status.textContent=meetMode==='screen'?'🔴 Enregistrement de l\'audio système en cours...':'🔴 Enregistrement micro en cours...';
   }catch(e){
-    status.textContent='Micro non disponible — colle ta transcription texte.';
+    if(e.name==='NotAllowedError'){
+      status.textContent='Permission refusée — autorise le micro/écran dans ton navigateur';
+    }else{
+      status.textContent='Erreur: '+e.message;
+    }
   }
+}
+
+async function transcribeWithWhisper(blob){
+  const status=document.getElementById('meet-status');
+  const summaryDiv=document.getElementById('meet-summary');
+  const summaryContent=document.getElementById('meet-summary-content');
+  try{
+    status.textContent='📡 Envoi à Whisper... (peut prendre 10-30 secondes)';
+    // Convertir blob en base64
+    const arrayBuffer=await blob.arrayBuffer();
+    const bytes=new Uint8Array(arrayBuffer);
+    let binary='';
+    for(let i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);
+    const b64=btoa(binary);
+    const data=await apiCall('/meeting/transcribe','POST',{
+      audio_b64:b64,format:'webm',summarize:true
+    });
+    if(data.summary){
+      summaryDiv.style.display='block';
+      summaryContent.innerHTML=data.summary
+        .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+        .replace(/^### (.*)/gm,'<div style="font-size:13px;color:var(--gold);font-weight:700;margin:10px 0 4px">$1</div>')
+        .replace(/^## (.*)/gm,'<div style="font-size:15px;color:var(--text-primary);font-weight:700;margin:12px 0 5px">$1</div>')
+        .replace(/^- (.*)/gm,'<div style="padding:3px 0 3px 10px;border-left:2px solid var(--violet-light);margin-bottom:3px">$1</div>')
+        .replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>');
+      status.textContent=`✅ Résumé généré — ${Math.round(meetSeconds/60)}min de réunion transcrites`;
+      speakText('Le résumé de ta réunion est prêt.');
+    }else if(data.transcript){
+      document.getElementById('meet-transcript').value=data.transcript;
+      status.textContent='✅ Transcription effectuée — clique "Résumer" pour générer le résumé';
+    }
+  }catch(e){
+    status.textContent='❌ Erreur Whisper — vérifie que ta clé OpenAI est configurée';
+  }
+}
+
+function copyMeetSummary(){
+  const text=document.getElementById('meet-summary-content').innerText;
+  navigator.clipboard.writeText(text).then(()=>{
+    addMsg('ai','📋 Résumé de réunion copié !',false);
+    sw('chat',document.querySelectorAll('.tab')[0]);
+  });
 }
 
 async function submitTranscript(){
   const transcript=document.getElementById('meet-transcript').value.trim();
   const status=document.getElementById('meet-status');
-  const result=document.getElementById('meet-summary');
+  const summaryDiv=document.getElementById('meet-summary');
+  const summaryContent=document.getElementById('meet-summary-content');
   if(!transcript){status.textContent='Ajoute une transcription d\'abord';return}
-  status.textContent='Analyse en cours...';result.style.display='none';
+  status.textContent='Analyse en cours...';summaryDiv.style.display='none';
   try{
     const data=await apiCall('/meeting/summarize','POST',{transcript});
-    result.style.display='block';
-    result.innerHTML=data.summary.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+    summaryDiv.style.display='block';
+    summaryContent.innerHTML=data.summary
+      .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+      .replace(/^### (.*)/gm,'<div style="font-size:13px;color:var(--gold);font-weight:700;margin:10px 0 4px">$1</div>')
+      .replace(/^## (.*)/gm,'<div style="font-size:15px;color:var(--text-primary);font-weight:700;margin:12px 0 5px">$1</div>')
+      .replace(/^- (.*)/gm,'<div style="padding:3px 0 3px 10px;border-left:2px solid var(--violet-light);margin-bottom:3px">$1</div>')
+      .replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>');
     status.textContent='✅ Résumé généré et sauvegardé dans ta mémoire';
     speakText('Le résumé de ta réunion est prêt.');
   }catch(e){status.textContent='Erreur lors de l\'analyse'}
