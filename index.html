@@ -318,6 +318,7 @@ canvas#bgc{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-
     <div class="tab" onclick="sw('brief',this)" id="tab-brief-btn">BRIEF</div>
     <div class="tab" onclick="sw('media',this)">MEDIA</div>
     <div class="tab" onclick="sw('fn',this)">OUTILS</div>
+    <div class="tab" onclick="sw('finance',this);loadFinance()">FINANCE</div>
     <div class="tab" onclick="sw('mem',this)">MEMOIRE</div>
     <div class="tab" onclick="sw('agents',this)">AGENTS</div>
     <div class="tab" onclick="sw('msgs',this)" id="tab-msgs-btn">MSGS</div>
@@ -389,6 +390,79 @@ canvas#bgc{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-
     </div>
 
     <!-- MEMOIRE -->
+    <!-- FINANCE -->
+    <div class="panel" id="tab-finance">
+      <div class="section-title">💰 TABLEAU DE BORD FINANCIER</div>
+
+      <!-- Résumé du mois -->
+      <div id="finance-summary" style="margin-bottom:14px">
+        <div style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px">Chargement...</div>
+      </div>
+
+      <!-- Formulaire rapide -->
+      <div class="section-title">NOUVELLE TRANSACTION</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div>
+            <div class="field-label">TYPE</div>
+            <select id="tx-type" class="finp" style="cursor:pointer">
+              <option value="expense">💸 Dépense</option>
+              <option value="income">💰 Revenu</option>
+            </select>
+          </div>
+          <div>
+            <div class="field-label">DEVISE</div>
+            <select id="tx-currency" class="finp" style="cursor:pointer">
+              <option value="XOF">XOF (FCFA)</option>
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-bottom:10px">
+          <div class="field-label">MONTANT</div>
+          <input id="tx-amount" class="finp" type="number" placeholder="0" min="0"/>
+        </div>
+        <div style="margin-bottom:10px">
+          <div class="field-label">CATÉGORIE</div>
+          <select id="tx-category" class="finp" style="cursor:pointer">
+            <option>Alimentation</option>
+            <option>Transport</option>
+            <option>Logement</option>
+            <option>Santé</option>
+            <option>Loisirs</option>
+            <option>Business</option>
+            <option>Technologie</option>
+            <option>Éducation</option>
+            <option>Autre</option>
+          </select>
+        </div>
+        <div style="margin-bottom:12px">
+          <div class="field-label">DESCRIPTION</div>
+          <input id="tx-desc" class="finp" placeholder="Ex: Courses au marché..."/>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="addTransaction()" class="access-btn" style="flex:1;padding:10px;font-size:13px">✓ ENREGISTRER</button>
+          <button onclick="loadFinance()" class="go-btn" style="padding:10px 14px">↻</button>
+        </div>
+        <div id="tx-msg" style="font-size:12px;text-align:center;margin-top:8px;min-height:16px"></div>
+      </div>
+
+      <!-- Question financière -->
+      <div class="section-title">DEMANDER À SUTUR</div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <input id="finance-q" class="finp" placeholder="Combien j'ai dépensé en transport ce mois ?"/>
+        <button onclick="askFinance()" class="go-btn">→</button>
+      </div>
+      <div id="finance-answer" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:14px;color:var(--text-primary);line-height:1.65;margin-bottom:14px"></div>
+
+      <!-- Historique -->
+      <div class="section-title">TRANSACTIONS RÉCENTES</div>
+      <div id="finance-list" style="margin-bottom:20px">
+        <div style="color:var(--text-muted);font-size:13px;text-align:center;padding:12px">Aucune transaction</div>
+      </div>
+    </div>
+
     <div class="panel" id="tab-mem">
       <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0">
         <div class="section-title" style="margin:0">CE QUE SUTUR SAIT DE TOI</div>
@@ -1234,6 +1308,123 @@ async function sendDraftEmail(draft){
   }catch(e){
     addMsg('ai','❌ Échec de l\'envoi. Vérifie que Gmail est connecté dans Config > Connexions.',true);
   }
+}
+
+// ── FINANCE ───────────────────────────────────────────────────────────────────
+const CURRENCY_SYMBOLS={XOF:'FCFA',USD:'$',EUR:'€'};
+function fmtAmount(amount,currency){
+  const sym=CURRENCY_SYMBOLS[currency]||currency;
+  return currency==='XOF'?`${Math.round(amount).toLocaleString()} ${sym}`:`${sym}${amount.toFixed(2)}`;
+}
+
+async function loadFinance(){
+  const month=new Date().toISOString().slice(0,7);
+  try{
+    const [sumData,txData]=await Promise.all([
+      apiCall(`/finance/summary?month=${month}`),
+      apiCall(`/finance/transactions?month=${month}&limit=30`)
+    ]);
+    renderFinanceSummary(sumData);
+    renderFinanceList(txData.transactions||[]);
+  }catch(e){
+    document.getElementById('finance-summary').innerHTML='<div style="color:#f87171;text-align:center;padding:12px">Erreur de chargement</div>';
+  }
+}
+
+function renderFinanceSummary(data){
+  const balances=data.balance||{};
+  const income=data.income||{};
+  const expenses=data.expenses||{};
+  const currencies=Object.keys({...income,...expenses});
+  
+  let balanceHtml=currencies.map(cur=>{
+    const bal=balances[cur]||0;
+    const color=bal>=0?'#4ade80':'#f87171';
+    return `<div style="text-align:center;padding:0 10px">
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">${cur}</div>
+      <div style="font-size:20px;font-weight:700;color:${color}">${fmtAmount(Math.abs(bal),cur)}</div>
+      <div style="font-size:10px;color:${color}">${bal>=0?'▲ excédent':'▼ déficit'}</div>
+    </div>`;
+  }).join('<div style="width:1px;background:var(--border)"></div>');
+
+  let statsHtml=currencies.map(cur=>`
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+      <span style="font-size:13px;color:var(--text-muted)">💰 Revenus ${cur}</span>
+      <span style="font-size:13px;color:#4ade80;font-weight:600">${fmtAmount(income[cur]||0,cur)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+      <span style="font-size:13px;color:var(--text-muted)">💸 Dépenses ${cur}</span>
+      <span style="font-size:13px;color:#f87171;font-weight:600">${fmtAmount(expenses[cur]||0,cur)}</span>
+    </div>`).join('');
+
+  const topCats=(data.top_categories||[]).map(([cat,amt])=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0">
+      <span style="font-size:12px;color:var(--text-secondary)">${cat}</span>
+      <span style="font-size:12px;color:var(--gold);font-weight:600">${amt.toLocaleString()}</span>
+    </div>`).join('');
+
+  document.getElementById('finance-summary').innerHTML=`
+    <div style="background:var(--surface);border:1px solid var(--border-gold);border-radius:14px;padding:14px;margin-bottom:10px">
+      <div style="font-size:10px;color:var(--gold);letter-spacing:2px;margin-bottom:10px">SOLDE ${data.month||''}</div>
+      <div style="display:flex;justify-content:center;gap:0;margin-bottom:14px">${balanceHtml||'<span style="color:var(--text-muted);font-size:13px">Aucune donnée</span>'}</div>
+      ${statsHtml}
+      ${topCats?`<div style="margin-top:10px"><div style="font-size:10px;color:var(--text-muted);letter-spacing:1px;margin-bottom:6px">TOP CATÉGORIES</div>${topCats}</div>`:''}
+    </div>
+    ${data.analysis?`<div style="background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.15);border-radius:12px;padding:12px;font-size:13px;color:var(--text-primary);line-height:1.65">🤖 ${data.analysis}</div>`:''}`;
+}
+
+function renderFinanceList(txs){
+  if(!txs.length){
+    document.getElementById('finance-list').innerHTML='<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:12px">Aucune transaction ce mois</div>';
+    return;
+  }
+  document.getElementById('finance-list').innerHTML=txs.map(tx=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:6px">
+      <div style="flex:1">
+        <div style="font-size:13px;color:var(--text-primary);font-weight:500">${tx.description||tx.category}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${tx.category} · ${tx.date}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:14px;font-weight:700;color:${tx.type==='income'?'#4ade80':'#f87171'}">${tx.type==='income'?'+':'-'}${fmtAmount(tx.amount,tx.currency)}</span>
+        <button onclick="deleteTransaction('${tx.id}')" style="background:none;border:none;color:rgba(248,113,113,.4);cursor:pointer;font-size:14px;padding:2px">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+async function addTransaction(){
+  const type=document.getElementById('tx-type').value;
+  const currency=document.getElementById('tx-currency').value;
+  const amount=parseFloat(document.getElementById('tx-amount').value);
+  const category=document.getElementById('tx-category').value;
+  const description=document.getElementById('tx-desc').value.trim();
+  const msg=document.getElementById('tx-msg');
+  if(!amount||amount<=0){msg.style.color='#f87171';msg.textContent='Montant invalide';return}
+  if(!description){msg.style.color='#f87171';msg.textContent='Ajoute une description';return}
+  try{
+    await apiCall('/finance/transaction','POST',{type,currency,amount,category,description});
+    msg.style.color='#4ade80';msg.textContent='✅ Enregistré !';
+    document.getElementById('tx-amount').value='';
+    document.getElementById('tx-desc').value='';
+    setTimeout(()=>{msg.textContent='';loadFinance()},1200);
+  }catch(e){msg.style.color='#f87171';msg.textContent='Erreur d\'enregistrement'}
+}
+
+async function deleteTransaction(id){
+  try{
+    await apiCall(`/finance/transaction/${id}`,'DELETE');
+    loadFinance();
+  }catch(e){}
+}
+
+async function askFinance(){
+  const q=document.getElementById('finance-q').value.trim();
+  if(!q)return;
+  const ansDiv=document.getElementById('finance-answer');
+  ansDiv.style.display='block';ansDiv.textContent='Analyse en cours...';
+  try{
+    const data=await apiCall('/finance/ask','POST',{question:q});
+    ansDiv.textContent=data.answer||'Pas de réponse';
+  }catch(e){ansDiv.textContent='Erreur lors de l\'analyse'}
 }
 
 async function loadBrief(){
