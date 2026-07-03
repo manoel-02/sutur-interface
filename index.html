@@ -928,6 +928,7 @@ select.finp option,select.cinp option,select.sinp option{
     <button class="micbtn" id="micbtn" onclick="toggleMic()">&#127908;</button>
     <input class="cinp" id="cinp" placeholder="Parle a Sutur..." onkeydown="if(event.key==='Enter')sendMsg()"/>
     <button class="sbtn" id="stopbtn" onclick="stopSpeech()" title="Arrêter la lecture" style="display:none;background:rgba(248,113,113,.15);border-color:rgba(248,113,113,.35);color:#f87171">&#9646;&#9646;</button>
+    <button class="sbtn" id="meet-stop-bar" onclick="stopMeetingFromBar()" title="Arrêter la réunion" style="display:none;background:rgba(248,113,113,.15);border-color:rgba(248,113,113,.35);color:#f87171;font-size:10px;width:auto;padding:0 10px;border-radius:10px">⏹ RÉU</button>
     <button class="sbtn" onclick="sendMsg()">&#9658;</button>
   </div>
   <div style="text-align:center;padding:3px 0 6px;font-size:10px;color:var(--text-muted);letter-spacing:1.5px;background:rgba(7,5,26,.95)">by <span style="color:var(--gold);font-weight:600">OrbixLabs</span></div>
@@ -2019,6 +2020,12 @@ setInterval(checkDueReminders,30000);
 // --- RÉUNION AVEC WHISPER ---
 let meetRecorder=null,meetChunks=[],meetStream=null,meetMode='mic',meetTimerInterval=null,meetSeconds=0,meetAnalyser=null,meetAnimFrame=null;
 
+function stopMeetingFromBar(){
+  // Revenir sur l'onglet FOCUS et déclencher l'arrêt
+  sw('focus',document.querySelectorAll('.tab')[5]);
+  setTimeout(()=>toggleMeetingRec(),200);
+}
+
 function setMeetMode(mode){
   meetMode=mode;
   document.getElementById('meet-mode-mic').classList.toggle('active',mode==='mic');
@@ -2078,7 +2085,9 @@ async function toggleMeetingRec(){
     meetStream&&meetStream.getTracks().forEach(t=>t.stop());
     btn.textContent='🎙 DÉMARRER';
     btn.style.background='';
+    btn.style.borderColor='';
     status.textContent='⏳ Transcription en cours via Whisper...';
+    document.getElementById('meet-stop-bar').style.display='none';
     return;
   }
 
@@ -2115,6 +2124,8 @@ async function toggleMeetingRec(){
     btn.style.background='rgba(248,113,113,.2)';
     btn.style.borderColor='rgba(248,113,113,.4)';
     status.textContent=meetMode==='screen'?'🔴 Enregistrement de l\'audio système en cours...':'🔴 Enregistrement micro en cours...';
+    // Afficher le bouton d'arrêt dans la barre fixe
+    document.getElementById('meet-stop-bar').style.display='flex';
   }catch(e){
     if(e.name==='NotAllowedError'){
       status.textContent='Permission refusée — autorise le micro/écran dans ton navigateur';
