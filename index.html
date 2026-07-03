@@ -222,6 +222,23 @@ canvas#bgc{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-
 .conn-btn.connected{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);color:rgba(248,113,113,.7)}
 .conn-btn.connected:hover{background:rgba(248,113,113,.15)}
 
+/* ── SELECT / OPTIONS ────────────────────────────────────────────────────── */
+select.finp,select.cinp,select.sinp{
+  color:var(--text-primary);
+  background:#13103a;
+  appearance:none;
+  -webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23a097c4' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right 12px center;
+  padding-right:32px;
+  cursor:pointer;
+}
+select.finp option,select.cinp option,select.sinp option{
+  background:#13103a;
+  color:var(--text-primary);
+}
+
 /* ── AMBIANCES PAR ONGLET ────────────────────────────────────────────────── */
 
 /* CHAT — Pulsar / onde radio */
