@@ -918,7 +918,29 @@ async function sendMsg(){
     const data=await apiCall('/chat','POST',{message:msg,model,history:history.slice(-8),location:userLocation});
     rmTyping();const reply=data.reply||data.detail||'Erreur';
     history.push({role:'assistant',content:reply});
-    addMsg('ai',reply,true);
+
+    // Brouillon d'email — afficher interface de confirmation
+    if(data.draft_email && data.draft_email.draft_email){
+      const d=data.draft_email;
+      const emailHtml=`
+        <div style="background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.2);border-radius:12px;padding:14px;margin-top:8px">
+          <div style="font-size:9px;color:rgba(0,212,255,.5);letter-spacing:2px;margin-bottom:10px">✉ BROUILLON D'EMAIL</div>
+          <div style="font-size:11px;color:rgba(150,120,255,.6);margin-bottom:4px">À :</div>
+          <div style="font-size:12px;color:#c8aaff;margin-bottom:8px" id="draft-to">${d.to||'<non spécifié>'}</div>
+          <div style="font-size:11px;color:rgba(150,120,255,.6);margin-bottom:4px">Objet :</div>
+          <div style="font-size:12px;color:#c8aaff;margin-bottom:8px">${d.subject||''}</div>
+          <div style="font-size:11px;color:rgba(150,120,255,.6);margin-bottom:4px">Message :</div>
+          <div style="font-size:12px;color:#e0d0ff;white-space:pre-wrap;margin-bottom:12px;line-height:1.6">${d.body||''}</div>
+          <div style="display:flex;gap:8px">
+            <button onclick="sendDraftEmail(${JSON.stringify(d).replace(/"/g,'&quot;')})" style="flex:1;padding:8px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);border-radius:8px;color:#00d4ff;font-size:10px;letter-spacing:1px;cursor:pointer;font-family:'Courier New',monospace">✓ ENVOYER</button>
+            <button onclick="this.closest('div[style]').remove()" style="flex:1;padding:8px;background:rgba(255,60,60,.07);border:1px solid rgba(255,60,60,.2);border-radius:8px;color:#ff6060;font-size:10px;letter-spacing:1px;cursor:pointer;font-family:'Courier New',monospace">✗ ANNULER</button>
+          </div>
+        </div>`;
+      addMsg('ai','Voici le mail que j\'ai rédigé pour toi :'+emailHtml,false);
+    }else{
+      addMsg('ai',reply,true);
+    }
+
     document.getElementById('hmod').textContent=(data.model_used||'CLAUDE').toUpperCase();
     // Indicateur émotionnel
     const emotIcons={stress:'😤',joie:'😊',fatigue:'😴',motivation:'🔥',tristesse:'😔',colere:'😠',anxiete:'😰',neutre:''};
@@ -927,6 +949,17 @@ async function sendMsg(){
     if(hemot)hemot.textContent=emotIcons[emot]||'';
   }catch(e){rmTyping();addMsg('ai','Erreur de connexion.')}
   setStatus('EN LIGNE','idle');busy=false;
+}
+
+async function sendDraftEmail(draft){
+  try{
+    const to=draft.to||prompt('Adresse email du destinataire :');
+    if(!to){addMsg('ai','Envoi annulé — adresse manquante.');return}
+    await apiCall('/google/gmail/send','POST',{to,subject:draft.subject||'',body:draft.body||''});
+    addMsg('ai','✅ Email envoyé avec succès à '+to+' !',true);
+  }catch(e){
+    addMsg('ai','❌ Échec de l\'envoi. Vérifie que Gmail est connecté dans Config > Connexions.',true);
+  }
 }
 
 async function loadBrief(){
