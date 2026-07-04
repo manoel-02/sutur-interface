@@ -73,7 +73,7 @@ canvas#bgc{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-
 .setup-toggle{font-size:12px;color:rgba(139,92,246,.6);cursor:pointer;letter-spacing:.5px;text-decoration:underline;text-align:center}
 
 /* ── LAYOUT PRINCIPAL ────────────────────────────────────────────────────── */
-#main{display:none;flex-direction:column;align-items:center;position:fixed;inset:0;width:100%;height:100%;overflow:hidden;z-index:1}
+#main{display:none;flex-direction:column;position:fixed;inset:0;width:100%;height:100%;overflow:hidden;z-index:1}
 
 /* HUD */
 .hud{width:100%;display:flex;justify-content:space-between;align-items:center;padding:8px 16px;background:rgba(7,5,26,.92);border-bottom:1px solid var(--border);flex-shrink:0;backdrop-filter:blur(8px)}
@@ -368,7 +368,7 @@ body.light-mode .trend-sub,.light-mode .fn-sub,.light-mode .sub-desc{color:rgba(
 </div>
 
 <!-- MAIN -->
-<div id="main" class="z1" style="width:100%">
+<div id="main" class="z1" style="width:100%;display:none">
   <!-- HUD -->
   <div class="hud">
     <div style="display:flex;align-items:center;gap:8px">
@@ -386,16 +386,13 @@ body.light-mode .trend-sub,.light-mode .fn-sub,.light-mode .sub-desc{color:rgba(
     </div>
   </div>
 
-  <!-- ZONE CHAT (panel actif par défaut) -->
-  <div id="chat-zone" style="display:flex;flex-direction:column;position:fixed;inset:0;top:44px;bottom:120px;width:100%;overflow:hidden;z-index:1">
+  <!-- Globe orbital -->
+  <div id="globe-area" style="display:none;justify-content:center;padding:4px 0 0;flex-shrink:0">
+    <canvas id="globe" width="200" height="200" style="touch-action:none"></canvas>
+  </div>
 
-    <!-- Globe orbital — visible sur l'écran d'accueil chat -->
-    <div id="globe-area" style="flex-shrink:0;display:none;justify-content:center;padding:4px 0 0">
-      <canvas id="globe" width="200" height="200" style="touch-action:none"></canvas>
-    </div>
-
-    <!-- Panels de contenu -->
-    <div class="panels" style="flex:1;overflow:hidden;position:relative">
+  <!-- Panels -->
+  <div class="panels">
       <!-- CHAT -->
       <div class="panel active" id="tab-chat">
         <div class="chat-box" id="chatbox"></div>
@@ -1010,7 +1007,6 @@ body.light-mode .trend-sub,.light-mode .fn-sub,.light-mode .sub-desc{color:rgba(
   </div>
 
   </div><!-- fin panels -->
-  </div><!-- fin chat-zone -->
 
   <!-- BARRE SAISIE CHAT -->
   <div class="inp-bar" id="inp-bar" style="display:none">
@@ -1551,7 +1547,8 @@ function getLocation(){
 }
 function unlock(){
   document.getElementById('lock').style.display='none';
-  const ms=document.getElementById('main');ms.style.display='flex';
+  const ms=document.getElementById('main');
+  ms.style.display='block';
   gActive=true;
   getLocation();
   loadMessages();
@@ -1559,17 +1556,18 @@ function unlock(){
   checkSpotifyStatus();
   checkNotionStatus();
   checkWebauthnStatus();
-  // Initialiser le mode clair si sauvegardé
   initLightMode();
-  // Afficher la nav du bas après connexion
+  // Afficher nav, inp-bar, globe
   const nav=document.getElementById('bottom-nav');
   if(nav)nav.style.display='flex';
-  const chatPanel=document.getElementById('tab-chat');
-  if(chatPanel)chatPanel.classList.add('active');
   const inpBar=document.getElementById('inp-bar');
   if(inpBar)inpBar.style.display='flex';
   const globeArea=document.getElementById('globe-area');
   if(globeArea)globeArea.style.display='flex';
+  // Panel chat actif par défaut
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  const chatPanel=document.getElementById('tab-chat');
+  if(chatPanel)chatPanel.classList.add('active');
   // Détecte retour OAuth
   const q=window.location.search;
   if(q.includes('google=connected')){
