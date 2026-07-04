@@ -304,6 +304,29 @@ select.finp option,select.cinp option,select.sinp option{
 #tab-cfg::before{content:'';position:fixed;bottom:100px;right:20px;width:70px;height:70px;border-radius:50%;border:1px dashed rgba(201,162,39,.1);animation:gear-turn 10s linear infinite;pointer-events:none;z-index:0}
 #tab-cfg::after{content:'';position:fixed;bottom:115px;right:35px;width:40px;height:40px;border-radius:50%;border:1px dashed rgba(139,92,246,.08);animation:gear-turn 6s linear infinite reverse;pointer-events:none;z-index:0}
 @keyframes gear-turn{to{transform:rotate(360deg)}}
+
+/* ── MODE CLAIR ──────────────────────────────────────────────────────────── */
+body.light-mode{background:#f0eef8}
+body.light-mode #app{background:linear-gradient(135deg,#e8e4f8 0%,#f5f3ff 50%,#ede9ff 100%)}
+body.light-mode .hud{background:rgba(240,238,248,.95);border-bottom-color:rgba(139,92,246,.15)}
+body.light-mode .cmsg.ai{background:rgba(139,92,246,.06);border-color:rgba(139,92,246,.15);color:#2d1f6e}
+body.light-mode .cmsg.user{background:rgba(139,92,246,.12);border-color:rgba(139,92,246,.2);color:#2d1f6e}
+body.light-mode .inp-bar{background:rgba(240,238,248,.98);border-top-color:rgba(139,92,246,.15)}
+body.light-mode .cinp{background:rgba(255,255,255,.8);border-color:rgba(139,92,246,.2);color:#2d1f6e}
+body.light-mode .cinp::placeholder{color:rgba(80,60,140,.4)}
+body.light-mode .panel{color:#2d1f6e}
+body.light-mode .section-title{color:#7c5cbf}
+body.light-mode .cfg-lbl,.light-mode .prof-lbl{color:#2d1f6e}
+body.light-mode .cfg-sub2,.light-mode .prof-val,.light-mode .mem-val{color:rgba(60,40,120,.6)}
+body.light-mode .glass,.light-mode .brief-card,.light-mode .mem-item,.light-mode .agent-card,.light-mode .msg-item,.light-mode .conn-card,.light-mode .sub-card{background:rgba(255,255,255,.7);border-color:rgba(139,92,246,.15)}
+body.light-mode .finp,.light-mode .sinp{background:rgba(255,255,255,.8);color:#2d1f6e;border-color:rgba(139,92,246,.2)}
+body.light-mode .finp::placeholder{color:rgba(80,60,140,.35)}
+body.light-mode .bottom-nav{background:rgba(240,238,248,.95);border-color:rgba(139,92,246,.2)}
+body.light-mode .nav-label{color:rgba(80,60,140,.6)}
+body.light-mode .subpage{background:#f0eef8}
+body.light-mode .subpage-header{background:rgba(240,238,248,.98);border-bottom-color:rgba(139,92,246,.15)}
+body.light-mode .trend-title,.light-mode .fn-title,.light-mode .sub-name{color:#2d1f6e}
+body.light-mode .trend-sub,.light-mode .fn-sub,.light-mode .sub-desc{color:rgba(60,40,120,.55)}
 </style>
 </head>
 <body>
@@ -829,13 +852,40 @@ select.finp option,select.cinp option,select.sinp option{
     <div class="panel" id="tab-msgs">
       <div class="section-title" style="margin-top:8px">MESSAGES RECUS</div>
       <div id="msgs-list" style="color:rgba(120,80,255,.35);font-size:12px;text-align:center;padding:10px">Chargement...</div>
-      <div class="section-title" id="send-section" style="display:none">ENVOYER UN MESSAGE (ADMIN)</div>
-      <div class="send-msg-area" id="send-area" style="display:none">
-        <div class="field-label">TOKEN DESTINATAIRE</div>
-        <input class="finp" id="msg-to" placeholder="Token de l'utilisateur..."/>
-        <div class="field-label">MESSAGE</div>
-        <textarea class="finp" id="msg-body" placeholder="Ton message..." style="resize:none;height:70px"></textarea>
-        <button class="access-btn" onclick="sendAdminMsg()">ENVOYER</button>
+
+      <!-- DASHBOARD ADMIN (owner seulement) -->
+      <div id="admin-dashboard" style="display:none">
+        <div class="section-title">🛡 TABLEAU DE BORD ADMIN</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px" id="admin-stats">
+          <div style="background:var(--surface);border:1px solid var(--border-gold);border-radius:12px;padding:12px;text-align:center">
+            <div style="font-size:24px;font-weight:700;color:var(--gold)" id="admin-users-count">-</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Utilisateurs actifs</div>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center">
+            <div style="font-size:24px;font-weight:700;color:var(--violet)" id="admin-msgs-count">-</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Messages échangés</div>
+          </div>
+        </div>
+        <div style="margin-bottom:10px">
+          <div class="field-label">LISTE DES UTILISATEURS</div>
+          <div id="admin-users-list" style="max-height:200px;overflow-y:auto"></div>
+        </div>
+        <div style="margin-bottom:10px">
+          <div class="field-label">INVITER UN UTILISATEUR</div>
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <input class="finp" id="invite-name" placeholder="Prénom (optionnel)" style="font-size:13px"/>
+            <button onclick="inviteUser()" class="go-btn" style="padding:8px 12px;white-space:nowrap">+ Inviter</button>
+          </div>
+          <div id="invite-result" style="font-size:12px;margin-top:8px;min-height:14px;color:var(--gold)"></div>
+        </div>
+        <div class="section-title" id="send-section" style="display:none">ENVOYER UN MESSAGE</div>
+        <div class="send-msg-area" id="send-area" style="display:none">
+          <div class="field-label">TOKEN DESTINATAIRE</div>
+          <input class="finp" id="msg-to" placeholder="Token de l'utilisateur..."/>
+          <div class="field-label">MESSAGE</div>
+          <textarea class="finp" id="msg-body" placeholder="Ton message..." style="resize:none;height:70px"></textarea>
+          <button class="access-btn" onclick="sendAdminMsg()">ENVOYER</button>
+        </div>
       </div>
     </div>
 
@@ -878,6 +928,15 @@ select.finp option,select.cinp option,select.sinp option{
       <div class="cfg-row"><div><div class="cfg-lbl">Voix ElevenLabs</div><div class="cfg-sub2">Reponses vocales premium</div></div><button class="tog on" id="t-voice" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
       <div class="cfg-row"><div><div class="cfg-lbl">Lecture auto des reponses</div><div class="cfg-sub2">Sutur lit chaque reponse</div></div><button class="tog on" id="t-autospeak" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
       <div class="cfg-row"><div><div class="cfg-lbl">Geolocalisation</div><div class="cfg-sub2">Reponses adaptees a ta position</div></div><button class="tog on" id="t-geo" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
+      <div class="cfg-row"><div><div class="cfg-lbl">Mode clair</div><div class="cfg-sub2">Interface lumineuse pour usage en plein jour</div></div><button class="tog off" id="t-light" onclick="toggleLightMode(this)"></button></div>
+      <div class="section-title">EXPORT DES DONNÉES</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+        <button onclick="exportData('transactions')" class="go-btn" style="padding:10px;font-size:12px">💰 Finances CSV</button>
+        <button onclick="exportData('contacts')" class="go-btn" style="padding:10px;font-size:12px">👥 Contacts CSV</button>
+        <button onclick="exportData('memories')" class="go-btn" style="padding:10px;font-size:12px">🧠 Mémoire CSV</button>
+        <button onclick="exportData('knowledge')" class="go-btn" style="padding:10px;font-size:12px">🔮 Graphe CSV</button>
+      </div>
+      <div id="export-status" style="font-size:12px;color:var(--gold);text-align:center;margin-bottom:12px;min-height:14px"></div>
       <div class="section-title">SÉCURITÉ AVANCÉE</div>
       <div class="cfg-row">
         <div><div class="cfg-lbl">Face ID / Touch ID</div><div class="cfg-sub2">Connexion biométrique réelle (WebAuthn)</div></div>
@@ -1500,6 +1559,8 @@ function unlock(){
   checkSpotifyStatus();
   checkNotionStatus();
   checkWebauthnStatus();
+  // Initialiser le mode clair si sauvegardé
+  initLightMode();
   // Afficher la nav du bas après connexion
   const nav=document.getElementById('bottom-nav');
   if(nav)nav.style.display='flex';
@@ -2635,6 +2696,117 @@ async function askFinance(){
   }catch(e){ansDiv.textContent='Erreur lors de l\'analyse'}
 }
 
+// ── MODE CLAIR ────────────────────────────────────────────────────────────────
+function toggleLightMode(btn){
+  btn.classList.toggle('on');
+  btn.classList.toggle('off');
+  const isLight=btn.classList.contains('on');
+  document.body.classList.toggle('light-mode',isLight);
+  localStorage.setItem('s_light',isLight?'1':'0');
+}
+function initLightMode(){
+  if(localStorage.getItem('s_light')==='1'){
+    document.body.classList.add('light-mode');
+    const btn=document.getElementById('t-light');
+    if(btn){btn.classList.remove('off');btn.classList.add('on')}
+  }
+}
+
+// ── EXPORT DES DONNÉES ────────────────────────────────────────────────────────
+async function exportData(type){
+  const status=document.getElementById('export-status');
+  status.textContent='Préparation de l\'export...';
+  try{
+    let data,filename,rows=[];
+    if(type==='transactions'){
+      data=await apiCall('/finance/transactions?limit=1000');
+      const txs=data.transactions||[];
+      rows=[['Date','Type','Montant','Devise','Catégorie','Description']];
+      txs.forEach(t=>rows.push([t.date,t.type,t.amount,t.currency,t.category,t.description]));
+      filename='sutur_finances.csv';
+    }else if(type==='contacts'){
+      data=await apiCall('/contacts');
+      const cts=data.contacts||[];
+      rows=[['Nom','Téléphone','Email','Contexte','Notes','Dernier contact']];
+      cts.forEach(c=>rows.push([c.name,c.phone,c.email,c.context,c.notes,c.last_contact]));
+      filename='sutur_contacts.csv';
+    }else if(type==='memories'){
+      data=await apiCall('/memories');
+      const mems=data.memories||[];
+      rows=[['Catégorie','Clé','Valeur']];
+      mems.forEach(m=>rows.push([m.category,m.key,m.value]));
+      filename='sutur_memoire.csv';
+    }else if(type==='knowledge'){
+      data=await apiCall('/knowledge');
+      const groups=data.knowledge||{};
+      rows=[['Catégorie','Clé','Valeur','Horizon']];
+      Object.entries(groups).forEach(([cat,items])=>{
+        items.forEach(i=>rows.push([cat,i.key,i.value,i.timeframe||'']));
+      });
+      filename='sutur_graphe.csv';
+    }
+    const csv=rows.map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=filename;a.click();
+    URL.revokeObjectURL(url);
+    status.style.color='#4ade80';status.textContent=`✅ ${filename} téléchargé !`;
+    setTimeout(()=>{status.textContent='';status.style.color='var(--gold)'},3000);
+  }catch(e){
+    status.style.color='#f87171';status.textContent='Erreur lors de l\'export';
+  }
+}
+
+// ── DASHBOARD ADMIN ───────────────────────────────────────────────────────────
+async function loadAdminDashboard(){
+  const dash=document.getElementById('admin-dashboard');
+  if(!dash||!userIsOwner)return;
+  dash.style.display='block';
+  document.getElementById('send-section').style.display='block';
+  document.getElementById('send-area').style.display='flex';
+  try{
+    const data=await apiCall('/admin/users');
+    const users=data.users||[];
+    document.getElementById('admin-users-count').textContent=users.filter(u=>u.active).length;
+    document.getElementById('admin-msgs-count').textContent=
+      users.reduce((s,u)=>s+(u.message_count||0),0)||'—';
+    document.getElementById('admin-users-list').innerHTML=users.map(u=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+        <div>
+          <div style="font-size:13px;color:var(--text-primary);font-weight:500">${u.name||'Sans nom'} ${u.is_owner?'👑':''}</div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:2px;font-family:'Courier New',monospace">${u.token.substring(0,16)}...</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="font-size:10px;padding:2px 8px;border-radius:99px;background:${u.active?'rgba(74,222,128,.1)':'rgba(248,113,113,.1)'};color:${u.active?'#4ade80':'#f87171'};border:1px solid ${u.active?'rgba(74,222,128,.3)':'rgba(248,113,113,.3)'}">${u.active?'ACTIF':'INACTIF'}</span>
+          ${!u.is_owner?`<button onclick="revokeUser('${u.token}')" style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:6px;color:rgba(248,113,113,.7);font-size:10px;padding:3px 8px;cursor:pointer">Révoquer</button>`:''}
+        </div>
+      </div>`).join('');
+  }catch(e){
+    document.getElementById('admin-users-list').innerHTML='<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:8px">Route /admin/users non disponible</div>';
+  }
+}
+
+async function inviteUser(){
+  const name=document.getElementById('invite-name').value.trim();
+  const result=document.getElementById('invite-result');
+  try{
+    const data=await apiCall('/admin/invite','POST',{name,profession:'',interests:[]});
+    const token=data.token||'';
+    result.style.color='#4ade80';
+    result.innerHTML=`✅ Invité ! Token : <span style="font-family:'Courier New',monospace;color:var(--gold)">${token}</span>`;
+    document.getElementById('invite-name').value='';
+    loadAdminDashboard();
+  }catch(e){result.style.color='#f87171';result.textContent='Erreur lors de l\'invitation'}
+}
+
+async function revokeUser(token){
+  if(!confirm('Révoquer cet utilisateur ?'))return;
+  try{
+    await apiCall('/admin/revoke','POST',{token});
+    loadAdminDashboard();
+  }catch(e){}
+}
+
 async function loadBrief(){
   document.getElementById('brief-content').innerHTML='<div style="color:rgba(120,80,255,.4);text-align:center;padding:20px">Generation de votre brief...<br><div class="typing" style="justify-content:center;margin-top:10px"><span></span><span></span><span></span></div></div>';
   try{
@@ -2717,7 +2889,7 @@ async function loadMessages(){
         <div class="msg-body">${m.content}</div>
         <div class="msg-time">${new Date(m.created_at).toLocaleString('fr')}</div>
       </div>`).join('');
-    if(userIsOwner){document.getElementById('send-section').style.display='block';document.getElementById('send-area').style.display='flex'}
+    if(userIsOwner){document.getElementById('send-section').style.display='block';document.getElementById('send-area').style.display='flex';loadAdminDashboard()}
   }catch(e){}
 }
 
