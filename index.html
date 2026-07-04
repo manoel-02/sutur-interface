@@ -222,6 +222,30 @@ canvas#bgc{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-
 .conn-btn.connected{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);color:rgba(248,113,113,.7)}
 .conn-btn.connected:hover{background:rgba(248,113,113,.15)}
 
+/* ── NAVIGATION 4 ZONES ──────────────────────────────────────────────────── */
+.bottom-nav{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:18;background:rgba(7,5,26,.92);border:1px solid rgba(139,92,246,.2);border-radius:20px;padding:6px 8px;backdrop-filter:blur(12px)}
+.nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:6px 14px;border-radius:14px;transition:all .2s;min-width:60px;border:1px solid transparent}
+.nav-item.active{background:rgba(139,92,246,.18);border-color:rgba(139,92,246,.35)}
+.nav-item:hover:not(.active){background:rgba(255,255,255,.04)}
+.nav-icon{font-size:20px;line-height:1}
+.nav-label{font-size:10px;color:var(--text-muted);letter-spacing:.3px;font-weight:500}
+.nav-item.active .nav-label{color:var(--text-primary)}
+.inp-bar{position:fixed;bottom:76px;left:0;right:0;padding:8px 12px;background:rgba(7,5,26,.95);border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;z-index:17;backdrop-filter:blur(8px)}
+
+/* ── SUBPAGES ─────────────────────────────────────────────────────────────── */
+.subpage{position:fixed;inset:0;z-index:20;background:#07051a;transform:translateY(100%);transition:transform .35s cubic-bezier(.32,.72,0,1);display:flex;flex-direction:column;overflow:hidden}
+.subpage.open{transform:translateY(0)}
+.subpage-header{display:flex;align-items:center;gap:14px;padding:14px 16px;background:rgba(7,5,26,.98);border-bottom:1px solid var(--border);flex-shrink:0}
+.back-btn{background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.25);border-radius:10px;color:#c8aaff;font-size:18px;width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0}
+.subpage-title{font-size:15px;font-weight:700;color:var(--text-primary);letter-spacing:2px}
+.subpage-body{flex:1;overflow-y:auto;padding:16px 12px 100px}
+.subpage-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sub-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px 14px;text-align:center;cursor:pointer;transition:all .2s}
+.sub-card:hover,.sub-card:active{background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);transform:translateY(-2px)}
+.sub-icon{font-size:28px;margin-bottom:8px}
+.sub-name{font-size:14px;font-weight:600;color:var(--text-primary);margin-bottom:3px}
+.sub-desc{font-size:11px;color:var(--text-muted);line-height:1.4}
+
 /* ── SELECT / OPTIONS ────────────────────────────────────────────────────── */
 select.finp,select.cinp,select.sinp{
   color:var(--text-primary);
@@ -322,42 +346,44 @@ select.finp option,select.cinp option,select.sinp option{
 
 <!-- MAIN -->
 <div id="main" class="z1" style="width:100%">
+  <!-- HUD -->
   <div class="hud">
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+        <circle cx="16" cy="16" r="6" fill="#8b5cf6"/>
+        <ellipse cx="16" cy="16" rx="15" ry="5.5" stroke="#c9a227" stroke-width="1.5" fill="none" transform="rotate(-20 16 16)"/>
+      </svg>
+      <span style="font-size:13px;font-weight:700;color:#fff;letter-spacing:1px">ORBIX</span>
+    </div>
     <div class="hud-s"><div class="hdot" id="hdot"></div><span id="hst">EN LIGNE</span></div>
-    <span style="font-size:10px;color:var(--gold);letter-spacing:2px;font-weight:600" id="hmod">ORBIX</span>
-    <span style="font-size:9px;letter-spacing:1px" id="hemot" title="État émotionnel détecté"></span>
-    <span style="font-size:9px;color:var(--text-muted);letter-spacing:1px" id="htime">--:--</span>
-  </div>
-  <div class="globe-wrap"><canvas id="globe" width="120" height="120"></canvas></div>
-
-  <div class="tabs">
-    <div class="tab active" onclick="sw('chat',this)">CHAT</div>
-    <div class="tab" onclick="sw('brief',this)" id="tab-brief-btn">BRIEF</div>
-    <div class="tab" onclick="sw('media',this)">MEDIA</div>
-    <div class="tab" onclick="sw('fn',this)">OUTILS</div>
-    <div class="tab" onclick="sw('finance',this);loadFinance()">FINANCE</div>
-    <div class="tab" onclick="sw('focus',this);loadReminders()">FOCUS</div>
-    <div class="tab" onclick="sw('contacts',this);loadContacts()">CONTACTS</div>
-    <div class="tab" onclick="sw('delegate',this);loadDelegateHistory();loadKnowledge()">DÉLÉGUER</div>
-    <div class="tab" onclick="sw('mem',this)">MEMOIRE</div>
-    <div class="tab" onclick="sw('agents',this)">AGENTS</div>
-    <div class="tab" onclick="sw('msgs',this)" id="tab-msgs-btn">MSGS</div>
-    <div class="tab" onclick="sw('profil',this)">PROFIL</div>
-    <div class="tab" onclick="sw('cfg',this)">CONFIG</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:9px;letter-spacing:1px" id="hemot"></span>
+      <span style="font-size:10px;color:var(--gold);letter-spacing:2px;font-weight:600" id="hmod">ORBIX</span>
+      <span style="font-size:9px;color:var(--text-muted)" id="htime">--:--</span>
+    </div>
   </div>
 
-  <div class="panels">
-    <!-- CHAT -->
-    <div class="panel active" id="tab-chat">
-      <div class="chat-box" id="chatbox"></div>
+  <!-- ZONE CHAT (panel actif par défaut) -->
+  <div id="chat-zone" style="display:flex;flex-direction:column;position:fixed;inset:0;top:44px;bottom:120px;width:100%;overflow:hidden;z-index:1">
+
+    <!-- Globe orbital — visible sur l'écran d'accueil chat -->
+    <div id="globe-area" style="flex-shrink:0;display:none;justify-content:center;padding:4px 0 0">
+      <canvas id="globe" width="200" height="200" style="touch-action:none"></canvas>
     </div>
 
-    <!-- BRIEF -->
-    <div class="panel" id="tab-brief">
-      <div style="display:flex;gap:8px;margin:8px 0">
-        <button class="go-btn" style="flex:1" onclick="loadBrief()">&#9728; Generer mon brief du jour</button>
-        <button class="go-btn" onclick="speakText(currentBrief)">&#128266; Lire</button>
+    <!-- Panels de contenu -->
+    <div class="panels" style="flex:1;overflow:hidden;position:relative">
+      <!-- CHAT -->
+      <div class="panel active" id="tab-chat">
+        <div class="chat-box" id="chatbox"></div>
       </div>
+
+      <!-- BRIEF -->
+      <div class="panel" id="tab-brief">
+        <div style="display:flex;gap:8px;margin:8px 0">
+          <button class="go-btn" style="flex:1" onclick="loadBrief()">&#9728; Generer mon brief du jour</button>
+          <button class="go-btn" onclick="speakText(currentBrief)">&#128266; Lire</button>
+        </div>
       <div id="brief-content" style="color:rgba(120,80,255,.35);font-size:12px;text-align:center;padding:20px">Appuie sur "Generer" pour ton brief personnalise</div>
     </div>
 
@@ -803,44 +829,13 @@ select.finp option,select.cinp option,select.sinp option{
     <div class="panel" id="tab-msgs">
       <div class="section-title" style="margin-top:8px">MESSAGES RECUS</div>
       <div id="msgs-list" style="color:rgba(120,80,255,.35);font-size:12px;text-align:center;padding:10px">Chargement...</div>
-
-      <!-- DASHBOARD ADMIN - visible uniquement pour owner -->
-      <div id="admin-dashboard" style="display:none;margin-top:8px">
-        <div class="section-title">🛡 TABLEAU DE BORD ADMIN</div>
-
-        <!-- Stats -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-          <div class="glass" style="padding:12px;text-align:center;border:1px solid rgba(201,162,39,.25)">
-            <div style="font-size:28px;font-weight:700;color:#c9a227" id="admin-users-count">-</div>
-            <div style="font-size:11px;color:rgba(160,151,196,.6);margin-top:3px">Utilisateurs actifs</div>
-          </div>
-          <div class="glass" style="padding:12px;text-align:center">
-            <div style="font-size:28px;font-weight:700;color:#8b5cf6" id="admin-msgs-count">-</div>
-            <div style="font-size:11px;color:rgba(160,151,196,.6);margin-top:3px">Messages échangés</div>
-          </div>
-        </div>
-
-        <!-- Liste utilisateurs -->
-        <div class="section-title">UTILISATEURS</div>
-        <div id="admin-users-list" style="margin-bottom:12px"></div>
-
-        <!-- Inviter -->
-        <div class="section-title">INVITER UN UTILISATEUR</div>
-        <div style="display:flex;gap:8px;margin-bottom:6px">
-          <input class="finp" id="invite-name" placeholder="Prénom (optionnel)" style="font-size:13px"/>
-          <button onclick="inviteUser()" class="access-btn" style="white-space:nowrap;padding:10px 14px;font-size:12px">+ Inviter</button>
-        </div>
-        <div id="invite-result" style="font-size:12px;margin-bottom:12px;min-height:14px;color:#4ade80"></div>
-
-        <!-- Envoyer message -->
-        <div class="section-title" id="send-section" style="display:none">ENVOYER UN MESSAGE</div>
-        <div class="send-msg-area" id="send-area" style="display:none">
-          <div class="field-label">TOKEN DESTINATAIRE</div>
-          <input class="finp" id="msg-to" placeholder="Token de l'utilisateur..."/>
-          <div class="field-label">MESSAGE</div>
-          <textarea class="finp" id="msg-body" placeholder="Ton message..." style="resize:none;height:70px"></textarea>
-          <button class="access-btn" onclick="sendAdminMsg()">ENVOYER</button>
-        </div>
+      <div class="section-title" id="send-section" style="display:none">ENVOYER UN MESSAGE (ADMIN)</div>
+      <div class="send-msg-area" id="send-area" style="display:none">
+        <div class="field-label">TOKEN DESTINATAIRE</div>
+        <input class="finp" id="msg-to" placeholder="Token de l'utilisateur..."/>
+        <div class="field-label">MESSAGE</div>
+        <textarea class="finp" id="msg-body" placeholder="Ton message..." style="resize:none;height:70px"></textarea>
+        <button class="access-btn" onclick="sendAdminMsg()">ENVOYER</button>
       </div>
     </div>
 
@@ -955,164 +950,369 @@ select.finp option,select.cinp option,select.sinp option{
     </div>
   </div>
 
-  <div class="inp-bar" id="inp-bar">
+  </div><!-- fin panels -->
+  </div><!-- fin chat-zone -->
+
+  <!-- BARRE SAISIE CHAT -->
+  <div class="inp-bar" id="inp-bar" style="display:none">
     <button class="micbtn" id="micbtn" onclick="toggleMic()">&#127908;</button>
     <input class="cinp" id="cinp" placeholder="Parle a Sutur..." onkeydown="if(event.key==='Enter')sendMsg()"/>
-    <button class="sbtn" id="stopbtn" onclick="stopSpeech()" title="Arrêter la lecture" style="display:none;background:rgba(248,113,113,.15);border-color:rgba(248,113,113,.35);color:#f87171">&#9646;&#9646;</button>
+    <button class="sbtn" id="stopbtn" onclick="stopSpeech()" style="display:none;background:rgba(248,113,113,.15);border-color:rgba(248,113,113,.35);color:#f87171">&#9646;&#9646;</button>
+    <button class="sbtn" id="meet-stop-bar" onclick="stopMeetingFromBar()" style="display:none;background:rgba(248,113,113,.15);border-color:rgba(248,113,113,.35);color:#f87171;font-size:10px;width:auto;padding:0 10px;border-radius:10px">⏹ RÉU</button>
     <button class="sbtn" onclick="sendMsg()">&#9658;</button>
   </div>
-  <div style="text-align:center;padding:3px 0 6px;font-size:10px;color:var(--text-muted);letter-spacing:1.5px;background:rgba(7,5,26,.95)">by <span style="color:var(--gold);font-weight:600">OrbixLabs</span></div>
+
+  <!-- NAV 4 ZONES -->
+  <nav class="bottom-nav" id="bottom-nav" style="display:none">
+    <div class="nav-item active" id="nav-home" onclick="navTo('home')">
+      <div class="nav-icon">🏠</div>
+      <div class="nav-label">Accueil</div>
+    </div>
+    <div class="nav-item" id="nav-ia" onclick="navTo('ia')">
+      <div class="nav-icon">🤖</div>
+      <div class="nav-label">IA</div>
+    </div>
+    <div class="nav-item" id="nav-gestion" onclick="navTo('gestion')">
+      <div class="nav-icon">📊</div>
+      <div class="nav-label">Gestion</div>
+    </div>
+    <div class="nav-item" id="nav-moi" onclick="navTo('moi')">
+      <div class="nav-icon">👤</div>
+      <div class="nav-label">Moi</div>
+    </div>
+  </nav>
+
+  <!-- PAGES SECONDAIRES (slide-in) -->
+  <div class="subpage" id="page-ia">
+    <div class="subpage-header">
+      <button class="back-btn" onclick="closePage()">&#8592;</button>
+      <span class="subpage-title">🤖 INTELLIGENCE</span>
+    </div>
+    <div class="subpage-body">
+      <div class="subpage-grid">
+        <div class="sub-card" onclick="closePage();sw('delegate',null);loadDelegateHistory();loadKnowledge()">
+          <div class="sub-icon">🤖</div>
+          <div class="sub-name">Déléguer</div>
+          <div class="sub-desc">Tâches complexes</div>
+        </div>
+        <div class="sub-card" onclick="closePage();sw('agents',null)">
+          <div class="sub-icon">🕵️</div>
+          <div class="sub-name">Agents</div>
+          <div class="sub-desc">Veille automatique</div>
+        </div>
+        <div class="sub-card" onclick="closePage();sw('focus',null);loadReminders()">
+          <div class="sub-icon">🎙</div>
+          <div class="sub-name">Réunion</div>
+          <div class="sub-desc">Résumé auto Whisper</div>
+        </div>
+        <div class="sub-card" onclick="closePage();sw('focus',null)">
+          <div class="sub-icon">📄</div>
+          <div class="sub-name">Documents</div>
+          <div class="sub-desc">Génération IA</div>
+        </div>
+        <div class="sub-card" onclick="closePage();sw('brief',null);loadBrief()">
+          <div class="sub-icon">📰</div>
+          <div class="sub-name">Brief</div>
+          <div class="sub-desc">Résumé du jour</div>
+        </div>
+        <div class="sub-card" onclick="closePage();sw('media',null)">
+          <div class="sub-icon">🎬</div>
+          <div class="sub-name">Médias</div>
+          <div class="sub-desc">Tendances & vidéos</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="subpage" id="page-gestion">
+    <div class="subpage-header">
+      <button class="back-btn" onclick="closePage()">&#8592;</button>
+      <span class="subpage-title">📊 GESTION</span>
+    </div>
+    <div class="subpage-body">
+      <div class="subpage-grid">
+        <div class="sub-card" onclick="closePage();sw('finance',null);loadFinance()">
+          <div class="sub-icon">💰</div>
+          <div class="sub-name">Finance</div>
+          <div class="sub-desc">Budget multi-devises</div>
+        </div>
+        <div class="sub-card" onclick="closePage();sw('focus',null);loadReminders()">
+          <div class="sub-icon">🎯</div>
+          <div class="sub-name">Focus</div>
+          <div class="sub-desc">Pomodoro & rappels</div>
+        </div>
+        <div class="sub-card" onclick="closePage();sw('contacts',null);loadContacts()">
+          <div class="sub-icon">👥</div>
+          <div class="sub-name">Contacts</div>
+          <div class="sub-desc">Réseau & relances</div>
+        </div>
+        <div class="sub-card" onclick="closePage();sw('contacts',null)">
+          <div class="sub-icon">🌍</div>
+          <div class="sub-name">Traduction</div>
+          <div class="sub-desc">Multilingue IA</div>
+        </div>
+        <div class="sub-card" onclick="closePage();sw('fn',null)">
+          <div class="sub-icon">🔧</div>
+          <div class="sub-name">Outils</div>
+          <div class="sub-desc">Fonctions rapides</div>
+        </div>
+        <div class="sub-card" onclick="closePage();sw('msgs',null)">
+          <div class="sub-icon">💬</div>
+          <div class="sub-name">Messages</div>
+          <div class="sub-desc">Messagerie interne</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="subpage" id="page-moi">
+    <div class="subpage-header">
+      <button class="back-btn" onclick="closePage()">&#8592;</button>
+      <span class="subpage-title">👤 MON PROFIL</span>
+    </div>
+    <div class="subpage-body">
+      <div class="subpage-grid">
+        <div class="sub-card" onclick="closePage();sw('profil',null);loadProfile()">
+          <div class="sub-icon">👤</div>
+          <div class="sub-name">Profil</div>
+          <div class="sub-desc">Mes informations</div>
+        </div>
+        <div class="sub-card" onclick="closePage();sw('mem',null);loadMemories()">
+          <div class="sub-icon">🧠</div>
+          <div class="sub-name">Mémoire</div>
+          <div class="sub-desc">Ce que sait Sutur</div>
+        </div>
+        <div class="sub-card" onclick="closePage();sw('delegate',null);loadKnowledge()">
+          <div class="sub-icon">🔮</div>
+          <div class="sub-name">Connaissance</div>
+          <div class="sub-desc">Graphe long terme</div>
+        </div>
+        <div class="sub-card" onclick="closePage();sw('cfg',null)">
+          <div class="sub-icon">⚙️</div>
+          <div class="sub-name">Config</div>
+          <div class="sub-desc">Paramètres & voix</div>
+        </div>
+        <div class="sub-card" onclick="closePage();sw('cfg',null)">
+          <div class="sub-icon">🔗</div>
+          <div class="sub-name">Connexions</div>
+          <div class="sub-desc">Google, Spotify...</div>
+        </div>
+        <div class="sub-card" onclick="closePage();sw('cfg',null)">
+          <div class="sub-icon">🔐</div>
+          <div class="sub-name">Sécurité</div>
+          <div class="sub-desc">Face ID & WebAuthn</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align:center;padding:2px 0 3px;font-size:10px;color:var(--text-muted);letter-spacing:1.5px;background:rgba(7,5,26,.98);position:fixed;bottom:0;left:0;right:0;z-index:19">by <span style="color:var(--gold);font-weight:600">OrbixLabs</span></div>
 </div>
 
 <script>
-// ── SYSTÈME SOLAIRE ──────────────────────────────────────────────────────────
+// ── FOND SPATIAL ─────────────────────────────────────────────────────────────
 const bgc=document.getElementById('bgc'),bc=bgc.getContext('2d');
 let BW,BH;
 function rsz(){BW=bgc.width=bgc.offsetWidth||window.innerWidth;BH=bgc.height=bgc.offsetHeight||window.innerHeight}
 rsz();window.addEventListener('resize',rsz);
 
-// Étoiles fixes
-const stars=Array.from({length:200},()=>({
-  x:Math.random(),y:Math.random(),
-  r:.2+Math.random()*.8,
-  a:Math.random()*Math.PI*2,
-  twinkle:.003+Math.random()*.008
-}));
-
-// Étoiles filantes
-const shooters=Array.from({length:3},()=>({active:false,x:0,y:0,vx:0,vy:0,life:0,maxLife:0}));
-function spawnShooter(){
-  const s=shooters.find(s=>!s.active);
-  if(!s)return;
-  s.active=true;s.x=Math.random();s.y=Math.random()*.4;
-  const angle=Math.PI/4+Math.random()*.4;
-  const speed=.003+Math.random()*.004;
-  s.vx=Math.cos(angle)*speed;s.vy=Math.sin(angle)*speed;
-  s.maxLife=s.life=40+Math.random()*30;
-}
-setInterval(spawnShooter,3500);
-
-// Planètes du système solaire
-const SX=()=>BW*.18, SY=()=>BH*.5;
-const planets=[
-  {name:'Mercure',r:3,dist:55,speed:.047,color:'#b5a89a',ring:false,angle:Math.random()*Math.PI*2},
-  {name:'Vénus',r:5,dist:85,speed:.035,color:'#e8c87a',ring:false,angle:Math.random()*Math.PI*2},
-  {name:'Terre',r:5.5,dist:120,speed:.029,color:'#4a9eff',ring:false,angle:Math.random()*Math.PI*2,moon:{r:1.5,dist:10,speed:.13,angle:0}},
-  {name:'Mars',r:4,dist:160,speed:.024,color:'#c1440e',ring:false,angle:Math.random()*Math.PI*2},
-  {name:'Jupiter',r:11,dist:215,speed:.013,color:'#c88b3a',ring:false,angle:Math.random()*Math.PI*2},
-  {name:'Saturne',r:9,dist:270,speed:.009,color:'#e4d191',ring:true,angle:Math.random()*Math.PI*2},
-  {name:'Uranus',r:7,dist:320,speed:.006,color:'#7de8e8',ring:false,angle:Math.random()*Math.PI*2},
-];
-
-// Nébuleuse de fond
-function drawNebula(t){
-  const cx=BW*.75,cy=BH*.25;
-  const g1=bc.createRadialGradient(cx,cy,0,cx,cy,BH*.35);
-  g1.addColorStop(0,'rgba(139,92,246,.03)');
-  g1.addColorStop(.5,'rgba(201,162,39,.015)');
-  g1.addColorStop(1,'transparent');
-  bc.fillStyle=g1;bc.fillRect(0,0,BW,BH);
-  const cx2=BW*.1,cy2=BH*.8;
-  const g2=bc.createRadialGradient(cx2,cy2,0,cx2,cy2,BH*.25);
-  g2.addColorStop(0,'rgba(100,60,200,.025)');
-  g2.addColorStop(1,'transparent');
-  bc.fillStyle=g2;bc.fillRect(0,0,BW,BH);
-}
+const STARS=Array.from({length:150},()=>({x:Math.random(),y:Math.random(),r:.2+Math.random()*1.1,a:Math.random()*Math.PI*2,tw:.003+Math.random()*.012}));
+const SHOOTERS=Array.from({length:3},()=>({active:false,x:0,y:0,vx:0,vy:0,life:0,max:0}));
+let stTimer=0;
+function spawnShooter(){const s=SHOOTERS.find(s=>!s.active);if(!s)return;s.active=true;s.x=Math.random()*.7;s.y=Math.random()*.4;const a=Math.PI/4+Math.random()*.5,sp=.004+Math.random()*.004;s.vx=Math.cos(a)*sp;s.vy=Math.sin(a)*sp;s.max=s.life=40+Math.random()*25}
 
 function drawBg(t){
   bc.clearRect(0,0,BW,BH);
-  drawNebula(t);
-
-  // Étoiles
-  stars.forEach(s=>{
-    const brightness=.4+.6*Math.sin(t*s.twinkle+s.a);
-    bc.beginPath();bc.arc(s.x*BW,s.y*BH,s.r,0,Math.PI*2);
-    bc.fillStyle=`rgba(255,255,255,${brightness*.7})`;bc.fill();
+  bc.fillStyle='#03010f';bc.fillRect(0,0,BW,BH);
+  // Nébuleuses
+  [[.75,.2,.4,'rgba(70,15,130,.2)'],[.1,.8,.3,'rgba(50,10,100,.15)'],[.9,.7,.25,'rgba(90,30,160,.12)']].forEach(([fx,fy,fr,c])=>{
+    const g=bc.createRadialGradient(fx*BW,fy*BH,0,fx*BW,fy*BH,fr*BH);
+    g.addColorStop(0,c);g.addColorStop(1,'transparent');
+    bc.fillStyle=g;bc.fillRect(0,0,BW,BH);
   });
-
+  // Étoiles
+  STARS.forEach(s=>{
+    const b=.2+.6*Math.sin(t*s.tw+s.a);
+    bc.beginPath();bc.arc(s.x*BW,s.y*BH,s.r,0,Math.PI*2);
+    bc.fillStyle=`rgba(255,255,255,${b})`;bc.fill();
+  });
   // Étoiles filantes
-  shooters.forEach(s=>{
+  stTimer++;if(stTimer>100){stTimer=0;spawnShooter()}
+  SHOOTERS.forEach(s=>{
     if(!s.active)return;
-    const p=s.life/s.maxLife;
-    const len=30*p;
-    bc.beginPath();
-    bc.moveTo(s.x*BW,s.y*BH);
-    bc.lineTo((s.x-s.vx*len*.1)*BW,(s.y-s.vy*len*.1)*BH);
-    bc.strokeStyle=`rgba(255,255,255,${p*.6})`;bc.lineWidth=1.5;bc.stroke();
+    const p=s.life/s.max;
+    bc.beginPath();bc.moveTo(s.x*BW,s.y*BH);bc.lineTo((s.x-s.vx*50*.1)*BW,(s.y-s.vy*50*.1)*BH);
+    bc.strokeStyle=`rgba(255,255,255,${p*.6})`;bc.lineWidth=1.2;bc.stroke();
+    bc.beginPath();bc.arc(s.x*BW,s.y*BH,1.5*p,0,Math.PI*2);
+    bc.fillStyle=`rgba(200,180,255,${p})`;bc.fill();
     s.x+=s.vx;s.y+=s.vy;s.life--;
     if(s.life<=0||s.x>1.1||s.y>1.1)s.active=false;
   });
-
-  // Système solaire (seulement si assez large)
-  if(BW<500)return;
-  const sx=SX(),sy=SY();
-
-  // Soleil
-  const sunGlow=bc.createRadialGradient(sx,sy,0,sx,sy,28);
-  sunGlow.addColorStop(0,'rgba(255,220,80,.9)');
-  sunGlow.addColorStop(.4,'rgba(255,160,30,.4)');
-  sunGlow.addColorStop(.8,'rgba(255,100,0,.1)');
-  sunGlow.addColorStop(1,'transparent');
-  bc.fillStyle=sunGlow;bc.fillRect(sx-30,sy-30,60,60);
-  bc.beginPath();bc.arc(sx,sy,10,0,Math.PI*2);
-  bc.fillStyle='rgba(255,220,80,.95)';bc.fill();
-  // Couronne solaire pulsante
-  bc.beginPath();bc.arc(sx,sy,14+Math.sin(t*.002)*2,0,Math.PI*2);
-  bc.strokeStyle=`rgba(255,180,30,${.2+Math.sin(t*.003)*.1})`;bc.lineWidth=3;bc.stroke();
-
-  // Orbites et planètes
-  planets.forEach(p=>{
-    if(sx+p.dist>BW+20)return; // masquer si hors écran
-    p.angle+=p.speed*.002;
-    const px=sx+Math.cos(p.angle)*p.dist;
-    const py=sy+Math.sin(p.angle)*p.dist*.38; // ellipse aplatie
-
-    // Orbite
-    bc.beginPath();bc.ellipse(sx,sy,p.dist,p.dist*.38,0,0,Math.PI*2);
-    bc.strokeStyle='rgba(255,255,255,.04)';bc.lineWidth=.5;bc.stroke();
-
-    // Anneau de Saturne
-    if(p.ring){
-      bc.beginPath();bc.ellipse(px,py,p.r*2.4,p.r*.6,-.3,0,Math.PI*2);
-      bc.strokeStyle=`rgba(228,209,145,.35)`;bc.lineWidth=2.5;bc.stroke();
-    }
-
-    // Planète
-    const grad=bc.createRadialGradient(px-p.r*.3,py-p.r*.3,0,px,py,p.r);
-    grad.addColorStop(0,'rgba(255,255,255,.3)');
-    grad.addColorStop(.3,p.color);
-    grad.addColorStop(1,`${p.color}88`);
-    bc.beginPath();bc.arc(px,py,p.r,0,Math.PI*2);
-    bc.fillStyle=grad;bc.fill();
-
-    // Lune de la Terre
-    if(p.moon){
-      p.moon.angle+=p.moon.speed*.002;
-      const mx=px+Math.cos(p.moon.angle)*p.moon.dist;
-      const my=py+Math.sin(p.moon.angle)*p.moon.dist*.5;
-      bc.beginPath();bc.arc(mx,my,p.moon.r,0,Math.PI*2);
-      bc.fillStyle='rgba(220,220,220,.7)';bc.fill();
-    }
-  });
+  // Planète bas gauche
+  bc.save();bc.translate(BW*-.05,BH*.95);bc.rotate(-.35);
+  bc.beginPath();bc.ellipse(0,0,BW*.2,BW*.05,0,0,Math.PI*2);
+  bc.strokeStyle='rgba(201,162,39,.15)';bc.lineWidth=2;bc.stroke();
+  bc.restore();
+  bc.beginPath();bc.arc(BW*-.02,BH*1.02,BW*.18,0,Math.PI*2);
+  bc.fillStyle='rgba(45,10,80,.55)';bc.fill();
 }
 
-// Globe
-const gc=document.getElementById('globe').getContext('2d');
-const GR=52,GPTS=90;
-const gpts=Array.from({length:GPTS},(_,i)=>{const phi=Math.acos(1-2*(i+.5)/GPTS),theta=Math.PI*(1+Math.sqrt(5))*i;return{ox:Math.sin(phi)*Math.cos(theta),oy:Math.sin(phi)*Math.sin(theta),oz:Math.cos(phi)}});
+// ── GLOBE ORBITAL CENTRAL ─────────────────────────────────────────────────────
+const gc=document.getElementById('globe');
+const gctx=gc.getContext('2d');
+let GW=200,GH=200,gMode=0,gT=0;
+
+function resizeGlobe(){
+  const isMobile=window.innerWidth<600;
+  GW=GH=isMobile?160:200;
+  gc.width=GW;gc.height=GH;
+}
+resizeGlobe();
+window.addEventListener('resize',resizeGlobe);
+
+const GMODES=[
+  {name:'VEILLE',col:'#8b5cf6',glow:'139,92,246',gold:'201,162,39',speed:1},
+  {name:'RÉFLEXION',col:'#c9a227',glow:'201,162,39',gold:'139,92,246',speed:2.8},
+  {name:'PAROLE',col:'#4ade80',glow:'74,222,128',gold:'201,162,39',speed:1.8},
+  {name:'ALERTE',col:'#f87171',glow:'248,113,113',gold:'201,162,39',speed:3.5},
+];
+
 let gActive=false,gThink=false;
+
 function drawGlobe(t){
-  gc.clearRect(0,0,120,120);
-  const rot=t*.0005,br=gThink?1.6:gActive?1.2:1;
-  gc.beginPath();gc.arc(60,60,GR+3,0,Math.PI*2);gc.strokeStyle=`rgba(139,92,246,${.08*br})`;gc.lineWidth=8;gc.stroke();
-  gc.beginPath();gc.arc(60,60,GR,0,Math.PI*2);gc.strokeStyle=`rgba(201,162,39,${.2*br})`;gc.lineWidth=1;gc.stroke();
-  const vis=[];
-  gpts.forEach(p=>{const x=p.ox*Math.cos(rot)-p.oy*Math.sin(rot),y=p.ox*Math.sin(rot)+p.oy*Math.cos(rot),sx=60+x*GR,sy=60-p.oz*GR,v=(y+1)/2;vis.push({sx,sy,v,y})});
-  vis.forEach(p=>{if(p.y<0)return;gc.beginPath();gc.arc(p.sx,p.sy,1+p.v*(gThink?2:1.2),0,Math.PI*2);gc.fillStyle=`rgba(139,92,246,${p.v*.9*br})`;gc.fill()});
-  for(let i=0;i<vis.length;i++){if(vis[i].y<0)continue;for(let j=i+1;j<vis.length;j++){if(vis[j].y<0)continue;const dx=vis[i].sx-vis[j].sx,dy=vis[i].sy-vis[j].sy,d=Math.sqrt(dx*dx+dy*dy);if(d<18){gc.beginPath();gc.moveTo(vis[i].sx,vis[i].sy);gc.lineTo(vis[j].sx,vis[j].sy);gc.strokeStyle=`rgba(201,162,39,${(1-d/18)*vis[i].v*vis[j].v*.2*br})`;gc.lineWidth=.4;gc.stroke()}}}
-  if(gThink){gc.beginPath();gc.arc(60,60,GR+5+Math.sin(t*.008)*3,0,Math.PI*2);gc.strokeStyle=`rgba(201,162,39,${.08+Math.sin(t*.01)*.04})`;gc.lineWidth=1.5;gc.stroke()}
+  gctx.clearRect(0,0,GW,GH);
+  const cx=GW/2,cy=GH/2;
+  const m=GMODES[gMode];
+  const sp=m.speed;
+  const R=GW*.38; // rayon globe
+  const pulse=1+.04*Math.sin(t*.04);
+
+  // ── Halos lumineux multicouches (comme sur la photo)
+  [[R*3,.04],[R*2.2,.08],[R*1.5,.14],[R*1.1,.2]].forEach(([r,a])=>{
+    const g=gctx.createRadialGradient(cx,cy,0,cx,cy,r*pulse);
+    g.addColorStop(0,`rgba(${m.glow},${a})`);
+    g.addColorStop(.6,`rgba(${m.glow},${a*.3})`);
+    g.addColorStop(1,'transparent');
+    gctx.fillStyle=g;gctx.beginPath();gctx.arc(cx,cy,r*pulse,0,Math.PI*2);gctx.fill();
+  });
+
+  // ── Anneau orbital doré principal (incliné comme sur la photo)
+  gctx.save();gctx.translate(cx,cy);gctx.rotate(-.3);
+  // Anneau doré brillant
+  const ringR=R*1.15;const ringY=R*.38;
+  gctx.beginPath();gctx.ellipse(0,0,ringR,ringY,0,0,Math.PI*2);
+  const ringG=gctx.createLinearGradient(-ringR,0,ringR,0);
+  ringG.addColorStop(0,'rgba(201,162,39,.1)');
+  ringG.addColorStop(.3,'rgba(201,162,39,.8)');
+  ringG.addColorStop(.5,'rgba(255,210,80,.95)');
+  ringG.addColorStop(.7,'rgba(201,162,39,.8)');
+  ringG.addColorStop(1,'rgba(201,162,39,.1)');
+  gctx.strokeStyle=ringG;gctx.lineWidth=2;gctx.stroke();
+  // Satellite doré sur l'anneau
+  const sa=t*.013*sp;
+  const sx=Math.cos(sa)*ringR,sy=Math.sin(sa)*ringY;
+  // Halo satellite
+  const shg=gctx.createRadialGradient(sx,sy,0,sx,sy,8);
+  shg.addColorStop(0,'rgba(255,210,80,.5)');shg.addColorStop(1,'transparent');
+  gctx.fillStyle=shg;gctx.fillRect(sx-8,sy-8,16,16);
+  gctx.beginPath();gctx.arc(sx,sy,3.5,0,Math.PI*2);
+  gctx.fillStyle='rgba(255,220,100,.95)';gctx.fill();
+  gctx.restore();
+
+  // ── Anneau violet secondaire (autre inclinaison)
+  gctx.save();gctx.translate(cx,cy);gctx.rotate(.2);
+  gctx.beginPath();gctx.ellipse(0,0,R*1.05,R*.32,0,0,Math.PI*2);
+  const ring2G=gctx.createLinearGradient(-R,0,R,0);
+  ring2G.addColorStop(0,`rgba(${m.glow},.05)`);
+  ring2G.addColorStop(.4,`rgba(${m.glow},.6)`);
+  ring2G.addColorStop(.6,`rgba(${m.glow},.6)`);
+  ring2G.addColorStop(1,`rgba(${m.glow},.05)`);
+  gctx.strokeStyle=ring2G;gctx.lineWidth=1.2;gctx.stroke();
+  // Satellite violet
+  const sb=-t*.017*sp;
+  const sx2=Math.cos(sb)*R*1.05,sy2=Math.sin(sb)*R*.32;
+  gctx.beginPath();gctx.arc(sx2,sy2,2.5,0,Math.PI*2);
+  gctx.fillStyle=`rgba(${m.glow},.9)`;gctx.fill();
+  gctx.restore();
+
+  // ── Globe central (sphère)
+  const sphereG=gctx.createRadialGradient(cx-R*.25,cy-R*.2,0,cx,cy,R*pulse);
+  sphereG.addColorStop(0,'rgba(80,40,140,.7)');
+  sphereG.addColorStop(.4,'rgba(30,10,70,.85)');
+  sphereG.addColorStop(.8,'rgba(10,4,30,.95)');
+  sphereG.addColorStop(1,'rgba(5,2,20,.98)');
+  gctx.beginPath();gctx.arc(cx,cy,R*pulse,0,Math.PI*2);
+  gctx.fillStyle=sphereG;gctx.fill();
+
+  // Bordure lumineuse de la sphère
+  const borderG=gctx.createLinearGradient(cx-R,cy-R,cx+R,cy+R);
+  borderG.addColorStop(0,`rgba(${m.glow},.9)`);
+  borderG.addColorStop(.5,`rgba(${m.glow},.4)`);
+  borderG.addColorStop(1,`rgba(${m.glow},.1)`);
+  gctx.strokeStyle=borderG;gctx.lineWidth=1.5;gctx.stroke();
+
+  // Reflet/spéculaire sur la sphère
+  const spec=gctx.createRadialGradient(cx-R*.3,cy-R*.3,0,cx-R*.2,cy-R*.2,R*.5);
+  spec.addColorStop(0,'rgba(255,255,255,.12)');
+  spec.addColorStop(1,'transparent');
+  gctx.beginPath();gctx.arc(cx,cy,R*pulse,0,Math.PI*2);
+  gctx.fillStyle=spec;gctx.fill();
+
+  // ── Couronne pulsante externe
+  const crPulse=R*pulse+5+3*Math.sin(t*.04);
+  gctx.beginPath();gctx.arc(cx,cy,crPulse,0,Math.PI*2);
+  gctx.strokeStyle=`rgba(${m.glow},${.12+.06*Math.sin(t*.035)})`;gctx.lineWidth=1;gctx.stroke();
+
+  // ── Animations selon le mode
+  if(gMode===1){ // RÉFLEXION — particules orbitantes
+    for(let i=0;i<12;i++){
+      const a=t*.07+i*(Math.PI/6);const pr=R+15+Math.sin(t*.05+i)*4;
+      const px=cx+Math.cos(a)*pr*pulse,py=cy+Math.sin(a)*pr*.38*pulse;
+      gctx.beginPath();gctx.arc(px,py,1.8,0,Math.PI*2);
+      gctx.fillStyle=`rgba(201,162,39,${.3+.5*Math.sin(t*.09+i)})`;gctx.fill();
+    }
+  }
+  if(gMode===2){ // PAROLE — ondes sonores
+    for(let i=1;i<=5;i++){
+      const wr=(R+i*10+5*Math.sin(t*.06+i*.7))*pulse;
+      const wa=.2-i*.035;
+      gctx.beginPath();gctx.arc(cx,cy,wr,0,Math.PI*2);
+      gctx.strokeStyle=`rgba(74,222,128,${Math.max(0,wa*Math.abs(Math.sin(t*.05+i)))})`;
+      gctx.lineWidth=1;gctx.stroke();
+    }
+  }
+  if(gMode===3){ // ALERTE — flash rouge pulsant
+    const flashA=.08+.06*Math.abs(Math.sin(t*.12));
+    for(let i=1;i<=3;i++){
+      gctx.beginPath();gctx.arc(cx,cy,(R+i*14)*pulse,0,Math.PI*2);
+      gctx.strokeStyle=`rgba(248,113,113,${flashA/i})`;gctx.lineWidth=1.5;gctx.stroke();
+    }
+  }
+
+  // ── Texte central
+  gctx.textAlign='center';
+  const fontSize=Math.round(R*.52);
+  gctx.font=`700 ${fontSize}px system-ui,-apple-system,sans-serif`;
+  gctx.fillStyle='rgba(232,228,248,.96)';
+  gctx.fillText('SUTUR',cx,cy+R*.08);
+  const subSize=Math.round(R*.22);
+  gctx.font=`${subSize}px system-ui`;
+  gctx.fillStyle='rgba(201,162,39,.8)';
+  gctx.fillText('by OrbixLabs',cx,cy+R*.36);
+
+  // ── Label mode en dessous du globe
+  gctx.font=`500 ${Math.round(R*.2)}px system-ui`;
+  gctx.fillStyle=`rgba(${m.glow},.6)`;
+  gctx.fillText(m.name,cx,GH-8);
 }
-function loop(t){drawBg(t);drawGlobe(t);document.getElementById('htime').textContent=new Date().toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'});requestAnimationFrame(loop)}
+
+function loop(t){
+  drawBg(t);
+  drawGlobe(gT);
+  gT++;
+  document.getElementById('htime').textContent=new Date().toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'});
+  requestAnimationFrame(loop);
+}
 requestAnimationFrame(loop);
 
 // State
@@ -1300,6 +1500,15 @@ function unlock(){
   checkSpotifyStatus();
   checkNotionStatus();
   checkWebauthnStatus();
+  // Afficher la nav du bas après connexion
+  const nav=document.getElementById('bottom-nav');
+  if(nav)nav.style.display='flex';
+  const chatPanel=document.getElementById('tab-chat');
+  if(chatPanel)chatPanel.classList.add('active');
+  const inpBar=document.getElementById('inp-bar');
+  if(inpBar)inpBar.style.display='flex';
+  const globeArea=document.getElementById('globe-area');
+  if(globeArea)globeArea.style.display='flex';
   // Détecte retour OAuth
   const q=window.location.search;
   if(q.includes('google=connected')){
@@ -1348,16 +1557,60 @@ async function greetUser(userName){
 
 function logout(){document.getElementById('main').style.display='none';document.getElementById('lock').style.display='flex';gActive=false;history=[];document.getElementById('chatbox').innerHTML='';document.getElementById('pass-inp').value=''}
 
+// ── NAVIGATION 4 ZONES ───────────────────────────────────────────────────────
+let currentPage=null;
+
+function navTo(zone){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('nav-'+zone).classList.add('active');
+  if(zone==='home'){
+    closePage();
+    // Revenir au chat
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    const chatPanel=document.getElementById('tab-chat');
+    if(chatPanel)chatPanel.classList.add('active');
+    const inpBar=document.getElementById('inp-bar');
+    if(inpBar)inpBar.style.display='flex';
+    const globeArea=document.getElementById('globe-area');
+    if(globeArea)globeArea.style.display='flex';
+    return;
+  }
+  const page=document.getElementById('page-'+zone);
+  if(page){
+    if(currentPage&&currentPage!==page){currentPage.classList.remove('open')}
+    page.classList.add('open');
+    currentPage=page;
+  }
+}
+
+function closePage(){
+  if(currentPage){currentPage.classList.remove('open');currentPage=null}
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('nav-home').classList.add('active');
+  // Masquer inp-bar sauf si on est sur chat
+  const activePanel=document.querySelector('.panel.active');
+  const inpBar=document.getElementById('inp-bar');
+  if(inpBar)inpBar.style.display=activePanel&&activePanel.id==='tab-chat'?'flex':'none';
+}
+
 function sw(name,el){
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-  if(el)el.classList.add('active');
-  document.getElementById('tab-'+name).classList.add('active');
-  document.getElementById('inp-bar').style.display=name==='chat'?'flex':'none';
+  const panel=document.getElementById('tab-'+name);
+  if(panel)panel.classList.add('active');
+  const inpBar=document.getElementById('inp-bar');
+  if(inpBar)inpBar.style.display=name==='chat'?'flex':'none';
   if(name==='mem')loadMemories();
   if(name==='agents')loadAgents();
-  if(name==='msgs'){loadMessages();if(userIsOwner)loadAdminDashboard();}
+  if(name==='msgs')loadMessages();
   if(name==='profil')loadProfile();
+  // Montrer/cacher le globe
+  const globeArea=document.getElementById('globe-area');
+  if(globeArea)globeArea.style.display=name==='chat'?'flex':'none';
+}
+
+function setGlobeMode(n){
+  gMode=n;
+  document.getElementById('hmod').textContent=['ORBIX','RÉFLEXION','PAROLE','ALERTE'][n];
 }
 
 function addMsg(role,text,speak=false){
@@ -2050,6 +2303,12 @@ setInterval(checkDueReminders,30000);
 // --- RÉUNION AVEC WHISPER ---
 let meetRecorder=null,meetChunks=[],meetStream=null,meetMode='mic',meetTimerInterval=null,meetSeconds=0,meetAnalyser=null,meetAnimFrame=null;
 
+function stopMeetingFromBar(){
+  // Revenir sur l'onglet FOCUS et déclencher l'arrêt
+  sw('focus',document.querySelectorAll('.tab')[5]);
+  setTimeout(()=>toggleMeetingRec(),200);
+}
+
 function setMeetMode(mode){
   meetMode=mode;
   document.getElementById('meet-mode-mic').classList.toggle('active',mode==='mic');
@@ -2109,7 +2368,9 @@ async function toggleMeetingRec(){
     meetStream&&meetStream.getTracks().forEach(t=>t.stop());
     btn.textContent='🎙 DÉMARRER';
     btn.style.background='';
+    btn.style.borderColor='';
     status.textContent='⏳ Transcription en cours via Whisper...';
+    document.getElementById('meet-stop-bar').style.display='none';
     return;
   }
 
@@ -2146,6 +2407,8 @@ async function toggleMeetingRec(){
     btn.style.background='rgba(248,113,113,.2)';
     btn.style.borderColor='rgba(248,113,113,.4)';
     status.textContent=meetMode==='screen'?'🔴 Enregistrement de l\'audio système en cours...':'🔴 Enregistrement micro en cours...';
+    // Afficher le bouton d'arrêt dans la barre fixe
+    document.getElementById('meet-stop-bar').style.display='flex';
   }catch(e){
     if(e.name==='NotAllowedError'){
       status.textContent='Permission refusée — autorise le micro/écran dans ton navigateur';
@@ -2447,68 +2710,15 @@ async function loadMessages(){
     const tabBtn=document.getElementById('tab-msgs-btn');
     if(msgs.length>0)tabBtn.innerHTML='MSGS<span class="notif-dot"></span>';
     else tabBtn.innerHTML='MSGS';
-    if(msgs.length===0){document.getElementById('msgs-list').innerHTML='<div style="color:rgba(120,80,255,.35);text-align:center;padding:10px">Aucun message recu</div>';}
-    else document.getElementById('msgs-list').innerHTML=msgs.map(m=>`
+    if(msgs.length===0){document.getElementById('msgs-list').innerHTML='<div style="color:rgba(120,80,255,.35);text-align:center;padding:10px">Aucun message</div>';return}
+    document.getElementById('msgs-list').innerHTML=msgs.map(m=>`
       <div class="msg-item">
         <div class="msg-from">DE: MANOEL</div>
         <div class="msg-body">${m.content}</div>
         <div class="msg-time">${new Date(m.created_at).toLocaleString('fr')}</div>
       </div>`).join('');
-    if(userIsOwner)loadAdminDashboard();
+    if(userIsOwner){document.getElementById('send-section').style.display='block';document.getElementById('send-area').style.display='flex'}
   }catch(e){}
-}
-
-async function loadAdminDashboard(){
-  if(!userIsOwner)return;
-  const dash=document.getElementById('admin-dashboard');
-  if(!dash)return;
-  dash.style.display='block';
-  const sendSec=document.getElementById('send-section');
-  const sendArea=document.getElementById('send-area');
-  if(sendSec)sendSec.style.display='block';
-  if(sendArea)sendArea.style.display='flex';
-  try{
-    const data=await apiCall('/admin/users');
-    const users=data.users||[];
-    const el_count=document.getElementById('admin-users-count');
-    const el_msgs=document.getElementById('admin-msgs-count');
-    const el_list=document.getElementById('admin-users-list');
-    if(el_count)el_count.textContent=users.filter(u=>u.active).length;
-    if(el_msgs)el_msgs.textContent=users.reduce((s,u)=>s+(u.message_count||0),0)||0;
-    if(el_list)el_list.innerHTML=users.length?users.map(u=>`
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 11px;background:rgba(120,80,255,.05);border:1px solid rgba(120,80,255,.12);border-radius:10px;margin-bottom:6px">
-        <div>
-          <div style="font-size:13px;color:#e8e4f8;font-weight:500">${u.name||'Sans nom'} ${u.is_owner?'👑':''}</div>
-          <div style="font-size:10px;color:rgba(160,151,196,.5);margin-top:2px;font-family:'Courier New',monospace">${(u.token||'').substring(0,20)}...</div>
-          <div style="font-size:10px;color:#c9a227;margin-top:1px">💬 ${u.message_count||0} messages</div>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center">
-          <span style="font-size:10px;padding:3px 8px;border-radius:99px;background:${u.active?'rgba(74,222,128,.1)':'rgba(248,113,113,.1)'};color:${u.active?'#4ade80':'#f87171'};border:1px solid ${u.active?'rgba(74,222,128,.3)':'rgba(248,113,113,.3)'}">${u.active?'ACTIF':'INACTIF'}</span>
-          ${!u.is_owner?`<button onclick="revokeUser('${u.token}')" style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:6px;color:rgba(248,113,113,.7);font-size:10px;padding:4px 8px;cursor:pointer;font-family:'Courier New',monospace">Révoquer</button>`:''}
-        </div>
-      </div>`).join(''):'<div style="color:rgba(120,80,255,.35);font-size:12px;text-align:center;padding:8px">Aucun utilisateur</div>';
-  }catch(e){
-    const el=document.getElementById('admin-users-list');
-    if(el)el.innerHTML='<div style="color:rgba(248,113,113,.5);font-size:12px;text-align:center;padding:8px">Erreur chargement</div>';
-  }
-}
-
-async function inviteUser(){
-  const name=document.getElementById('invite-name').value.trim();
-  const result=document.getElementById('invite-result');
-  try{
-    const data=await apiCall('/admin/invite','POST',{name,profession:'',interests:[]});
-    const token=data.token||'';
-    result.style.color='#4ade80';
-    result.innerHTML=`✅ Token : <span style="font-family:'Courier New',monospace;color:#c9a227;font-size:11px">${token}</span>`;
-    document.getElementById('invite-name').value='';
-    loadAdminDashboard();
-  }catch(e){result.style.color='#f87171';result.textContent='Erreur invitation'}
-}
-
-async function revokeUser(token){
-  if(!confirm('Révoquer cet utilisateur ?'))return;
-  try{await apiCall('/admin/revoke','POST',{token});loadAdminDashboard();}catch(e){}
 }
 
 async function sendAdminMsg(){
@@ -2521,11 +2731,10 @@ async function sendAdminMsg(){
   }catch(e){addMsg('ai','Erreur envoi message.')}
 }
 
-
 async function loadProfile(){
   try{
     const data=await apiCall('/profile');
-    if(data.is_owner){userIsOwner=true;setTimeout(loadAdminDashboard,500);}
+    if(data.is_owner)userIsOwner=true;
     const interests=data.interests||[];
     // Stocker le nom globalement
     currentUserName = data.name || '';
