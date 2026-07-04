@@ -2759,22 +2759,28 @@ async function exportData(type){
 
 // ── DASHBOARD ADMIN ───────────────────────────────────────────────────────────
 async function loadAdminDashboard(){
+  if(!userIsOwner)return;
   const dash=document.getElementById('admin-dashboard');
-  if(!dash||!userIsOwner)return;
+  if(!dash)return;
   dash.style.display='block';
-  document.getElementById('send-section').style.display='block';
-  document.getElementById('send-area').style.display='flex';
+  const sendSec=document.getElementById('send-section');
+  const sendArea=document.getElementById('send-area');
+  if(sendSec)sendSec.style.display='block';
+  if(sendArea)sendArea.style.display='flex';
   try{
     const data=await apiCall('/admin/users');
     const users=data.users||[];
-    document.getElementById('admin-users-count').textContent=users.filter(u=>u.active).length;
-    document.getElementById('admin-msgs-count').textContent=
-      users.reduce((s,u)=>s+(u.message_count||0),0)||'—';
-    document.getElementById('admin-users-list').innerHTML=users.map(u=>`
+    const countEl=document.getElementById('admin-users-count');
+    const msgsEl=document.getElementById('admin-msgs-count');
+    const listEl=document.getElementById('admin-users-list');
+    if(countEl)countEl.textContent=users.filter(u=>u.active).length;
+    if(msgsEl)msgsEl.textContent=users.reduce((s,u)=>s+(u.message_count||0),0)||'—';
+    if(listEl)listEl.innerHTML=users.map(u=>`
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
         <div>
           <div style="font-size:13px;color:var(--text-primary);font-weight:500">${u.name||'Sans nom'} ${u.is_owner?'👑':''}</div>
-          <div style="font-size:10px;color:var(--text-muted);margin-top:2px;font-family:'Courier New',monospace">${u.token.substring(0,16)}...</div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:2px;font-family:'Courier New',monospace">${(u.token||'').substring(0,16)}...</div>
+          <div style="font-size:10px;color:var(--gold);margin-top:1px">💬 ${u.message_count||0} messages</div>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
           <span style="font-size:10px;padding:2px 8px;border-radius:99px;background:${u.active?'rgba(74,222,128,.1)':'rgba(248,113,113,.1)'};color:${u.active?'#4ade80':'#f87171'};border:1px solid ${u.active?'rgba(74,222,128,.3)':'rgba(248,113,113,.3)'}">${u.active?'ACTIF':'INACTIF'}</span>
@@ -2782,10 +2788,13 @@ async function loadAdminDashboard(){
         </div>
       </div>`).join('');
   }catch(e){
-    document.getElementById('admin-users-list').innerHTML='<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:8px">Route /admin/users non disponible</div>';
+    const listEl=document.getElementById('admin-users-list');
+    if(listEl)listEl.innerHTML='<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:8px">Erreur chargement utilisateurs</div>';
   }
 }
-
+    document.getElementById('admin-msgs-count').textContent=
+      users.reduce((s,u)=>s+(u.message_count||0),0)||'—';
+    document.getElementById('admin-users-list').innerHTML=users.map(u=>`
 async function inviteUser(){
   const name=document.getElementById('invite-name').value.trim();
   const result=document.getElementById('invite-result');
