@@ -963,7 +963,7 @@ select.finp option,select.cinp option,select.sinp option{
   </div>
 
   <!-- NAV 4 ZONES -->
-  <nav class="bottom-nav">
+  <nav class="bottom-nav" id="bottom-nav" style="display:none">
     <div class="nav-item active" id="nav-home" onclick="navTo('home')">
       <div class="nav-icon">🏠</div>
       <div class="nav-label">Accueil</div>
@@ -1500,8 +1500,9 @@ function unlock(){
   checkSpotifyStatus();
   checkNotionStatus();
   checkWebauthnStatus();
-  // Initialiser nav — chat actif, globe visible, inp-bar visible
-  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  // Afficher la nav du bas après connexion
+  const nav=document.getElementById('bottom-nav');
+  if(nav)nav.style.display='flex';
   const chatPanel=document.getElementById('tab-chat');
   if(chatPanel)chatPanel.classList.add('active');
   const inpBar=document.getElementById('inp-bar');
@@ -1564,6 +1565,14 @@ function navTo(zone){
   document.getElementById('nav-'+zone).classList.add('active');
   if(zone==='home'){
     closePage();
+    // Revenir au chat
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    const chatPanel=document.getElementById('tab-chat');
+    if(chatPanel)chatPanel.classList.add('active');
+    const inpBar=document.getElementById('inp-bar');
+    if(inpBar)inpBar.style.display='flex';
+    const globeArea=document.getElementById('globe-area');
+    if(globeArea)globeArea.style.display='flex';
     return;
   }
   const page=document.getElementById('page-'+zone);
