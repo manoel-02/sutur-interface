@@ -367,7 +367,7 @@ select.finp option,select.cinp option,select.sinp option{
   <div id="chat-zone" style="display:flex;flex-direction:column;position:fixed;inset:0;top:44px;bottom:120px;width:100%;overflow:hidden;z-index:1">
 
     <!-- Globe orbital — visible sur l'écran d'accueil chat -->
-    <div id="globe-area" style="flex-shrink:0;display:flex;justify-content:center;padding:4px 0 0">
+    <div id="globe-area" style="flex-shrink:0;display:none;justify-content:center;padding:4px 0 0">
       <canvas id="globe" width="200" height="200" style="touch-action:none"></canvas>
     </div>
 
@@ -954,7 +954,7 @@ select.finp option,select.cinp option,select.sinp option{
   </div><!-- fin chat-zone -->
 
   <!-- BARRE SAISIE CHAT -->
-  <div class="inp-bar" id="inp-bar">
+  <div class="inp-bar" id="inp-bar" style="display:none">
     <button class="micbtn" id="micbtn" onclick="toggleMic()">&#127908;</button>
     <input class="cinp" id="cinp" placeholder="Parle a Sutur..." onkeydown="if(event.key==='Enter')sendMsg()"/>
     <button class="sbtn" id="stopbtn" onclick="stopSpeech()" style="display:none;background:rgba(248,113,113,.15);border-color:rgba(248,113,113,.35);color:#f87171">&#9646;&#9646;</button>
