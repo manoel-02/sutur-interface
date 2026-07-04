@@ -1662,7 +1662,7 @@ function sw(name,el){
   if(inpBar)inpBar.style.display=name==='chat'?'flex':'none';
   if(name==='mem')loadMemories();
   if(name==='agents')loadAgents();
-  if(name==='msgs')loadMessages();
+  if(name==='msgs'){loadMessages();if(userIsOwner)loadAdminDashboard();}
   if(name==='profil')loadProfile();
   // Montrer/cacher le globe
   const globeArea=document.getElementById('globe-area');
@@ -2906,7 +2906,7 @@ async function sendAdminMsg(){
 async function loadProfile(){
   try{
     const data=await apiCall('/profile');
-    if(data.is_owner)userIsOwner=true;
+    if(data.is_owner){userIsOwner=true;loadAdminDashboard();}
     const interests=data.interests||[];
     // Stocker le nom globalement
     currentUserName = data.name || '';
