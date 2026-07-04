@@ -846,11 +846,15 @@ select.finp option,select.cinp option,select.sinp option{
         <div class="section-title">UTILISATEURS</div>
         <div id="admin-users-list" style="margin-bottom:12px"></div>
         <div class="section-title">INVITER UN UTILISATEUR</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
+          <input class="finp" id="invite-name" placeholder="Prénom *" style="font-size:12px"/>
+          <input class="finp" id="invite-token" placeholder="Token (ex: samuel2026)" style="font-size:12px"/>
+        </div>
         <div style="display:flex;gap:8px;margin-bottom:6px">
-          <input class="finp" id="invite-name" placeholder="Prénom (optionnel)" style="font-size:12px"/>
+          <input class="finp" id="invite-pass" placeholder="Mot de passe (ex: samuel123)" style="font-size:12px;flex:1"/>
           <button onclick="inviteUser()" class="access-btn" style="white-space:nowrap;padding:8px 12px;font-size:11px;letter-spacing:1px">+ INVITER</button>
         </div>
-        <div id="invite-result" style="font-size:11px;margin-bottom:12px;min-height:14px;color:#4ade80"></div>
+        <div id="invite-result" style="font-size:11px;margin-bottom:12px;min-height:32px;color:#4ade80;line-height:1.6"></div>
         <div class="section-title" id="send-section" style="display:none">ENVOYER UN MESSAGE</div>
         <div class="send-msg-area" id="send-area" style="display:none">
           <div class="field-label">TOKEN DESTINATAIRE</div>
@@ -1371,10 +1375,30 @@ function saveSetup(){
   showLoginForm();unlock();
 }
 
-function tryPass(){
-  const v=document.getElementById('pass-inp').value;
-  if(!PASS||!TOKEN){showErr('Configure ton accès dabord');showFirstSetup();return}
-  if(v===PASS)unlock();else showErr('Mot de passe incorrect')
+async function tryPass(){
+  const v=document.getElementById('pass-inp').value.trim();
+  if(!TOKEN){showErr('Configure ton accès dabord');showFirstSetup();return}
+  if(!v){showErr('Entre ton mot de passe');return}
+  // Vérification côté serveur — token + password
+  try{
+    const r=await fetch(API_URL+'/auth/login',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({token:TOKEN,password:v})
+    });
+    const data=await r.json();
+    if(r.ok&&data.valid){
+      PASS=v;
+      localStorage.setItem('s_pass',v);
+      unlock();
+    }else{
+      showErr(data.detail||'Mot de passe incorrect');
+    }
+  }catch(e){
+    // Fallback local si le serveur est indisponible
+    if(PASS&&v===PASS){unlock();}
+    else{showErr('Erreur de connexion');}
+  }
 }
 
 function webauthnSupported(){
@@ -2782,20 +2806,39 @@ async function loadAdminDashboard(){
 
 async function inviteUser(){
   const name=document.getElementById('invite-name').value.trim();
+  const customToken=document.getElementById('invite-token').value.trim();
+  const password=document.getElementById('invite-pass').value.trim();
   const result=document.getElementById('invite-result');
-  if(!result)return;
+  if(!name){result.style.color='#f87171';result.textContent='Le prénom est requis';return}
+  result.style.color='rgba(150,120,255,.5)';result.textContent='Création en cours...';
   try{
-    const data=await apiCall('/admin/invite','POST',{name,profession:'',interests:[]});
+    const data=await apiCall('/admin/invite','POST',{
+      name,
+      custom_token:customToken||null,
+      password:password||null,
+      profession:'',interests:[]
+    });
     result.style.color='#4ade80';
-    result.innerHTML='✅ Token : <span style="font-family:\'Courier New\',monospace;color:#c9a227">'+data.token+'</span>';
+    result.innerHTML=`✅ Compte créé pour <strong>${data.name}</strong><br>
+      🔑 Token : <span style="font-family:'Courier New',monospace;color:#c9a227">${data.token}</span><br>
+      🔒 Mot de passe : <span style="font-family:'Courier New',monospace;color:#c9a227">${data.password}</span>`;
     document.getElementById('invite-name').value='';
-    setTimeout(()=>loadAdminDashboard(),500);
-  }catch(e){result.style.color='#f87171';result.textContent='Erreur invitation'}
+    document.getElementById('invite-token').value='';
+    document.getElementById('invite-pass').value='';
+    setTimeout(()=>loadAdminDashboard(),800);
+  }catch(e){
+    result.style.color='#f87171';
+    result.textContent=e.message||'Erreur lors de la création';
+  }
 }
 
 async function revokeUser(token){
-  if(!confirm('Révoquer cet utilisateur ?'))return;
-  try{await apiCall('/admin/revoke','POST',{token});loadAdminDashboard();}catch(e){}
+  if(!confirm('Révoquer cet utilisateur ? Il ne pourra plus se connecter.'))return;
+  try{
+    await apiCall('/admin/revoke','POST',{token});
+    // Retirer visuellement l'utilisateur de la liste immédiatement
+    loadAdminDashboard();
+  }catch(e){alert('Erreur lors de la révocation')}
 }
 
 async function sendAdminMsg(){
