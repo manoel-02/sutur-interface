@@ -809,22 +809,37 @@ select.finp option,select.cinp option,select.sinp option{
     <div class="panel" id="tab-agents">
       <div style="margin:8px 0">
         <div class="section-title">MES AGENTS DE VEILLE</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.6">Les agents surveillent tes sujets automatiquement chaque jour et te livrent un rapport au login, basé sur une vraie recherche web.</div>
         <div class="glass" style="padding:12px;margin-bottom:10px">
           <div class="field-label">NOM DE L'AGENT</div>
-          <input class="finp" id="ag-name" placeholder="Ex: Agent Bourse" style="margin-bottom:8px"/>
-          <div class="field-label">TYPE</div>
-          <select class="finp" id="ag-type" style="margin-bottom:8px">
-            <option value="marche">Marche financier / Bourse</option>
-            <option value="emploi">Offres d'emploi</option>
-            <option value="tech">Actualites tech</option>
-            <option value="musique">Nouveautes musicales</option>
-            <option value="crypto">Crypto / Bitcoin</option>
-            <option value="startup">Startups / Entrepreneuriat</option>
-            <option value="custom">Personnalise</option>
-          </select>
-          <div class="field-label">SUJET SPECIFIQUE</div>
-          <input class="finp" id="ag-topic" placeholder="Ex: CAC40, offres Cotonou, afrobeat..." style="margin-bottom:8px"/>
-          <button class="access-btn" onclick="createAgent()">CREER L'AGENT</button>
+          <input class="finp" id="ag-name" placeholder="Ex: Veille F1, Marché crypto..." style="margin-bottom:8px"/>
+          <div class="field-label">SUJET DE RECHERCHE</div>
+          <input class="finp" id="ag-topic" placeholder="Ex: Formule 1 résultats, Bitcoin prix, startups Bénin..." style="margin-bottom:8px"/>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+            <div>
+              <div class="field-label">TYPE</div>
+              <select class="finp sinp" id="ag-type">
+                <option value="sport">Sport</option>
+                <option value="finance">Finance / Bourse</option>
+                <option value="tech">Tech / IA</option>
+                <option value="crypto">Crypto</option>
+                <option value="startup">Startups</option>
+                <option value="musique">Musique</option>
+                <option value="emploi">Emploi</option>
+                <option value="custom">Personnalisé</option>
+              </select>
+            </div>
+            <div>
+              <div class="field-label">FRÉQUENCE</div>
+              <select class="finp sinp" id="ag-freq">
+                <option value="daily">Quotidien (8h)</option>
+                <option value="hourly">Toutes les heures</option>
+                <option value="weekly">Hebdomadaire</option>
+              </select>
+            </div>
+          </div>
+          <button class="access-btn" style="width:100%" onclick="createAgent()">+ CRÉER L'AGENT</button>
+          <div id="ag-msg" style="font-size:11px;text-align:center;margin-top:6px;min-height:14px;color:#4ade80"></div>
         </div>
         <div id="agents-list" style="color:rgba(120,80,255,.35);font-size:12px;text-align:center;padding:10px">Chargement...</div>
       </div>
@@ -1746,7 +1761,6 @@ function rejectTerms(){
 }
 
 async function greetUser(userName){
-  // Nouvel utilisateur — pas de nom ou profil vide
   if(!userName || userName === 'Utilisateur'){
     setTimeout(()=>{
       addMsg('ai', 'Bonjour ! Je suis Sutur, ton assistant personnel. Je ne te connais pas encore — comment tu t\'appelles ?', true);
@@ -1754,12 +1768,13 @@ async function greetUser(userName){
       onboardingStep = 'name';
     }, 400);
   } else {
-    // Utilisateur connu — salutation personnalisée
     const hour = new Date().getHours();
     const salut = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
     setTimeout(()=>{
       addMsg('ai', `${salut} ${userName}. Sutur est opérationnel. Que puis-je faire pour toi ?`, true);
     }, 400);
+    // Livrer les rapports d'agents en attente
+    setTimeout(deliverPendingNotifications, 2500);
   }
 }
 
@@ -2913,37 +2928,82 @@ async function loadAgents(){
   document.getElementById('agents-list').innerHTML='<div style="color:rgba(120,80,255,.35);text-align:center;padding:10px">Chargement...</div>';
   try{
     const data=await apiCall('/agents');
-    if(!data.agents||data.agents.length===0){document.getElementById('agents-list').innerHTML='<div style="color:rgba(120,80,255,.35);text-align:center;padding:10px">Aucun agent. Cree ton premier agent ci-dessus.</div>';return}
-    document.getElementById('agents-list').innerHTML=data.agents.map(a=>`
+    const agents=data.agents||[];
+    if(!agents.length){
+      document.getElementById('agents-list').innerHTML='<div style="color:rgba(120,80,255,.35);text-align:center;padding:10px">Aucun agent — crée ton premier agent ci-dessus.</div>';
+      return;
+    }
+    const freqLabel={'daily':'Quotidien','hourly':'Toutes les heures','weekly':'Hebdomadaire'};
+    document.getElementById('agents-list').innerHTML=agents.map(a=>{
+      const cfg=a.config||{};
+      const topic=cfg.topic||a.name;
+      const freq=freqLabel[cfg.frequency||'daily']||'Quotidien';
+      const lastRun=a.last_run?new Date(a.last_run).toLocaleString('fr',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'Jamais exécuté';
+      return `
       <div class="agent-card">
         <div class="agent-header">
-          <div><div class="agent-name">${a.name}</div><div class="agent-type">${a.type.toUpperCase()}</div></div>
-          <button class="run-btn" onclick="runAgent('${a.id}','${a.name}')">&#9654; LANCER</button>
+          <div style="flex:1">
+            <div class="agent-name">${a.name}</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">🔍 ${topic} · ⏱ ${freq}</div>
+            <div class="agent-last">Dernière exécution: ${lastRun}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button class="run-btn" onclick="runAgent('${a.id}','${a.name}')">▶ LANCER</button>
+            <button onclick="deleteAgent('${a.id}')" style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:6px;color:rgba(248,113,113,.6);font-size:9px;padding:4px 6px;cursor:pointer;font-family:system-ui">✕ Suppr.</button>
+          </div>
         </div>
-        <div class="agent-last">${a.last_run?'Derniere execution: '+new Date(a.last_run).toLocaleString('fr'):'Jamais execute'}</div>
-        <div class="agent-result" id="ar-${a.id}"></div>
-      </div>`).join('');
-  }catch(e){document.getElementById('agents-list').innerHTML='<div style="color:#ff6060;text-align:center;padding:10px">Erreur</div>'}
+        <div class="agent-result" id="ar-${a.id}" style="display:none;margin-top:8px;font-size:13px;color:var(--text-secondary);line-height:1.6;border-top:1px solid var(--border);padding-top:8px"></div>
+      </div>`;
+    }).join('');
+  }catch(e){document.getElementById('agents-list').innerHTML='<div style="color:#ff6060;text-align:center;padding:10px">Erreur chargement</div>'}
 }
 
 async function createAgent(){
-  const name=document.getElementById('ag-name').value.trim(),type=document.getElementById('ag-type').value,topic=document.getElementById('ag-topic').value.trim();
-  if(!name){return}
+  const name=document.getElementById('ag-name').value.trim();
+  const type=document.getElementById('ag-type').value;
+  const topic=document.getElementById('ag-topic').value.trim();
+  const freq=document.getElementById('ag-freq').value;
+  const msg=document.getElementById('ag-msg');
+  if(!name){msg.style.color='#f87171';msg.textContent='Donne un nom à l\'agent';return}
+  msg.style.color='var(--gold)';msg.textContent='Création...';
   try{
-    await apiCall('/agents','POST',{name,type,config:{topic:topic||type,sujet:topic}});
-    document.getElementById('ag-name').value='';document.getElementById('ag-topic').value='';
-    loadAgents();
-  }catch(e){alert('Erreur creation agent')}
+    await apiCall('/agents','POST',{name,type,config:{topic:topic||name,frequency:freq}});
+    document.getElementById('ag-name').value='';
+    document.getElementById('ag-topic').value='';
+    msg.style.color='#4ade80';msg.textContent='✅ Agent créé !';
+    setTimeout(()=>{msg.textContent='';loadAgents()},1500);
+  }catch(e){msg.style.color='#f87171';msg.textContent='Erreur création'}
 }
 
 async function runAgent(id,name){
   const el=document.getElementById('ar-'+id);
-  el.style.display='block';el.innerHTML='<div class="typing"><span></span><span></span><span></span></div>';
+  el.style.display='block';
+  el.innerHTML='<div class="typing"><span></span><span></span><span></span></div>';
   try{
     const data=await apiCall('/agents/'+id+'/run','POST');
-    el.innerHTML=data.result||'Erreur';
+    el.innerHTML=(data.result||'Erreur').replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
     speakText(`Rapport de l'agent ${name}: ${(data.result||'').substring(0,200)}`);
-  }catch(e){el.innerHTML='Erreur execution'}
+  }catch(e){el.innerHTML='<span style="color:#f87171">Erreur lors de l\'exécution</span>'}
+}
+
+async function deleteAgent(id){
+  if(!confirm('Supprimer cet agent ?'))return;
+  try{await apiCall('/agents/'+id,'DELETE');loadAgents();}catch(e){}
+}
+
+// Livraison des notifications d'agents au login
+async function deliverPendingNotifications(){
+  try{
+    const data=await apiCall('/notifications/pending');
+    const notifs=data.notifications||[];
+    if(!notifs.length)return;
+    // Livrer chaque notification avec délai
+    notifs.forEach((n,i)=>{
+      setTimeout(()=>{
+        addMsg('ai',`${n.title}\n\n${n.body}`,false);
+      },i*1000);
+    });
+  }catch(e){}
 }
 
 async function loadMessages(){
