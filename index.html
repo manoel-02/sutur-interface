@@ -1379,7 +1379,7 @@ function selectGender(g){
   const gb=document.getElementById('gender-btns');if(gb)gb.remove();
   addMsg('user',g==='m'?'👨 Homme':'👩 Femme',false);
   onboardingStep='profession';
-  setTimeout(()=>addMsg('ai','Parfait ! Pour mieux t'aider, quelle est ta profession ou ton activité principale ?',true),400);
+  setTimeout(()=>addMsg('ai','Parfait ! Pour mieux te connaitre, quelle est ta profession ou ton activite principale ?',true),400);
 }
 
 let TOKEN='',API_URL='',EL_KEY='',PASS='',history=[],busy=false,micActive=false,selApp='youtube',currentBrief='',userIsOwner=false,userLocation=null,currentUserName='',onboarding=false,onboardingStep='';
