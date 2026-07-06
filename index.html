@@ -3438,6 +3438,32 @@ async function connectGoogle(){
   }catch(e){addMsg('ai','Erreur: '+( e.message||'Connexion Google impossible'));}
 }
 
+async function connectGoogle(){
+  if(!TOKEN||!API_URL){addMsg('ai','Configure ton accès dabord.');return}
+  try{
+    const data=await apiCall('/google/auth','GET');
+    if(data.auth_url){
+      addMsg('ai','Ouverture de Google. Autorise l\'accès à ton compte dans la fenêtre qui s\'ouvre.',false);
+      const popup=window.open(data.auth_url,'google_auth','width=500,height=600,scrollbars=yes');
+      // Vérifier toutes les 2s si la popup s'est fermée
+      const check=setInterval(()=>{
+        if(popup&&popup.closed){
+          clearInterval(check);
+          setTimeout(()=>checkGoogleStatus(),1000);
+        }
+      },2000);
+    }
+  }catch(e){addMsg('ai','Erreur connexion Google: '+(e.message||'inconnue'),false);}
+}
+
+async function disconnectGoogle(){
+  try{
+    await apiCall('/google/disconnect','POST');
+    addMsg('ai','✅ Google déconnecté.',false);
+    checkGoogleStatus();
+  }catch(e){addMsg('ai','Erreur déconnexion Google.',false);}
+}
+
 async function checkGoogleStatus(){
   if(!TOKEN||!API_URL)return;
   try{
@@ -3448,16 +3474,16 @@ async function checkGoogleStatus(){
     const gmailBtn=document.getElementById('goog-gmail-btn');
     if(data.connected){
       const since=data.updated_at?new Date(data.updated_at).toLocaleDateString('fr'):'';
-      calSt.textContent='✓ Connecté' + (since?' · '+since:'');
+      calSt.textContent='✓ Connecté'+(since?' · '+since:'');
       calSt.className='conn-status ok';
       calBtn.textContent='DÉCONNECTER';
       calBtn.className='conn-btn connected';
-      calBtn.onclick=()=>addMsg('ai','Pour déconnecter Google, va dans Supabase et supprime ta ligne dans la table google_tokens.');
-      gmailSt.textContent='✓ Connecté' + (since?' · '+since:'');
+      calBtn.onclick=disconnectGoogle;
+      gmailSt.textContent='✓ Connecté'+(since?' · '+since:'');
       gmailSt.className='conn-status ok';
       gmailBtn.textContent='DÉCONNECTER';
       gmailBtn.className='conn-btn connected';
-      gmailBtn.onclick=()=>addMsg('ai','Pour déconnecter Google, va dans Supabase et supprime ta ligne dans la table google_tokens.');
+      gmailBtn.onclick=disconnectGoogle;
     }else{
       calSt.textContent='Non connecté';calSt.className='conn-status ko';
       calBtn.textContent='CONNECTER';calBtn.className='conn-btn connect';calBtn.onclick=connectGoogle;
@@ -3468,15 +3494,25 @@ async function checkGoogleStatus(){
 }
 
 async function connectSpotify(){
-  if(!TOKEN||!API_URL){addMsg('ai','Configure ton token et URL API dabord.');return}
+  if(!TOKEN||!API_URL){addMsg('ai','Configure ton accès dabord.');return}
   try{
     const data=await apiCall('/spotify/auth','GET');
     if(data.auth_url){
-      addMsg('ai','Ouverture de Spotify. Autorise l\'accès à ton compte.');
-      window.open(data.auth_url,'_blank');
-      setTimeout(()=>checkSpotifyStatus(),10000);
+      addMsg('ai','Ouverture de Spotify. Autorise l\'accès dans la fenêtre.',false);
+      const popup=window.open(data.auth_url,'spotify_auth','width=500,height=600,scrollbars=yes');
+      const check=setInterval(()=>{
+        if(popup&&popup.closed){clearInterval(check);setTimeout(()=>checkSpotifyStatus(),1000);}
+      },2000);
     }
-  }catch(e){addMsg('ai','Erreur connexion Spotify: '+(e.message||''));}
+  }catch(e){addMsg('ai','Erreur connexion Spotify.',false);}
+}
+
+async function disconnectSpotify(){
+  try{
+    await apiCall('/spotify/disconnect','POST');
+    addMsg('ai','✅ Spotify déconnecté.',false);
+    checkSpotifyStatus();
+  }catch(e){addMsg('ai','Erreur déconnexion Spotify.',false);}
 }
 
 async function checkSpotifyStatus(){
@@ -3491,7 +3527,7 @@ async function checkSpotifyStatus(){
       st.className='conn-status ok';
       btn.textContent='DÉCONNECTER';
       btn.className='conn-btn connected';
-      btn.onclick=()=>addMsg('ai','Pour déconnecter Spotify, supprime ta ligne dans la table spotify_tokens sur Supabase.');
+      btn.onclick=disconnectSpotify;
     }else{
       st.textContent='Non connecté';st.className='conn-status ko';
       btn.textContent='CONNECTER';btn.className='conn-btn connect';btn.onclick=connectSpotify;
@@ -3500,15 +3536,25 @@ async function checkSpotifyStatus(){
 }
 
 async function connectNotion(){
-  if(!TOKEN||!API_URL){addMsg('ai','Configure ton token et URL API dabord.');return}
+  if(!TOKEN||!API_URL){addMsg('ai','Configure ton accès dabord.');return}
   try{
     const data=await apiCall('/notion/auth','GET');
     if(data.auth_url){
-      addMsg('ai','Ouverture de Notion. Autorise l\'accès à ton workspace.');
-      window.open(data.auth_url,'_blank');
-      setTimeout(()=>checkNotionStatus(),10000);
+      addMsg('ai','Ouverture de Notion. Autorise l\'accès dans la fenêtre.',false);
+      const popup=window.open(data.auth_url,'notion_auth','width=500,height=600,scrollbars=yes');
+      const check=setInterval(()=>{
+        if(popup&&popup.closed){clearInterval(check);setTimeout(()=>checkNotionStatus(),1000);}
+      },2000);
     }
-  }catch(e){addMsg('ai','Notion pas encore configuré côté serveur. Ajoute NOTION_CLIENT_ID et NOTION_CLIENT_SECRET dans Railway.');}
+  }catch(e){addMsg('ai','Notion non configuré — ajoute NOTION_CLIENT_ID dans Railway.',false);}
+}
+
+async function disconnectNotion(){
+  try{
+    await apiCall('/notion/disconnect','POST');
+    addMsg('ai','✅ Notion déconnecté.',false);
+    checkNotionStatus();
+  }catch(e){addMsg('ai','Erreur déconnexion Notion.',false);}
 }
 
 async function checkNotionStatus(){
@@ -3523,7 +3569,7 @@ async function checkNotionStatus(){
       st.className='conn-status ok';
       btn.textContent='DÉCONNECTER';
       btn.className='conn-btn connected';
-      btn.onclick=()=>addMsg('ai','Pour déconnecter Notion, supprime ta ligne dans la table notion_tokens sur Supabase.');
+      btn.onclick=disconnectNotion;
     }else{
       st.textContent='Non connecté';st.className='conn-status ko';
       btn.textContent='CONNECTER';btn.className='conn-btn connect';btn.onclick=connectNotion;
