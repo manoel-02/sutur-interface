@@ -3,26 +3,22 @@
     {
       "source": "/(.*)",
       "headers": [
-        {
-          "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://vercel.live; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' blob: data:; connect-src 'self' https://uvicorn-appmain-production-95d3.up.railway.app https://*.supabase.co https://api.elevenlabs.io https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com https://accounts.spotify.com https://api.spotify.com https://api.notion.com https://vercel.live wss://vercel.live; frame-src 'self' https://accounts.google.com https://vercel.live; frame-ancestors 'self' https://vercel.live; font-src 'self' data:;"
-        },
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "SAMEORIGIN"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
-        },
-        {
-          "key": "Permissions-Policy",
-          "value": "geolocation=(self), microphone=(self), camera=()"
-        }
+        {"key": "X-Content-Type-Options", "value": "nosniff"},
+        {"key": "Cache-Control", "value": "public, max-age=0, must-revalidate"}
+      ]
+    },
+    {
+      "source": "/favicon.ico",
+      "headers": [
+        {"key": "Content-Type", "value": "image/x-icon"},
+        {"key": "Cache-Control", "value": "public, max-age=86400"}
+      ]
+    },
+    {
+      "source": "/icon-(.*).png",
+      "headers": [
+        {"key": "Content-Type", "value": "image/png"},
+        {"key": "Cache-Control", "value": "public, max-age=86400"}
       ]
     }
   ]
