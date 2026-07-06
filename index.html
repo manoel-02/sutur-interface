@@ -414,13 +414,18 @@ select.finp option,select.cinp option,select.sinp option{
         <button class="af" onclick="setAF(this,'x')">X</button>
         <button class="af" onclick="setAF(this,'instagram')">Instagram</button>
       </div>
-      <div class="section-title">TENDANCES</div>
+      <div class="section-title">TENDANCES
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          <button onclick="loadTrends('general')" id="tr-general" class="af active">🌍 Général</button>
+          <button onclick="loadTrends('tech')" id="tr-tech" class="af">💻 Tech</button>
+          <button onclick="loadTrends('business')" id="tr-business" class="af">💼 Business</button>
+          <button onclick="loadTrends('sports')" id="tr-sports" class="af">🏆 Sport</button>
+          <button onclick="loadTrends('science')" id="tr-science" class="af">🔬 Science</button>
+          <button onclick="loadTrends('health')" id="tr-health" class="af">🏥 Santé</button>
+        </div>
+      </div>
       <div id="trend-list">
-        <div class="trend-item" onclick="openTrend('Intelligence artificielle Afrique 2026')"><div class="trend-num">#1</div><div class="trend-info"><div class="trend-title">IA en Afrique 2026</div><div class="trend-sub">Tech · Tendance</div></div><div class="trend-play">&#9654;</div></div>
-        <div class="trend-item" onclick="openTrend('Actualites Benin 2026')"><div class="trend-num">#2</div><div class="trend-info"><div class="trend-title">Actualites Benin</div><div class="trend-sub">Actualite · Local</div></div><div class="trend-play">&#9654;</div></div>
-        <div class="trend-item" onclick="openTrend('Afrobeat nouveautes 2026')"><div class="trend-num">#3</div><div class="trend-info"><div class="trend-title">Afrobeat 2026</div><div class="trend-sub">Musique · En vogue</div></div><div class="trend-play">&#9654;</div></div>
-        <div class="trend-item" onclick="openTrend('Crypto Bitcoin juin 2026')"><div class="trend-num">#4</div><div class="trend-info"><div class="trend-title">Crypto & Bitcoin</div><div class="trend-sub">Finance · Marche</div></div><div class="trend-play">&#9654;</div></div>
-        <div class="trend-item" onclick="openTrend('Startups Tech West Africa 2026')"><div class="trend-num">#5</div><div class="trend-info"><div class="trend-title">Startups Afrique de l'Ouest</div><div class="trend-sub">Entrepreneuriat · Financement</div></div><div class="trend-play">&#9654;</div></div>
+        <div style="color:rgba(120,80,255,.35);text-align:center;padding:20px;font-size:13px">Chargement des tendances...</div>
       </div>
     </div>
 
@@ -791,8 +796,44 @@ select.finp option,select.cinp option,select.sinp option{
 
       <!-- Historique -->
       <div class="section-title">TRANSACTIONS RÉCENTES</div>
-      <div id="finance-list" style="margin-bottom:20px">
+      <div id="finance-list" style="margin-bottom:14px">
         <div style="color:var(--text-muted);font-size:13px;text-align:center;padding:12px">Aucune transaction</div>
+      </div>
+
+      <!-- Import CSV -->
+      <div class="section-title">IMPORT RELEVÉ BANCAIRE CSV</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:20px">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.6">Importe ton relevé bancaire CSV. Sutur détecte automatiquement les colonnes et catégorise les transactions.</div>
+        <input type="file" id="csv-file" accept=".csv,.txt" style="display:none" onchange="previewCSV(this)"/>
+        <button onclick="document.getElementById('csv-file').click()" class="access-btn" style="width:100%;margin-bottom:10px">📂 CHOISIR UN FICHIER CSV</button>
+        <div id="csv-preview" style="display:none">
+          <div style="font-size:12px;color:var(--gold);margin-bottom:8px" id="csv-info"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+            <div>
+              <div class="field-label">COLONNE DATE</div>
+              <select class="finp sinp" id="csv-col-date" style="font-size:12px"></select>
+            </div>
+            <div>
+              <div class="field-label">COLONNE MONTANT</div>
+              <select class="finp sinp" id="csv-col-amount" style="font-size:12px"></select>
+            </div>
+            <div>
+              <div class="field-label">COLONNE DESCRIPTION</div>
+              <select class="finp sinp" id="csv-col-desc" style="font-size:12px"></select>
+            </div>
+          </div>
+          <div style="margin-bottom:10px">
+            <div class="field-label">DEVISE</div>
+            <select class="finp sinp" id="csv-currency" style="font-size:12px">
+              <option value="XOF">XOF (FCFA)</option>
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+            </select>
+          </div>
+          <div id="csv-table-preview" style="overflow-x:auto;margin-bottom:10px;font-size:11px;max-height:150px;overflow-y:auto"></div>
+          <button onclick="importCSV()" class="access-btn" style="width:100%">⬆ IMPORTER LES TRANSACTIONS</button>
+          <div id="csv-status" style="font-size:12px;text-align:center;margin-top:8px;min-height:14px;color:var(--gold)"></div>
+        </div>
       </div>
     </div>
 
@@ -907,6 +948,7 @@ select.finp option,select.cinp option,select.sinp option{
       <div class="cfg-row"><div><div class="cfg-lbl">Voix ElevenLabs</div><div class="cfg-sub2">Reponses vocales premium</div></div><button class="tog on" id="t-voice" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
       <div class="cfg-row"><div><div class="cfg-lbl">Lecture auto des reponses</div><div class="cfg-sub2">Sutur lit chaque reponse</div></div><button class="tog on" id="t-autospeak" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
       <div class="cfg-row"><div><div class="cfg-lbl">Geolocalisation</div><div class="cfg-sub2">Reponses adaptees a ta position</div></div><button class="tog on" id="t-geo" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
+      <div class="cfg-row"><div><div class="cfg-lbl">Notifications push</div><div class="cfg-sub2">Alertes meme quand Sutur est ferme</div></div><button class="tog off" id="t-push" onclick="togglePushNotifications(this)"></button></div>
       <div class="section-title">SÉCURITÉ AVANCÉE</div>
       <div class="cfg-row">
         <div><div class="cfg-lbl">Face ID / Touch ID</div><div class="cfg-sub2">Connexion biométrique réelle (WebAuthn)</div></div>
@@ -1764,6 +1806,7 @@ function sw(name,el){
   if(name==='agents')loadAgents();
   if(name==='msgs'){loadMessages();if(userIsOwner)setTimeout(loadAdminDashboard,300);}
   if(name==='profil')loadProfile();
+  if(name==='media')loadTrends(currentTrendCategory||'general');
   // Montrer/cacher le globe
   const globeArea=document.getElementById('globe-area');
   if(globeArea)globeArea.style.display=name==='chat'?'flex':'none';
@@ -2895,6 +2938,155 @@ async function runAgent(id,name){
     el.innerHTML=data.result||'Erreur';
     speakText(`Rapport de l'agent ${name}: ${(data.result||'').substring(0,200)}`);
   }catch(e){el.innerHTML='Erreur execution'}
+}
+
+// ── WEB PUSH NOTIFICATIONS ────────────────────────────────────────────────────
+const VAPID_PUBLIC_KEY='BB205SQgaEeCyXLCW7K3l1szOowMkXs61Fxkc0oJCKA9L1tNAVjk4VhDzkZ6rWLmwUxFsYlDUoqmO1wsOjMAjvw';
+
+function urlBase64ToUint8Array(base64String){
+  const padding='='.repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+  const rawData=window.atob(base64);
+  const outputArray=new Uint8Array(rawData.length);
+  for(let i=0;i<rawData.length;++i)outputArray[i]=rawData.charCodeAt(i);
+  return outputArray;
+}
+
+async function togglePushNotifications(btn){
+  btn.classList.toggle('on');btn.classList.toggle('off');
+  const isOn=btn.classList.contains('on');
+  if(!isOn)return;
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)){
+    addMsg('ai','Les notifications push ne sont pas supportées sur ce navigateur. Utilise Chrome sur Android.',false);
+    btn.classList.remove('on');btn.classList.add('off');
+    return;
+  }
+  try{
+    const permission=await Notification.requestPermission();
+    if(permission!=='granted'){
+      addMsg('ai','Permission notifications refusée. Active-les dans les paramètres du navigateur.',false);
+      btn.classList.remove('on');btn.classList.add('off');
+      return;
+    }
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+    await apiCall('/push/subscribe','POST',{subscription:sub.toJSON()});
+    addMsg('ai','✅ Notifications push activées ! Tu recevras les alertes Sutur même quand l\'app est fermée.',false);
+    localStorage.setItem('s_push','1');
+  }catch(e){
+    btn.classList.remove('on');btn.classList.add('off');
+    addMsg('ai','Erreur activation push: '+e.message,false);
+  }
+}
+
+// ── TENDANCES DYNAMIQUES ──────────────────────────────────────────────────────
+let currentTrendCategory='general';
+
+async function loadTrends(category='general'){
+  currentTrendCategory=category;
+  // Mettre à jour boutons
+  document.querySelectorAll('[id^="tr-"]').forEach(b=>{
+    b.classList.remove('active');
+  });
+  const btn=document.getElementById('tr-'+category);
+  if(btn)btn.classList.add('active');
+  const list=document.getElementById('trend-list');
+  list.innerHTML='<div style="color:rgba(120,80,255,.35);text-align:center;padding:20px;font-size:13px">Chargement des tendances...</div>';
+  try{
+    const data=await apiCall('/trends?category='+category);
+    const trends=data.trends||[];
+    if(!trends.length){
+      list.innerHTML='<div style="color:rgba(120,80,255,.35);text-align:center;padding:20px;font-size:13px">Aucune tendance disponible</div>';
+      return;
+    }
+    const sourceLabel=data.source==='NewsAPI'?'📰 NewsAPI':'🔍 Web';
+    list.innerHTML=`<div style="font-size:10px;color:var(--text-muted);text-align:right;margin-bottom:6px;letter-spacing:1px">${sourceLabel}</div>`+
+    trends.map((t,i)=>`
+      <div class="trend-item" onclick="openTrend('${(t.title||'').replace(/'/g,"\\'")}')">
+        <div class="trend-num">#${i+1}</div>
+        <div class="trend-info">
+          <div class="trend-title">${t.title||''}</div>
+          <div class="trend-sub">${t.source||''} ${t.publishedAt?'· '+new Date(t.publishedAt).toLocaleDateString('fr'):''}${t.description?'<br><span style="font-size:10px;color:var(--text-muted)">'+(t.description||'').substring(0,80)+'...</span>':''}</div>
+        </div>
+        <div class="trend-play">&#9654;</div>
+      </div>`).join('');
+  }catch(e){
+    list.innerHTML='<div style="color:rgba(120,80,255,.35);text-align:center;padding:20px;font-size:13px">Erreur chargement tendances</div>';
+  }
+}
+
+// ── IMPORT CSV BANCAIRE ───────────────────────────────────────────────────────
+let csvRows=[], csvHeaders=[];
+
+function previewCSV(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const text=e.target.result;
+    // Détecter le séparateur
+    const firstLine=text.split('\n')[0];
+    const sep=firstLine.includes(';')?';':firstLine.includes('\t')?'\t':',';
+    // Parser
+    const lines=text.trim().split('\n');
+    csvHeaders=lines[0].split(sep).map(h=>h.trim().replace(/"/g,''));
+    csvRows=lines.slice(1).filter(l=>l.trim()).map(l=>{
+      const vals=l.split(sep).map(v=>v.trim().replace(/"/g,''));
+      const obj={};
+      csvHeaders.forEach((h,i)=>obj[h]=vals[i]||'');
+      return obj;
+    });
+    // Afficher le preview
+    document.getElementById('csv-preview').style.display='block';
+    document.getElementById('csv-info').textContent=`✅ ${csvRows.length} transactions détectées · ${csvHeaders.length} colonnes`;
+    // Peupler les selects
+    const selects=['csv-col-date','csv-col-amount','csv-col-desc'];
+    selects.forEach(id=>{
+      const sel=document.getElementById(id);
+      sel.innerHTML=csvHeaders.map(h=>`<option value="${h}">${h}</option>`).join('');
+    });
+    // Auto-détecter les colonnes
+    const dateGuess=csvHeaders.find(h=>/date|jour|time/i.test(h))||csvHeaders[0];
+    const amountGuess=csvHeaders.find(h=>/mont|amount|debit|credit|sum|solde/i.test(h))||csvHeaders[1];
+    const descGuess=csvHeaders.find(h=>/lib|desc|label|detail|intit/i.test(h))||csvHeaders[2];
+    document.getElementById('csv-col-date').value=dateGuess;
+    document.getElementById('csv-col-amount').value=amountGuess;
+    document.getElementById('csv-col-desc').value=descGuess;
+    // Aperçu table
+    const preview=csvRows.slice(0,5);
+    document.getElementById('csv-table-preview').innerHTML=`
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <tr>${csvHeaders.map(h=>`<th style="padding:4px;border:1px solid var(--border);color:var(--gold);text-align:left">${h}</th>`).join('')}</tr>
+        ${preview.map(r=>`<tr>${csvHeaders.map(h=>`<td style="padding:4px;border:1px solid var(--border);color:var(--text-secondary)">${r[h]||''}</td>`).join('')}</tr>`).join('')}
+      </table>`;
+  };
+  reader.readAsText(file,'UTF-8');
+}
+
+async function importCSV(){
+  const dateCol=document.getElementById('csv-col-date').value;
+  const amountCol=document.getElementById('csv-col-amount').value;
+  const descCol=document.getElementById('csv-col-desc').value;
+  const currency=document.getElementById('csv-currency').value;
+  const status=document.getElementById('csv-status');
+  if(!csvRows.length){status.textContent='Aucune donnée à importer';return}
+  status.style.color='var(--gold)';status.textContent='Import en cours...';
+  try{
+    const data=await apiCall('/finance/import-csv','POST',{
+      rows:csvRows,
+      currency,
+      mapping:{date:dateCol,amount:amountCol,description:descCol}
+    });
+    status.style.color='#4ade80';
+    status.textContent=`✅ ${data.imported} transactions importées${data.errors?' ('+data.errors+' erreurs)':''}`;
+    setTimeout(()=>loadFinance(),1500);
+  }catch(e){
+    status.style.color='#f87171';
+    status.textContent='Erreur import: '+(e.message||'inconnue');
+  }
 }
 
 async function loadMessages(){
