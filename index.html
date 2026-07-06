@@ -1704,9 +1704,16 @@ async function loadSportNotifications(){
   try{
     const data=await apiCall('/notifications/sport');
     const notifs=data.notifications||[];
-    if(!notifs.length)return;
-    notifs.forEach((n,i)=>setTimeout(()=>addMsg('ai',`${n.icon} **Actualités ${n.sport} :**\n\n${n.content}`,false),i*1500));
-  }catch(e){}// Silencieux — pas critique
+    // N'afficher que les vraies nouveautés
+    const newNotifs = notifs.filter(n=>n.is_new);
+    if(newNotifs.length){
+      newNotifs.forEach((n,i)=>setTimeout(()=>{
+        addMsg('ai',`${n.icon} **Nouveauté ${n.sport} !**\n\n${n.content}`,false);
+      },i*1500));
+    }
+    // Pour les infos non nouvelles, les mettre dans un résumé silencieux
+    // accessible via le chat ("actualités F1") mais sans notification
+  }catch(e){}// Silencieux
 }
 
 async function deliverPendingNotifications(){
