@@ -1059,6 +1059,17 @@ select.finp option,select.cinp option,select.sinp option{
         <button onclick="setTheme('terminal')" id="theme-terminal-btn" class="access-btn" style="flex:1;padding:10px;font-size:11px;letter-spacing:1px;border-color:rgba(0,200,255,.3);background:rgba(0,200,255,.08);color:rgba(0,200,255,.8)">💻 TERMINAL</button>
       </div>
       <div id="theme-label" style="font-size:11px;color:var(--text-muted);text-align:center;margin-bottom:8px;letter-spacing:1px">Thème actuel : LIQUID GLASS</div>
+
+      <!-- SYSTÈME -->
+      <div class="section-title" style="margin-top:12px">SYSTÈME</div>
+      <button onclick="runDiagnostic()" class="access-btn" style="width:100%;padding:10px;font-size:11px;letter-spacing:1px;margin-bottom:8px">🔍 DIAGNOSTIC COMPLET</button>
+      <div id="sys-status" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">
+        <div id="sys-overall" style="padding:8px 12px;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);font-size:11px;color:var(--text-muted);text-align:center;letter-spacing:1px">Appuie sur DIAGNOSTIC pour vérifier le système</div>
+      </div>
+      <div id="sys-bugs" style="display:none;margin-bottom:8px">
+        <div style="font-size:10px;color:rgba(248,113,113,.6);letter-spacing:1px;margin-bottom:4px">BUGS RÉCENTS</div>
+        <div id="sys-bugs-list" style="font-size:11px;color:rgba(248,113,113,.5);display:flex;flex-direction:column;gap:4px"></div>
+      </div>
       <div class="section-title">SÉCURITÉ AVANCÉE</div>
       <div class="cfg-row">
         <div><div class="cfg-lbl">Face ID / Touch ID</div><div class="cfg-sub2">Connexion biométrique réelle (WebAuthn)</div></div>
@@ -1716,7 +1727,128 @@ function getLocation(){
     navigator.geolocation.getCurrentPosition(pos=>{userLocation={lat:pos.coords.latitude,lng:pos.coords.longitude}},()=>{})
   }
 }
-// ── THÈMES ────────────────────────────────────────────────────────────────────
+// ── DÉTECTEUR DE BUGS ─────────────────────────────────────────────────────────
+
+// Capture automatique des erreurs JS
+window.onerror = function(msg, src, line, col, err){
+  if(TOKEN && API_URL){
+    apiCall('/bugs/report','POST',{
+      error: `${msg} (${src}:${line}:${col})`,
+      context: err ? err.stack : 'no stack',
+      path: 'frontend:js_error'
+    }).catch(()=>{});
+  }
+  return false;
+};
+
+window.onunhandledrejection = function(evt){
+  if(TOKEN && API_URL){
+    apiCall('/bugs/report','POST',{
+      error: String(evt.reason || 'Unhandled rejection'),
+      context: evt.reason?.stack || '',
+      path: 'frontend:promise_rejection'
+    }).catch(()=>{});
+  }
+};
+
+const SYS_ICONS = {
+  ok: '✅', error: '❌', degraded: '⚠️',
+  not_configured: '⚙️', configured: '✅',
+  connected: '✅', not_connected: '⚪', healthy: '✅',
+  critical: '🔴', warning: '🟡'
+};
+
+async function runDiagnostic(){
+  if(!TOKEN||!API_URL){
+    document.getElementById('sys-overall').textContent='Configure ton accès dabord.';
+    return;
+  }
+  const overall = document.getElementById('sys-overall');
+  const statusDiv = document.getElementById('sys-status');
+  overall.innerHTML = '<span style="color:var(--gold)">🔄 Diagnostic en cours...</span>';
+
+  try{
+    const data = await apiCall('/health/deep','GET');
+    // Score global
+    const statusColor = data.overall === 'healthy' ? '#4ade80' : data.overall === 'critical' ? '#f87171' : '#fbbf24';
+    const statusEmoji = data.overall === 'healthy' ? '✅' : data.overall === 'critical' ? '🔴' : '⚠️';
+    overall.innerHTML = `<span style="color:${statusColor};font-weight:600">${statusEmoji} ${data.overall.toUpperCase()}</span> <span style="color:var(--text-muted);font-size:10px">· ${data.total_ms}ms total</span>`;
+
+    // Composants
+    const comps = data.components || {};
+    const compLabels = {
+      supabase: '🗄️ Base de données',
+      claude_api: '🤖 Claude IA',
+      elevenlabs: '🎙️ Voix ElevenLabs',
+      web_search: '🌐 Recherche web',
+      google_oauth: '🔐 Google OAuth',
+      google_user: '📧 Google (toi)'
+    };
+
+    let html = `<div style="display:flex;flex-direction:column;gap:5px;margin-top:8px">`;
+    for(const [key, label] of Object.entries(compLabels)){
+      const comp = comps[key] || {};
+      const st = comp.status || 'unknown';
+      const ico = SYS_ICONS[st] || '❓';
+      const color = st === 'ok' || st === 'connected' || st === 'configured' ? '#4ade80' : st === 'error' || st === 'critical' ? '#f87171' : '#fbbf24';
+      let extra = '';
+      if(comp.latency_ms) extra += ` <span style="color:var(--text-muted);font-size:9px">${comp.latency_ms}ms</span>`;
+      if(key === 'elevenlabs' && comp.chars_remaining != null){
+        const pct = Math.round((comp.chars_remaining/comp.chars_limit)*100);
+        extra += ` <span style="color:var(--text-muted);font-size:9px">${comp.chars_remaining.toLocaleString()} chars restants (${pct}%)</span>`;
+      }
+      if(comp.error) extra += ` <span style="color:#f87171;font-size:9px">${comp.error.slice(0,40)}</span>`;
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(255,255,255,.02);border-radius:8px;border:1px solid rgba(255,255,255,.05)">
+        <span style="color:${color};flex-shrink:0">${ico}</span>
+        <span style="font-size:11px;color:var(--text-secondary);flex:1">${label}</span>
+        ${extra}
+      </div>`;
+    }
+    html += '</div>';
+    statusDiv.innerHTML = overall.outerHTML + html;
+
+    // Bugs récents
+    const bugs = data.components?.recent_bugs || [];
+    const bugsDiv = document.getElementById('sys-bugs');
+    const bugsList = document.getElementById('sys-bugs-list');
+    if(bugs.length > 0){
+      bugsDiv.style.display = 'block';
+      bugsList.innerHTML = bugs.map(b=>`
+        <div style="padding:5px 8px;background:rgba(248,113,113,.04);border-radius:6px;border:1px solid rgba(248,113,113,.1)">
+          <span style="color:rgba(248,113,113,.7)">${b.path}</span>
+          <span style="color:rgba(160,151,196,.4);font-size:10px;margin-left:4px">${new Date(b.timestamp).toLocaleTimeString('fr')}</span>
+          <div style="color:rgba(248,113,113,.5);font-size:10px;margin-top:2px">${(b.error||'').slice(0,80)}</div>
+        </div>`).join('');
+    } else {
+      bugsDiv.style.display = 'none';
+    }
+
+    // Notifier si critique
+    if(data.overall === 'critical'){
+      addMsg('ai', `⚠️ **Alerte système** — Des composants critiques sont en erreur : ${data.errors.join(', ')}. Vérifie les logs Railway.`, false);
+    }
+  }catch(e){
+    overall.innerHTML = `<span style="color:#f87171">❌ Impossible de contacter le backend : ${e.message||'erreur réseau'}</span>`;
+  }
+}
+
+// Diagnostic auto silencieux au login
+async function silentHealthCheck(){
+  if(!TOKEN||!API_URL) return;
+  try{
+    const r = await fetch(API_URL+'/health', {headers:{'Authorization':'Bearer '+TOKEN}});
+    if(!r.ok){
+      // Backend down — alerter
+      setTimeout(()=>{
+        addMsg('ai', '⚠️ Le serveur Sutur semble avoir un problème. Lance un diagnostic depuis CONFIG → SYSTÈME.', false);
+      }, 5000);
+    }
+  }catch(e){
+    setTimeout(()=>{
+      addMsg('ai', '⚠️ Impossible de joindre le serveur Sutur. Vérifie ta connexion ou les logs Railway.', false);
+    }, 5000);
+  }
+}
 function setTheme(theme, init){
   document.body.classList.remove('theme-terminal');
   if(theme==='terminal') document.body.classList.add('theme-terminal');
@@ -1803,6 +1935,7 @@ function unlock(){
       setTimeout(loadSportNotifications, 2000);
       setTimeout(deliverPendingNotifications, 3000);
       setTimeout(checkAndRequestPermissions, 4000);
+      setTimeout(silentHealthCheck, 6000);
     });
   }
 }
