@@ -1070,6 +1070,15 @@ select.finp option,select.cinp option,select.sinp option{
         <div style="font-size:10px;color:rgba(248,113,113,.6);letter-spacing:1px;margin-bottom:4px">BUGS RÉCENTS</div>
         <div id="sys-bugs-list" style="font-size:11px;color:rgba(248,113,113,.5);display:flex;flex-direction:column;gap:4px"></div>
       </div>
+
+      <!-- REMOTE DESKTOP -->
+      <div class="section-title" style="margin-top:12px">🖥️ REMOTE DESKTOP</div>
+      <div id="remote-status-bar" style="padding:8px 12px;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);font-size:11px;color:var(--text-muted);text-align:center;letter-spacing:1px;margin-bottom:8px">PC non connecté</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button onclick="checkRemoteStatus()" class="access-btn" style="flex:1;padding:9px;font-size:11px">🔄 Statut</button>
+        <button onclick="openRemoteDesktop()" class="access-btn" style="flex:1;padding:9px;font-size:11px;border-color:rgba(74,222,128,.4);background:rgba(74,222,128,.08);color:#4ade80">🖥️ Ouvrir</button>
+      </div>
+      <button onclick="showAgentInstructions()" class="access-btn" style="width:100%;padding:9px;font-size:11px;letter-spacing:1px;margin-bottom:4px">📋 INSTALLER L'AGENT PC</button>
       <div class="section-title">SÉCURITÉ AVANCÉE</div>
       <div class="cfg-row">
         <div><div class="cfg-lbl">Face ID / Touch ID</div><div class="cfg-sub2">Connexion biométrique réelle (WebAuthn)</div></div>
@@ -1727,7 +1736,330 @@ function getLocation(){
     navigator.geolocation.getCurrentPosition(pos=>{userLocation={lat:pos.coords.latitude,lng:pos.coords.longitude}},()=>{})
   }
 }
-// ── DÉTECTEUR DE BUGS ─────────────────────────────────────────────────────────
+// ── REMOTE DESKTOP v3 — COMPUTER USE ─────────────────────────────────────────
+let rdStreaming = false;
+let rdStreamInterval = null;
+let rdFrameCount = 0;
+let rdLastFrameTs = 0;
+let rdConnected = false;
+
+function rdTab(name){
+  ['terminal','ai'].forEach(t=>{
+    const panel = document.getElementById('rdpanel-'+t);
+    if(panel) panel.style.display = t===name ? 'flex' : 'none';
+    const btn = document.getElementById('rdtab-'+t);
+    if(btn) btn.className = 'rdtab' + (t===name ? ' rdtab-active' : '');
+  });
+}
+
+async function checkRemoteStatus(){
+  if(!TOKEN||!API_URL) return;
+  try{
+    const data = await apiCall('/remote/status','GET');
+    rdConnected = data.connected;
+    const bar = document.getElementById('remote-status-bar');
+    const dot = document.getElementById('rd-dot');
+    const lbl = document.getElementById('rd-status-lbl');
+    if(data.connected){
+      if(bar) bar.innerHTML=`<span style="color:#4ade80">✅ PC connecté</span> <span style="color:var(--text-muted);font-size:10px">depuis ${new Date(data.connected_at).toLocaleTimeString('fr')}</span>`;
+      if(dot){dot.style.background='#4ade80';dot.style.boxShadow='0 0 8px #4ade80';}
+      if(lbl){lbl.textContent='CONNECTÉ';lbl.style.color='rgba(74,222,128,.7)';}
+    }else{
+      if(bar) bar.textContent="PC non connecté — lance l\'agent sur ton PC Linux";
+      if(dot){dot.style.background='#f87171';dot.style.boxShadow='none';}
+      if(lbl){lbl.textContent='DÉCONNECTÉ';lbl.style.color='rgba(248,113,113,.5)';}
+    }
+  }catch(e){}
+}
+
+function openRemoteDesktop(){
+  const modal = document.getElementById('remote-modal');
+  if(modal) modal.style.display='flex';
+  checkRemoteStatus().then(()=>{ if(rdConnected) rdStartStream(); });
+}
+
+function closeRemoteDesktop(){
+  const modal = document.getElementById('remote-modal');
+  if(modal) modal.style.display='none';
+  rdStopStream();
+}
+
+async function rdScreenshot(){
+  if(!TOKEN||!API_URL) return;
+  try{
+    const data = await apiCall('/remote/screenshot','GET');
+    if(data.screenshot) rdUpdateScreen(data.screenshot);
+  }catch(e){}
+}
+
+function rdUpdateScreen(b64){
+  const img = document.getElementById('rd-screen');
+  const noScreen = document.getElementById('rd-no-screen');
+  if(!img) return;
+  img.src = 'data:image/jpeg;base64,' + b64;
+  img.style.display = 'block';
+  if(noScreen) noScreen.style.display = 'none';
+  rdFrameCount++;
+  const now = Date.now();
+  if(now - rdLastFrameTs > 1000){
+    const fps = rdLastFrameTs ? Math.round(rdFrameCount * 1000 / (now - rdLastFrameTs)) : 0;
+    const fpsEl = document.getElementById('rd-fps');
+    if(fpsEl) fpsEl.textContent = fps + ' fps';
+    rdFrameCount = 0; rdLastFrameTs = now;
+  }
+}
+
+function rdStartStream(){
+  rdStreaming = true;
+  const btn = document.getElementById('rd-stream-btn');
+  if(btn) btn.textContent = '⏸ PAUSE';
+  if(rdStreamInterval) clearInterval(rdStreamInterval);
+  rdLastFrameTs = Date.now();
+  rdStreamInterval = setInterval(rdScreenshot, 600);
+  apiCall('/remote/stream/start','POST').catch(()=>{});
+}
+
+function rdStopStream(){
+  rdStreaming = false;
+  if(rdStreamInterval){ clearInterval(rdStreamInterval); rdStreamInterval = null; }
+  apiCall('/remote/stream/stop','POST').catch(()=>{});
+  const btn = document.getElementById('rd-stream-btn');
+  if(btn) btn.textContent = '▶ STREAM';
+}
+
+function rdToggleStream(){
+  if(rdStreaming) rdStopStream(); else rdStartStream();
+}
+
+function rdGetImgCoords(evt){
+  const img = document.getElementById('rd-screen');
+  if(!img) return {x:0,y:0};
+  const rect = img.getBoundingClientRect();
+  return {
+    x: Math.round((evt.clientX - rect.left) * img.naturalWidth / rect.width),
+    y: Math.round((evt.clientY - rect.top) * img.naturalHeight / rect.height)
+  };
+}
+
+async function rdHandleClick(evt, button){
+  const {x,y} = rdGetImgCoords(evt);
+  try{
+    await apiCall('/remote/click','POST',{x,y,button,double:false});
+    rdOutLog('[click '+button+'] ('+x+','+y+')');
+    setTimeout(rdScreenshot, 500);
+  }catch(e){ rdOutLog('❌ '+( e.message||'PC non connecté')); }
+}
+
+async function rdHandleDoubleClick(evt){
+  const {x,y} = rdGetImgCoords(evt);
+  try{
+    await apiCall('/remote/click','POST',{x,y,button:'left',double:true});
+    rdOutLog('[dbl-click] ('+x+','+y+')');
+    setTimeout(rdScreenshot, 600);
+  }catch(e){}
+}
+
+async function rdKey(key){
+  try{
+    await apiCall('/remote/key','POST',{key});
+    rdOutLog('[key] '+key);
+    setTimeout(rdScreenshot, 400);
+  }catch(e){ rdOutLog('❌ '+e.message); }
+}
+
+async function rdScroll(direction){
+  try{
+    await apiCall('/remote/scroll','POST',{x:640,y:400,direction,amount:3});
+    rdOutLog('[scroll '+direction+']');
+    setTimeout(rdScreenshot, 400);
+  }catch(e){}
+}
+
+async function rdExec(){
+  const inp = document.getElementById('rd-cmd');
+  if(!inp||!inp.value.trim()) return;
+  const cmd = inp.value.trim(); inp.value='';
+  rdOutLog('$ '+cmd);
+  try{
+    const data = await apiCall('/remote/exec','POST',{command:cmd,timeout:30});
+    rdOutLog(data.result||'(pas de sortie)');
+    rdOutLog('[exit '+data.exit_code+']
+');
+    setTimeout(rdScreenshot, 800);
+  }catch(e){ rdOutLog('❌ '+(e.message||'PC non connecté')); }
+}
+
+async function rdType(){
+  const inp = document.getElementById('rd-type');
+  if(!inp||!inp.value) return;
+  const text = inp.value; inp.value='';
+  try{
+    await apiCall('/remote/type','POST',{text});
+    rdOutLog('[type] "'+text.slice(0,30)+'"');
+    setTimeout(rdScreenshot, 500);
+  }catch(e){ rdOutLog('❌ '+e.message); }
+}
+
+function rdOutLog(text){
+  const out = document.getElementById('rd-output');
+  if(!out) return;
+  const ts = new Date().toLocaleTimeString('fr');
+  out.textContent += '['+ts+'] '+text+'
+';
+  out.scrollTop = out.scrollHeight;
+}
+
+async function rdStartComputerUse(){
+  const inp = document.getElementById('rd-cu-instruction');
+  const btn = document.getElementById('rd-cu-btn');
+  const log = document.getElementById('rd-cu-log');
+  if(!inp||!inp.value.trim()) return;
+  const instruction = inp.value.trim();
+  if(btn){ btn.disabled=true; btn.textContent='🔄 EN COURS...'; }
+  if(log) log.innerHTML = '<div style="color:rgba(201,162,39,.7);margin-bottom:8px">🤖 Instruction: "'+instruction+'"</div>';
+  try{
+    const data = await apiCall('/remote/computer_use','POST',{instruction,max_steps:15});
+    if(log){
+      const sc = data.status==='done'?'#4ade80':data.status==='failed'?'#f87171':'#fbbf24';
+      log.innerHTML += '<div style="color:'+sc+';font-weight:600;margin-bottom:8px">'+(data.status==='done'?'✅':'❌')+' '+(data.message||data.status)+' ('+data.steps+' étapes)</div>';
+      (data.actions||[]).forEach((a,i)=>{
+        log.innerHTML += '<div style="margin-bottom:6px;padding:5px 8px;background:rgba(255,255,255,.02);border-radius:6px;border-left:2px solid rgba(139,92,246,.3)"><div style="font-size:9px;color:rgba(139,92,246,.5);margin-bottom:2px">ÉTAPE '+(i+1)+' · '+a.action+'</div><div style="font-size:10px;color:rgba(200,190,230,.6)">'+(a.thinking||'').slice(0,100)+'</div></div>';
+        log.scrollTop=log.scrollHeight;
+      });
+    }
+    rdScreenshot();
+  }catch(e){
+    if(log) log.innerHTML+='<div style="color:#f87171">❌ '+(e.message||'Erreur')+'</div>';
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='🤖 LANCER COMPUTER USE'; }
+  }
+}
+
+function showAgentInstructions(){
+  const runCmd = document.getElementById('agent-run-cmd');
+  if(runCmd&&TOKEN) runCmd.innerHTML='python3 sutur_agent.py --token <span style="color:var(--gold)">'+TOKEN+'</span>';
+  const modal = document.getElementById('agent-modal');
+  if(modal) modal.style.display='flex';
+}
+
+// Navigation web depuis Remote Desktop
+async function rdBrowse(){
+  const inp = document.getElementById('rd-url-inp');
+  if(!inp||!inp.value.trim()) return;
+  const val = inp.value.trim();
+  const isUrl = val.startsWith('http')||val.startsWith('www.');
+  try{
+    const data = await apiCall('/remote/browse','POST',{
+      url: isUrl ? val : '',
+      query: isUrl ? '' : val,
+      action: isUrl ? 'open' : 'search'
+    });
+    rdOutLog('🌐 Navigation → '+(data.url||val));
+    if(data.screenshot) rdUpdateScreen(data.screenshot);
+    inp.value='';
+  }catch(e){ rdOutLog('❌ '+( e.message||'PC non connecté')); }
+}
+
+async function rdBrowseQuick(url){
+  try{
+    const data = await apiCall('/remote/browse','POST',{url,action:'open'});
+    rdOutLog('🌐 → '+url);
+    if(data.screenshot) rdUpdateScreen(data.screenshot);
+  }catch(e){ rdOutLog('❌ '+e.message); }
+}
+
+// Gestion fichiers
+async function rdBrowseFiles(){
+  const pathInp = document.getElementById('rd-browse-path');
+  const listing = document.getElementById('rd-file-listing');
+  const path = pathInp ? pathInp.value.trim()||'~' : '~';
+  try{
+    const data = await apiCall('/files/pc_browse?path='+encodeURIComponent(path),'GET');
+    if(listing) listing.textContent = data.listing||'(vide)';
+  }catch(e){ if(listing) listing.textContent='❌ '+(e.message||'PC non connecté'); }
+}
+
+async function rdFetchFile(){
+  const pathInp = document.getElementById('rd-pc-path');
+  if(!pathInp||!pathInp.value.trim()) return;
+  const path = pathInp.value.trim();
+  pathInp.value='';
+  rdOutLog('📥 Récupération: '+path);
+  try{
+    const data = await apiCall('/files/from_pc','POST',{path});
+    rdOutLog('✅ '+data.name+' ('+Math.round(data.size/1024)+'KB) prêt');
+    rdRefreshFiles();
+  }catch(e){ rdOutLog('❌ '+(e.message||'Erreur')); }
+}
+
+async function rdRefreshFiles(){
+  const list = document.getElementById('rd-files-list');
+  if(!list) return;
+  try{
+    const data = await apiCall('/files/list','GET');
+    const files = data.files||[];
+    if(files.length===0){
+      list.innerHTML='<div style="font-size:10px;color:rgba(160,151,196,.3)">Aucun fichier disponible</div>';
+      return;
+    }
+    list.innerHTML = files.map(f=>`
+      <div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:7px">
+        <span style="font-size:14px">${getFileIcon(f.name)}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;color:rgba(200,190,230,.8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</div>
+          <div style="font-size:9px;color:rgba(160,151,196,.4)">${Math.round(f.size/1024)}KB · ${f.source==='pc'?'📺 PC':'📱 Tél'}</div>
+        </div>
+        <button onclick="rdDownloadFile('${f.id}','${f.name}')" style="background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);border-radius:5px;color:#4ade80;cursor:pointer;font-size:10px;padding:3px 7px;flex-shrink:0">↓</button>
+        <button onclick="rdSendFileToPc('${f.id}')" style="background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.2);border-radius:5px;color:#c8aaff;cursor:pointer;font-size:10px;padding:3px 7px;flex-shrink:0" title="Envoyer vers PC">→🖥</button>
+      </div>`).join('');
+  }catch(e){}
+}
+
+function getFileIcon(name){
+  const ext=(name.split('.').pop()||'').toLowerCase();
+  const icons={pdf:'📄',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',ppt:'📑',pptx:'📑',
+    png:'🖼',jpg:'🖼',jpeg:'🖼',gif:'🖼',mp4:'🎬',mp3:'🎵',zip:'📦',tar:'📦',
+    py:'🐍',js:'📜',html:'🌐',css:'🎨',txt:'📃',json:'⚙️'};
+  return icons[ext]||'📁';
+}
+
+function rdDownloadFile(fileId, name){
+  if(!TOKEN||!API_URL) return;
+  const a = document.createElement('a');
+  a.href = API_URL+'/files/download/'+fileId;
+  a.download = name;
+  a.setAttribute('data-token', TOKEN);
+  // Téléchargement avec auth
+  fetch(API_URL+'/files/download/'+fileId, {
+    headers:{'Authorization':'Bearer '+TOKEN}
+  }).then(r=>r.blob()).then(blob=>{
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=name;a.click();
+    URL.revokeObjectURL(url);
+  }).catch(e=>rdOutLog('❌ Téléchargement échoué'));
+}
+
+async function rdSendFileToPc(fileId){
+  try{
+    const data = await apiCall('/files/to_pc','POST',{file_id:fileId});
+    rdOutLog('✅ Envoyé vers PC: '+data.dest);
+  }catch(e){ rdOutLog('❌ '+(e.message||'PC non connecté')); }
+}
+
+async function phoneUploadFile(file){
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    const b64=e.target.result.split(',')[1];
+    try{
+      const data=await apiCall('/files/upload','POST',{name:file.name,data:b64});
+      addMsg('ai','✅ Fichier **'+file.name+'** reçu ('+Math.round(data.size/1024)+'KB). Tu peux maintenant le transférer vers ton PC.',false);
+    }catch(err){addMsg('ai','❌ Erreur upload: '+(err.message||''),false);}
+  };
+  reader.readAsDataURL(file);
+}
+
+async function silentRemoteCheck(){ await checkRemoteStatus(); }
 
 // Capture automatique des erreurs JS
 window.onerror = function(msg, src, line, col, err){
@@ -4078,4 +4410,163 @@ if('serviceWorker' in navigator){
   </div>
 </div>
 
+<!-- MODAL REMOTE DESKTOP v3 — Style Claude Desktop -->
+<div id="remote-modal" style="display:none;position:fixed;inset:0;z-index:200;background:#0a0a12;flex-direction:column;font-family:'Courier New',monospace">
+
+  <!-- Barre du haut -->
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#0d0b1e;border-bottom:1px solid rgba(139,92,246,.2);flex-shrink:0">
+    <!-- Indicateur connexion -->
+    <div style="display:flex;align-items:center;gap:6px">
+      <div id="rd-dot" style="width:8px;height:8px;border-radius:50%;background:#f87171;transition:background .3s"></div>
+      <span id="rd-status-lbl" style="font-size:10px;color:rgba(160,151,196,.6);letter-spacing:1.5px">DÉCONNECTÉ</span>
+    </div>
+    <div style="width:1px;height:16px;background:rgba(255,255,255,.08)"></div>
+    <!-- Nom session -->
+    <span style="font-size:11px;color:rgba(200,190,230,.7);letter-spacing:1px;flex:1">🖥️ SUTUR REMOTE DESKTOP</span>
+    <!-- Contrôles stream -->
+    <button id="rd-stream-btn" onclick="rdToggleStream()" style="background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.25);border-radius:6px;color:#c8aaff;cursor:pointer;font-size:10px;padding:5px 10px;letter-spacing:1px">⏸ PAUSE</button>
+    <button onclick="rdScreenshot()" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:rgba(200,190,230,.6);cursor:pointer;font-size:10px;padding:5px 10px;letter-spacing:1px">📸</button>
+    <button onclick="closeRemoteDesktop()" style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:6px;color:rgba(248,113,113,.7);cursor:pointer;font-size:13px;padding:4px 8px">✕</button>
+  </div>
+
+  <!-- Corps principal -->
+  <div style="display:flex;flex:1;overflow:hidden;min-height:0">
+
+    <!-- Vue bureau (gauche) -->
+    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;background:#000">
+      <!-- Canvas/image bureau -->
+      <div id="rd-screen-wrap" style="flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;cursor:crosshair">
+        <div id="rd-no-screen" style="text-align:center;color:rgba(139,92,246,.3)">
+          <div style="font-size:48px;margin-bottom:16px">🖥️</div>
+          <div style="font-size:12px;letter-spacing:3px;color:rgba(200,190,230,.4)">PC NON CONNECTÉ</div>
+          <div style="font-size:10px;margin-top:10px;color:rgba(160,151,196,.25)">Lance l'agent sur ton PC Linux</div>
+        </div>
+        <img id="rd-screen" style="display:none;max-width:100%;max-height:100%;object-fit:contain"
+          onclick="rdHandleClick(event,'left')"
+          oncontextmenu="rdHandleClick(event,'right');return false;"
+          ondblclick="rdHandleDoubleClick(event)"
+          title="Clic gauche · Clic droit · Double-clic"/>
+        <!-- Overlay FPS -->
+        <div id="rd-fps" style="position:absolute;top:8px;left:8px;font-size:9px;color:rgba(74,222,128,.4);letter-spacing:1px;pointer-events:none"></div>
+        <!-- Curseur personnalisé lors du drag -->
+        <div id="rd-drag-indicator" style="display:none;position:absolute;pointer-events:none;width:20px;height:20px;border:2px solid #c9a227;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 8px rgba(201,162,39,.5)"></div>
+      </div>
+
+      <!-- Touches rapides -->
+      <div style="display:flex;gap:4px;padding:6px 10px;background:#0d0b1e;border-top:1px solid rgba(255,255,255,.05);flex-shrink:0;overflow-x:auto">
+        <button onclick="rdKey('super')" class="rdkey">⊞ Super</button>
+        <button onclick="rdKey('ctrl+c')" class="rdkey">Ctrl+C</button>
+        <button onclick="rdKey('ctrl+v')" class="rdkey">Ctrl+V</button>
+        <button onclick="rdKey('ctrl+z')" class="rdkey">Ctrl+Z</button>
+        <button onclick="rdKey('ctrl+a')" class="rdkey">Ctrl+A</button>
+        <button onclick="rdKey('alt+F4')" class="rdkey">Alt+F4</button>
+        <button onclick="rdKey('Return')" class="rdkey">↵ Enter</button>
+        <button onclick="rdKey('Escape')" class="rdkey">Esc</button>
+        <button onclick="rdKey('Tab')" class="rdkey">Tab</button>
+        <button onclick="rdScroll('up')" class="rdkey">↑ Scroll</button>
+        <button onclick="rdScroll('down')" class="rdkey">↓ Scroll</button>
+      </div>
+    </div>
+
+    <!-- Panel droit -->
+    <div style="width:260px;border-left:1px solid rgba(139,92,246,.15);background:#0d0b1e;display:flex;flex-direction:column;flex-shrink:0">
+
+      <!-- Tabs -->
+      <div style="display:flex;border-bottom:1px solid rgba(139,92,246,.12)">
+        <button onclick="rdTab('terminal')" id="rdtab-terminal" class="rdtab rdtab-active">TERMINAL</button>
+        <button onclick="rdTab('ai')" id="rdtab-ai" class="rdtab">IA</button>
+        <button onclick="rdTab('files')" id="rdtab-files" class="rdtab">FICHIERS</button>
+      </div>
+
+      <!-- Terminal -->
+      <div id="rdpanel-terminal" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+        <div id="rd-output" style="flex:1;overflow-y:auto;padding:10px;font-size:11px;color:rgba(180,240,200,.75);white-space:pre-wrap;word-break:break-all;line-height:1.5"></div>
+        <div style="border-top:1px solid rgba(255,255,255,.05);padding:8px">
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+            <span style="color:rgba(74,222,128,.5);font-size:11px;flex-shrink:0">$</span>
+            <input id="rd-cmd" style="flex:1;background:transparent;border:none;color:rgba(180,240,200,.8);font-size:11px;font-family:'Courier New',monospace;outline:none" placeholder="commande bash..." onkeydown="if(event.key==='Enter')rdExec()"/>
+            <button onclick="rdExec()" style="background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);border-radius:5px;color:rgba(74,222,128,.6);cursor:pointer;font-size:10px;padding:4px 8px;letter-spacing:1px">▶</button>
+          </div>
+          <input id="rd-type" style="width:100%;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:6px 10px;color:rgba(200,190,230,.7);font-size:11px;font-family:'Courier New',monospace;outline:none;box-sizing:border-box" placeholder="Taper du texte..." onkeydown="if(event.key==='Enter')rdType()"/>
+        </div>
+      </div>
+
+      <!-- Panel IA / Computer Use -->
+      <div id="rdpanel-ai" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+        <!-- Navigation web rapide -->
+        <div style="padding:8px;border-bottom:1px solid rgba(139,92,246,.1)">
+          <div style="font-size:9px;color:rgba(139,92,246,.4);letter-spacing:1.5px;margin-bottom:6px">🌐 NAVIGATION WEB</div>
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <input id="rd-url-inp" style="flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(139,92,246,.15);border-radius:6px;padding:6px 10px;color:rgba(200,190,230,.8);font-size:11px;font-family:'Courier New',monospace;outline:none" placeholder="URL ou recherche Google..." onkeydown="if(event.key==='Enter')rdBrowse()"/>
+            <button onclick="rdBrowse()" style="background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.25);border-radius:6px;color:#c8aaff;cursor:pointer;font-size:11px;padding:5px 10px">▶</button>
+          </div>
+          <div style="display:flex;gap:4px">
+            <button onclick="rdBrowseQuick('https://google.com')" style="flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:5px;color:rgba(180,170,220,.5);cursor:pointer;font-size:9px;padding:4px">Google</button>
+            <button onclick="rdBrowseQuick('https://youtube.com')" style="flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:5px;color:rgba(180,170,220,.5);cursor:pointer;font-size:9px;padding:4px">YouTube</button>
+            <button onclick="rdKey('alt+Left')" style="flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:5px;color:rgba(180,170,220,.5);cursor:pointer;font-size:9px;padding:4px">← Retour</button>
+          </div>
+        </div>
+        <div id="rd-cu-log" style="flex:1;overflow-y:auto;padding:10px;font-size:11px;color:rgba(200,190,230,.7);line-height:1.6"></div>
+        <div style="border-top:1px solid rgba(139,92,246,.12);padding:8px;display:flex;flex-direction:column;gap:6px">
+          <textarea id="rd-cu-instruction" style="width:100%;background:rgba(255,255,255,.03);border:1px solid rgba(139,92,246,.2);border-radius:8px;padding:8px;color:rgba(200,190,230,.8);font-size:12px;font-family:'Courier New',monospace;outline:none;resize:none;box-sizing:border-box;min-height:55px" placeholder="Dis à Sutur ce qu'il doit faire...&#10;Ex: Cherche le prix du dollar aujourd'hui"></textarea>
+          <button id="rd-cu-btn" onclick="rdStartComputerUse()" style="padding:9px;border-radius:8px;border:1px solid rgba(139,92,246,.4);background:rgba(139,92,246,.12);color:#c8aaff;cursor:pointer;font-size:11px;letter-spacing:1.5px;font-family:'Courier New',monospace">🤖 LANCER COMPUTER USE</button>
+        </div>
+      </div>
+
+      <!-- Panel FICHIERS -->
+      <div id="rdpanel-files" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+        <div style="padding:8px;border-bottom:1px solid rgba(139,92,246,.1)">
+          <div style="font-size:9px;color:rgba(139,92,246,.4);letter-spacing:1.5px;margin-bottom:6px">📂 PARCOURIR PC</div>
+          <div style="display:flex;gap:6px;margin-bottom:4px">
+            <input id="rd-browse-path" style="flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(139,92,246,.15);border-radius:6px;padding:5px 8px;color:rgba(200,190,230,.7);font-size:11px;font-family:'Courier New',monospace;outline:none" value="~" onkeydown="if(event.key==='Enter')rdBrowseFiles()"/>
+            <button onclick="rdBrowseFiles()" style="background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.25);border-radius:5px;color:#c8aaff;cursor:pointer;font-size:10px;padding:4px 8px">📂</button>
+          </div>
+          <div id="rd-file-listing" style="font-size:10px;color:rgba(180,170,220,.5);font-family:'Courier New',monospace;max-height:80px;overflow-y:auto;white-space:pre"></div>
+        </div>
+        <div style="padding:8px;border-bottom:1px solid rgba(139,92,246,.1)">
+          <div style="font-size:9px;color:rgba(139,92,246,.4);letter-spacing:1.5px;margin-bottom:6px">📤 PC → TÉLÉPHONE</div>
+          <div style="display:flex;gap:6px">
+            <input id="rd-pc-path" style="flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(139,92,246,.15);border-radius:6px;padding:5px 8px;color:rgba(200,190,230,.7);font-size:11px;font-family:'Courier New',monospace;outline:none" placeholder="~/Documents/fichier.pdf"/>
+            <button onclick="rdFetchFile()" style="background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);border-radius:5px;color:#4ade80;cursor:pointer;font-size:10px;padding:4px 8px;white-space:nowrap">Récupérer</button>
+          </div>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:8px">
+          <div style="font-size:9px;color:rgba(139,92,246,.4);letter-spacing:1.5px;margin-bottom:6px">📁 FICHIERS DISPONIBLES</div>
+          <div id="rd-files-list" style="display:flex;flex-direction:column;gap:4px">
+            <div style="font-size:10px;color:rgba(160,151,196,.3)">Aucun fichier — récupère un fichier depuis ton PC</div>
+          </div>
+          <button onclick="rdRefreshFiles()" style="width:100%;margin-top:8px;padding:6px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:6px;color:rgba(160,151,196,.4);cursor:pointer;font-size:10px">🔄 Actualiser</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.rdkey{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:5px;color:rgba(180,170,220,.6);cursor:pointer;font-size:9px;padding:4px 8px;font-family:'Courier New',monospace;letter-spacing:.5px;white-space:nowrap;flex-shrink:0}
+.rdkey:hover{background:rgba(139,92,246,.12);border-color:rgba(139,92,246,.25);color:#c8aaff}
+.rdtab{flex:1;padding:8px;background:transparent;border:none;color:rgba(160,151,196,.4);cursor:pointer;font-size:9px;letter-spacing:1.5px;font-family:'Courier New',monospace;border-bottom:2px solid transparent}
+.rdtab-active{color:rgba(200,190,230,.85);border-bottom-color:rgba(139,92,246,.6)!important}
+</style>
+
+<!-- Modal instructions agent -->
+<div id="agent-modal" style="display:none;position:fixed;inset:0;z-index:250;background:rgba(0,0,0,.92);align-items:center;justify-content:center;padding:16px">
+  <div style="background:#0d0a24;border:1px solid rgba(139,92,246,.3);border-radius:16px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto">
+    <div style="padding:16px 20px;border-bottom:1px solid rgba(139,92,246,.1);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:13px;font-weight:600;color:#e8e4f8;letter-spacing:1px">📋 INSTALLER L'AGENT PC</span>
+      <button onclick="document.getElementById('agent-modal').style.display='none'" style="background:none;border:none;color:rgba(160,151,196,.5);cursor:pointer;font-size:18px">✕</button>
+    </div>
+    <div style="padding:16px 20px;font-size:12px;color:rgba(200,190,220,.8);line-height:1.9">
+      <div style="margin-bottom:8px;color:var(--gold);font-weight:600">1. Télécharge le script</div>
+      <div style="background:rgba(0,0,0,.4);border:1px solid rgba(139,92,246,.15);border-radius:8px;padding:10px;font-family:'Courier New',monospace;font-size:11px;color:rgba(139,92,246,.8);margin-bottom:12px">wget [URL du script depuis Vercel]/sutur_agent.py</div>
+      <div style="margin-bottom:8px;color:var(--gold);font-weight:600">2. Installe les dépendances</div>
+      <div style="background:rgba(0,0,0,.4);border:1px solid rgba(139,92,246,.15);border-radius:8px;padding:10px;font-family:'Courier New',monospace;font-size:11px;color:rgba(139,92,246,.8);margin-bottom:12px">pip install websockets pillow pyautogui<br>sudo apt install scrot xdotool -y</div>
+      <div style="margin-bottom:8px;color:var(--gold);font-weight:600">3. Lance l'agent</div>
+      <div id="agent-run-cmd" style="background:rgba(0,0,0,.4);border:1px solid rgba(139,92,246,.15);border-radius:8px;padding:10px;font-family:'Courier New',monospace;font-size:11px;color:rgba(139,92,246,.8);margin-bottom:16px;word-break:break-all">python3 sutur_agent.py --token TON_TOKEN</div>
+      <div style="padding:10px;background:rgba(201,162,39,.06);border:1px solid rgba(201,162,39,.15);border-radius:8px;font-size:11px;color:rgba(201,162,39,.7)">
+        ℹ️ Une fois lancé, ouvre CONFIG → REMOTE DESKTOP → Ouvrir. Stream démarre automatiquement.
+      </div>
+    </div>
+  </div>
+</div>
 </body></html>
