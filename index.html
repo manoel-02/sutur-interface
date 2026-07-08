@@ -1883,8 +1883,7 @@ async function rdExec(){
   try{
     const data = await apiCall('/remote/exec','POST',{command:cmd,timeout:30});
     rdOutLog(data.result||'(pas de sortie)');
-    rdOutLog('[exit '+data.exit_code+']
-');
+    rdOutLog('[exit '+data.exit_code+']\n');
     setTimeout(rdScreenshot, 800);
   }catch(e){ rdOutLog('❌ '+(e.message||'PC non connecté')); }
 }
@@ -1904,8 +1903,7 @@ function rdOutLog(text){
   const out = document.getElementById('rd-output');
   if(!out) return;
   const ts = new Date().toLocaleTimeString('fr');
-  out.textContent += '['+ts+'] '+text+'
-';
+  out.textContent += '['+ts+'] '+text+'\n';
   out.scrollTop = out.scrollHeight;
 }
 
@@ -2864,7 +2862,7 @@ async function sendMsg(){
       if(onboardingStep==='connections'){
         onboarding=false;
         onboardingStep='';
-        const wantsConn=/oui|ouais|ok|d'accord|connecter|yes/i.test(msg);
+        const wantsConn=/oui|ouais|ok|d accord|connecter|yes/i.test(msg);
         if(wantsConn){
           setTimeout(()=>{
             addMsg('ai',`Parfait ! Va dans l'onglet CONFIG ci-dessus, section Connexions, et clique sur CONNECTER pour chaque service que tu veux lier. Je suis prêt à t'assister en attendant !`,true);
