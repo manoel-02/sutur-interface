@@ -1138,7 +1138,13 @@ select.finp option,select.cinp option,select.sinp option{
   <div class="inp-bar" id="inp-bar" style="display:none">
     <span id="cmd-prefix" style="display:none;font-size:11px;color:rgba(0,200,255,.5);letter-spacing:1px;font-family:'Courier New',monospace;white-space:nowrap;flex-shrink:0">CMD›</span>
     <button class="micbtn" id="micbtn" onclick="toggleMic()">&#127908;</button>
+    <button class="micbtn" id="photobtn" onclick="document.getElementById('photo-input').click()" title="Envoyer une photo" style="font-size:16px">📷</button>
+    <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none" onchange="handlePhotoSelect(this)"/>
     <input class="cinp" id="cinp" placeholder="Parle a Sutur..." onkeydown="if(event.key==='Enter')sendMsg()"/>
+    <div id="photo-preview-bar" style="display:none;align-items:center;gap:6px;flex-shrink:0">
+      <img id="photo-thumb" style="width:32px;height:32px;border-radius:6px;object-fit:cover;border:1px solid var(--violet-glow)"/>
+      <button onclick="clearPhoto()" style="background:none;border:none;color:rgba(248,113,113,.6);cursor:pointer;font-size:14px;flex-shrink:0">✕</button>
+    </div>
     <button class="sbtn" id="stopbtn" onclick="stopSpeech()" style="display:none;background:rgba(248,113,113,.15);border-color:rgba(248,113,113,.35);color:#f87171">&#9646;&#9646;</button>
     <button class="sbtn" id="meet-stop-bar" onclick="stopMeetingFromBar()" style="display:none;background:rgba(248,113,113,.15);border-color:rgba(248,113,113,.35);color:#f87171;font-size:10px;width:auto;padding:0 10px;border-radius:10px">⏹ RÉU</button>
     <button class="sbtn" onclick="sendMsg()">&#9658;</button>
@@ -2168,12 +2174,61 @@ function handleMediaCmd(app,msg){
   addMsg('ai',`J'ouvre ${app} sur "${q}"...`);speakText(`J'ouvre ${app} sur ${q}.`);setTimeout(()=>window.open(urls[app]+encodeURIComponent(q),'_blank'),600);
 }
 
+// ── MODE PHOTO ────────────────────────────────────────────────────────────────
+let currentPhotoB64 = null;
+let currentPhotoType = 'image/jpeg';
+
+function handlePhotoSelect(input){
+  const file = input.files[0];
+  if(!file) return;
+  currentPhotoType = file.type || 'image/jpeg';
+  const reader = new FileReader();
+  reader.onload = e => {
+    currentPhotoB64 = e.target.result; // data:image/jpeg;base64,...
+    // Afficher la miniature
+    const thumb = document.getElementById('photo-thumb');
+    const preview = document.getElementById('photo-preview-bar');
+    if(thumb) thumb.src = currentPhotoB64;
+    if(preview) preview.style.display = 'flex';
+    // Mettre le focus sur l'input et suggérer une question
+    const inp = document.getElementById('cinp');
+    if(inp && !inp.value) inp.placeholder = "Que veux-tu savoir sur cette photo ?";
+  };
+  reader.readAsDataURL(file);
+  // Réinitialiser l'input pour permettre de resélectionner le même fichier
+  input.value = '';
+}
+
+function clearPhoto(){
+  currentPhotoB64 = null;
+  currentPhotoType = 'image/jpeg';
+  const preview = document.getElementById('photo-preview-bar');
+  const thumb = document.getElementById('photo-thumb');
+  const inp = document.getElementById('cinp');
+  if(preview) preview.style.display = 'none';
+  if(thumb) thumb.src = '';
+  if(inp) inp.placeholder = isTerminal() ? 'entrer commande...' : 'Parle a Sutur...';
+}
+
 async function sendMsg(){
   const inp=document.getElementById('cinp'),model=document.getElementById('model-sel').value,msg=inp.value.trim();
-  if(!msg||busy)return;
+  // Permettre envoi si photo sélectionnée même sans texte
+  if((!msg && !currentPhotoB64)||busy)return;
   if(!TOKEN){addMsg('ai','Configure ton acces dans CONFIG.');return}
   inp.value='';busy=true;gActive=true;
-  addMsg('user',msg);
+  // Afficher le message utilisateur avec la photo si présente
+  if(currentPhotoB64){
+    const thumbHtml=`<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+      <img src="${currentPhotoB64}" style="max-width:200px;max-height:150px;border-radius:10px;border:1px solid var(--violet-glow);object-fit:cover"/>
+      ${msg?`<span style="text-align:right">${msg}</span>`:''}
+    </div>`;
+    const cb=document.getElementById('chatbox');
+    const d=document.createElement('div');
+    d.className='cmsg user';d.innerHTML=thumbHtml;
+    cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
+  }else{
+    addMsg('user',msg);
+  }
 
   // ── ONBOARDING ──────────────────────────────────────────────────────────
   if(onboarding){
@@ -2257,9 +2312,18 @@ async function sendMsg(){
   const mc=detectMediaCmd(msg);
   if(mc){rmTyping();handleMediaCmd(mc,msg);busy=false;setStatus('EN LIGNE','idle');return}
   try{
-    const data=await apiCall('/chat','POST',{message:msg,model,history:history.slice(-8),location:userLocation});
+    const data=await apiCall('/chat','POST',{
+      message:msg,
+      model,
+      history:history.slice(-8),
+      location:userLocation,
+      image_data: currentPhotoB64 || null,
+      image_type: currentPhotoType || 'image/jpeg'
+    });
     rmTyping();const reply=data.reply||data.detail||'Erreur';
     history.push({role:'assistant',content:reply});
+    // Nettoyer la photo après envoi
+    clearPhoto();
 
     // Brouillon d'email — afficher interface de confirmation
     if(data.draft_email && data.draft_email.draft_email){
