@@ -1106,6 +1106,7 @@ select.finp option,select.cinp option,select.sinp option{
 
   <!-- BARRE SAISIE CHAT -->
   <div class="inp-bar" id="inp-bar" style="display:none">
+    <span id="cmd-prefix" style="display:none;font-size:11px;color:rgba(0,200,255,.5);letter-spacing:1px;font-family:'Courier New',monospace;white-space:nowrap;flex-shrink:0">CMD›</span>
     <button class="micbtn" id="micbtn" onclick="toggleMic()">&#127908;</button>
     <input class="cinp" id="cinp" placeholder="Parle a Sutur..." onkeydown="if(event.key==='Enter')sendMsg()"/>
     <button class="sbtn" id="stopbtn" onclick="stopSpeech()" style="display:none;background:rgba(248,113,113,.15);border-color:rgba(248,113,113,.35);color:#f87171">&#9646;&#9646;</button>
@@ -1683,13 +1684,24 @@ function setTheme(theme){
   document.body.classList.remove('theme-terminal');
   if(theme==='terminal') document.body.classList.add('theme-terminal');
   localStorage.setItem('s_theme', theme);
-  const lbl = document.getElementById('theme-label');
-  if(lbl) lbl.textContent = 'Thème actuel : ' + (theme==='terminal' ? 'TERMINAL' : 'LIQUID GLASS');
-  // Mettre à jour les boutons
-  const btnDefault = document.getElementById('theme-default');
-  const btnTerminal = document.getElementById('theme-terminal-btn');
-  if(btnDefault) btnDefault.style.opacity = theme==='default' ? '1' : '0.5';
-  if(btnTerminal) btnTerminal.style.opacity = theme==='terminal' ? '1' : '0.5';
+  // Label
+  const lbl=document.getElementById('theme-label');
+  if(lbl)lbl.textContent='Thème actuel : '+(theme==='terminal'?'TERMINAL':'LIQUID GLASS');
+  // Boutons
+  const btnD=document.getElementById('theme-default');
+  const btnT=document.getElementById('theme-terminal-btn');
+  if(btnD)btnD.style.opacity=theme==='default'?'1':'0.4';
+  if(btnT)btnT.style.opacity=theme==='terminal'?'1':'0.4';
+  // Input placeholder et prefix CMD
+  const inp=document.getElementById('chat-inp');
+  const cmdPfx=document.getElementById('cmd-prefix');
+  if(inp)inp.placeholder=theme==='terminal'?'entrer commande...':'Message à Sutur...';
+  if(cmdPfx)cmdPfx.style.display=theme==='terminal'?'flex':'none';
+  // Chatbox fond
+  const chatbox=document.getElementById('chatbox');
+  if(chatbox){
+    chatbox.style.fontFamily=theme==='terminal'?'\'Courier New\',monospace':'var(--font-main)';
+  }
 }
 
 // Charger le thème sauvegardé
@@ -1924,21 +1936,45 @@ function setGlobeMode(n){
   document.getElementById('hmod').textContent=['ORBIX','RÉFLEXION','PAROLE','ALERTE'][n];
 }
 
+function isTerminal(){return document.body.classList.contains('theme-terminal');}
+
 function addMsg(role,text,speak=false){
   const cb=document.getElementById('chatbox');
   const d=document.createElement('div');
-  if(role==='ai'){
-    currentAvatarCtx=detectAvatarContext(text);
-    const src=getAvatarSrc(currentAvatarCtx);
-    const avatarHtml=src
-      ?`<img src="${src}" class="msg-avatar" alt="Sutur"/>`
-      :`<div style="width:36px;height:36px;border-radius:50%;flex-shrink:0;background:radial-gradient(circle,rgba(139,92,246,.5),rgba(7,5,26,.9));border:1.5px solid rgba(139,92,246,.4);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#c8aaff;margin-top:2px">S</div>`;
-    const ctxLabel=AVATAR_CONTEXTS[currentAvatarCtx]?.label||'Assistant';
-    d.className='msg-row';
-    d.innerHTML=`${avatarHtml}<div class="msg-bubble"><div class="lbl">SUTUR <span style="color:var(--gold);font-size:9px;letter-spacing:1px">${ctxLabel}</span> <button class="speak-btn" onclick="speakText(this.closest('.msg-bubble').querySelector('.mt').textContent)">&#128266;</button></div><span class="mt">${text}</span></div>`;
+  if(isTerminal()){
+    // ── MODE TERMINAL : structure ligne de commande ──
+    if(role==='ai'){
+      currentAvatarCtx=detectAvatarContext(text);
+      const ctxLabel=AVATAR_CONTEXTS[currentAvatarCtx]?.label||'ASSISTANT';
+      d.style.cssText='display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;animation:fu .2s ease';
+      d.innerHTML=`
+        <span style="font-size:10px;color:rgba(0,200,255,.6);letter-spacing:1px;font-weight:600;white-space:nowrap;padding-top:2px;min-width:52px;font-family:'Courier New',monospace">SUTUR›</span>
+        <div style="flex:1">
+          <div style="font-size:9px;color:rgba(0,200,255,.35);letter-spacing:2px;margin-bottom:3px;font-family:'Courier New',monospace">MODE:${ctxLabel.toUpperCase().replace(/ /g,'_')}</div>
+          <span class="mt" style="font-size:13px;color:rgba(180,240,255,.85);line-height:1.65;font-family:'Courier New',monospace">${text}</span>
+          <button class="speak-btn" style="margin-left:8px;background:none;border:none;cursor:pointer;font-size:12px;color:rgba(0,200,255,.4)" onclick="speakText(this.previousElementSibling.textContent)">▶</button>
+        </div>`;
+    }else{
+      d.style.cssText='display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;animation:fu .2s ease';
+      d.innerHTML=`
+        <span style="font-size:10px;color:rgba(255,210,80,.5);letter-spacing:1px;font-weight:600;white-space:nowrap;padding-top:2px;min-width:52px;font-family:'Courier New',monospace">${currentUserName||'USER'}›</span>
+        <span style="font-size:13px;color:rgba(255,230,150,.75);line-height:1.65;font-family:'Courier New',monospace">${text}</span>`;
+    }
   }else{
-    d.className='cmsg user';
-    d.textContent=text;
+    // ── MODE LIQUID GLASS : bulles avec avatars ──
+    if(role==='ai'){
+      currentAvatarCtx=detectAvatarContext(text);
+      const src=getAvatarSrc(currentAvatarCtx);
+      const avatarHtml=src
+        ?`<img src="${src}" class="msg-avatar" alt="Sutur"/>`
+        :`<div style="width:36px;height:36px;border-radius:50%;flex-shrink:0;background:radial-gradient(circle,rgba(139,92,246,.5),rgba(7,5,26,.9));border:1.5px solid rgba(139,92,246,.4);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#c8aaff;margin-top:2px">S</div>`;
+      const ctxLabel=AVATAR_CONTEXTS[currentAvatarCtx]?.label||'Assistant';
+      d.className='msg-row';
+      d.innerHTML=`${avatarHtml}<div class="msg-bubble"><div class="lbl">SUTUR <span style="color:var(--gold);font-size:9px;letter-spacing:1px">${ctxLabel}</span> <button class="speak-btn" onclick="speakText(this.closest('.msg-bubble').querySelector('.mt').textContent)">&#128266;</button></div><span class="mt">${text}</span></div>`;
+    }else{
+      d.className='cmsg user';
+      d.textContent=text;
+    }
   }
   cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
   if(speak&&role==='ai'&&document.getElementById('t-autospeak').classList.contains('on'))setTimeout(()=>speakText(text),200);
@@ -1947,15 +1983,26 @@ function addMsg(role,text,speak=false){
 function addTyping(){
   const cb=document.getElementById('chatbox');
   const d=document.createElement('div');
-  d.className='msg-row';d.id='tymsg';
-  const src=getAvatarSrc(currentAvatarCtx);
-  const avatarHtml=src
-    ?`<img src="${src}" class="msg-avatar" alt="Sutur"/>`
-    :`<div style="width:36px;height:36px;border-radius:50%;flex-shrink:0;background:radial-gradient(circle,rgba(139,92,246,.5),rgba(7,5,26,.9));border:1.5px solid rgba(139,92,246,.4);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#c8aaff;margin-top:2px">S</div>`;
-  d.innerHTML=`${avatarHtml}<div class="msg-bubble"><div class="lbl">SUTUR</div><div class="typing"><span></span><span></span><span></span></div></div>`;
+  d.id='tymsg';
+  if(isTerminal()){
+    d.style.cssText='display:flex;gap:10px;align-items:flex-start;margin-bottom:8px';
+    d.innerHTML=`
+      <span style="font-size:10px;color:rgba(0,200,255,.6);letter-spacing:1px;font-weight:600;white-space:nowrap;padding-top:2px;min-width:52px;font-family:'Courier New',monospace">SUTUR›</span>
+      <span style="font-size:13px;color:rgba(0,200,255,.5);font-family:'Courier New',monospace">TRAITEMENT<span id="tcursor">_</span></span>`;
+    // Curseur clignotant
+    let c=0;const el=setInterval(()=>{const cu=d.querySelector('#tcursor');if(cu)cu.textContent=c++%2?'_':' ';else clearInterval(el)},500);
+    d._interval=el;
+  }else{
+    const src=getAvatarSrc(currentAvatarCtx);
+    const avatarHtml=src
+      ?`<img src="${src}" class="msg-avatar" alt="Sutur"/>`
+      :`<div style="width:36px;height:36px;border-radius:50%;flex-shrink:0;background:radial-gradient(circle,rgba(139,92,246,.5),rgba(7,5,26,.9));border:1.5px solid rgba(139,92,246,.4);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#c8aaff;margin-top:2px">S</div>`;
+    d.className='msg-row';
+    d.innerHTML=`${avatarHtml}<div class="msg-bubble"><div class="lbl">SUTUR</div><div class="typing"><span></span><span></span><span></span></div></div>`;
+  }
   cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
 }
-function rmTyping(){const t=document.getElementById('tymsg');if(t)t.remove()}
+function rmTyping(){const t=document.getElementById('tymsg');if(t){if(t._interval)clearInterval(t._interval);t.remove();}}
 function setStatus(s,state){document.getElementById('hst').textContent=s;document.getElementById('hdot').style.background=state==='think'?'#ffaa00':state==='talk'?'#00ff88':'#00d4ff';gThink=state==='think'}
 
 // ── MOTEUR VOCAL ─────────────────────────────────────────────────────────────
