@@ -165,6 +165,14 @@ canvas#bgc{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-
 
 /* ── CHAT ────────────────────────────────────────────────────────────────── */
 .chat-box{display:flex;flex-direction:column;gap:10px;padding:4px;margin-bottom:8px}
+.chat-box .mt{word-wrap:break-word;overflow-wrap:anywhere;white-space:pre-wrap;display:block}
+.chat-box .mt strong,.chat-box .mt b{color:var(--gold);font-weight:600}
+.chat-box .mt em,.chat-box .mt i{color:var(--text-secondary);font-style:italic}
+.chat-box .mt code{font-family:var(--font-mono);background:rgba(0,0,0,.3);padding:1px 5px;border-radius:4px;font-size:12px;color:#4ade80}
+.chat-box .mt a{color:var(--violet);text-decoration:underline;word-break:break-all}
+.msg-bubble .mt{word-wrap:break-word;overflow-wrap:anywhere;white-space:pre-wrap;display:block}
+.msg-bubble .mt strong,.msg-bubble .mt b{color:var(--gold);font-weight:600}
+.msg-bubble .mt code{font-family:var(--font-mono);background:rgba(0,0,0,.3);padding:1px 5px;border-radius:4px;font-size:12px;color:#4ade80}
 .cmsg{padding:12px 16px;border-radius:14px;font-size:15px;line-height:1.65;animation:fu .25s ease;font-family:var(--font-main)}
 @keyframes fu{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 .cmsg.user{background:var(--msg-user-bg);border:1px solid var(--msg-user-border);color:var(--text-primary);align-self:flex-end;max-width:85%;text-align:right;margin-left:auto}
@@ -1976,6 +1984,40 @@ function setGlobeMode(n){
   document.getElementById('hmod').textContent=['ORBIX','RÉFLEXION','PAROLE','ALERTE'][n];
 }
 
+// Rend le markdown basique en HTML sûr
+function renderMarkdown(text){
+  if(!text) return '';
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')  // échapper HTML
+    .replace(/\*\*\*(.*?)\*\*\*/g,'<strong><em>$1</em></strong>')
+    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g,'<em>$1</em>')
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,'<a href="$2" target="_blank">$1</a>')
+    .replace(/^#{3}\s(.+)$/gm,'<strong style="font-size:13px;color:var(--gold)">$1</strong>')
+    .replace(/^#{2}\s(.+)$/gm,'<strong style="font-size:14px;color:var(--gold)">$1</strong>')
+    .replace(/^#{1}\s(.+)$/gm,'<strong style="font-size:15px;color:var(--gold)">$1</strong>')
+    .replace(/^[-•]\s(.+)$/gm,'&nbsp;&nbsp;· $1')
+    .replace(/\n/g,'<br>');
+}
+
+// Nettoie le texte pour lecture vocale naturelle
+function cleanForSpeech(text){
+  return text
+    .replace(/\*\*?(.*?)\*\*?/g,'$1')
+    .replace(/#{1,6}\s/g,'')
+    .replace(/`[^`]+`/g,'')
+    .replace(/\[([^\]]+)\]\([^\)]+\)/g,'$1')
+    .replace(/---+/g,'.')
+    .replace(/[🎙📬🏎⚽📊💼🤖🏠👤📅✅❌🔴🟡🟢⚡🏆🔍📖•·]/g,'')
+    .replace(/\n{2,}/g,'. ')
+    .replace(/\n/g,', ')
+    .replace(/\s{2,}/g,' ')
+    .replace(/^[-•]\s/gm,'')
+    .replace(/\*\*/g,'')
+    .trim();
+}
+
 function isTerminal(){return document.body.classList.contains('theme-terminal');}
 
 function addMsg(role,text,speak=false){
@@ -1991,7 +2033,7 @@ function addMsg(role,text,speak=false){
         <span style="font-size:10px;color:rgba(0,200,255,.6);letter-spacing:1px;font-weight:600;white-space:nowrap;padding-top:2px;min-width:52px;font-family:'Courier New',monospace">SUTUR›</span>
         <div style="flex:1">
           <div style="font-size:9px;color:rgba(0,200,255,.35);letter-spacing:2px;margin-bottom:3px;font-family:'Courier New',monospace">MODE:${ctxLabel.toUpperCase().replace(/ /g,'_')}</div>
-          <span class="mt" style="font-size:13px;color:rgba(180,240,255,.85);line-height:1.65;font-family:'Courier New',monospace">${text}</span>
+          <span class="mt" style="font-size:13px;color:rgba(180,240,255,.85);line-height:1.65;font-family:'Courier New',monospace;word-wrap:break-word;overflow-wrap:anywhere;white-space:pre-wrap">${renderMarkdown(text)}</span>
           <button class="speak-btn" style="margin-left:8px;background:none;border:none;cursor:pointer;font-size:12px;color:rgba(0,200,255,.4)" onclick="speakText(this.previousElementSibling.textContent)">▶</button>
         </div>`;
     }else{
@@ -2010,7 +2052,7 @@ function addMsg(role,text,speak=false){
         :`<div style="width:36px;height:36px;border-radius:50%;flex-shrink:0;background:radial-gradient(circle,rgba(139,92,246,.5),rgba(7,5,26,.9));border:1.5px solid rgba(139,92,246,.4);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#c8aaff;margin-top:2px">S</div>`;
       const ctxLabel=AVATAR_CONTEXTS[currentAvatarCtx]?.label||'Assistant';
       d.className='msg-row';
-      d.innerHTML=`${avatarHtml}<div class="msg-bubble"><div class="lbl">SUTUR <span style="color:var(--gold);font-size:9px;letter-spacing:1px">${ctxLabel}</span> <button class="speak-btn" onclick="speakText(this.closest('.msg-bubble').querySelector('.mt').textContent)">&#128266;</button></div><span class="mt">${text}</span></div>`;
+      d.innerHTML=`${avatarHtml}<div class="msg-bubble"><div class="lbl">SUTUR <span style="color:var(--gold);font-size:9px;letter-spacing:1px">${ctxLabel}</span> <button class="speak-btn" onclick="speakText(this.closest('.msg-bubble').querySelector('.mt').innerText)">&#128266;</button></div><span class="mt">${renderMarkdown(text)}</span></div>`;
     }else{
       d.className='cmsg user';
       d.textContent=text;
@@ -2123,14 +2165,24 @@ async function playChunk(text){
     }catch(e){}
   }
   
-  // Option C — Synthèse navigateur
+  // Option C — Synthèse navigateur améliorée
   if('speechSynthesis'in window){
     return new Promise(resolve=>{
       const u=new SpeechSynthesisUtterance(text);
-      u.lang='fr-FR';u.rate=0.95;
+      u.lang='fr-FR';
+      u.rate=0.88;      // Plus lent = plus naturel
+      u.pitch=1.05;     // Légèrement plus haut
+      u.volume=0.95;
+      // Chercher la meilleure voix française disponible
       const vs=window.speechSynthesis.getVoices();
-      const fr=vs.find(v=>v.lang.startsWith('fr'));
-      if(fr)u.voice=fr;
+      const preferred=['Google français','Microsoft Paul','Google French','fr-FR'];
+      let voice=null;
+      for(const name of preferred){
+        voice=vs.find(v=>v.name.includes(name)||v.lang===name);
+        if(voice)break;
+      }
+      if(!voice)voice=vs.find(v=>v.lang.startsWith('fr'));
+      if(voice)u.voice=voice;
       u.onend=resolve;u.onerror=resolve;
       window.speechSynthesis.speak(u);
     });
@@ -2156,7 +2208,10 @@ async function speakText(text){
   const voiceOn=document.getElementById('t-voice').classList.contains('on');
   if(!voiceOn)return;
   stopSpeech();
-  const chunks=splitIntoChunks(text);
+  // Nettoyer le texte pour lecture naturelle
+  const cleanText=cleanForSpeech(text);
+  if(!cleanText.trim())return;
+  const chunks=splitIntoChunks(cleanText);
   ttsQueue=[...chunks];
   processQueue();
 }
