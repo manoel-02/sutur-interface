@@ -1138,11 +1138,12 @@ select.finp option,select.cinp option,select.sinp option{
   <div class="inp-bar" id="inp-bar" style="display:none">
     <span id="cmd-prefix" style="display:none;font-size:11px;color:rgba(0,200,255,.5);letter-spacing:1px;font-family:'Courier New',monospace;white-space:nowrap;flex-shrink:0">CMD›</span>
     <button class="micbtn" id="micbtn" onclick="toggleMic()">&#127908;</button>
-    <button class="micbtn" id="photobtn" onclick="document.getElementById('photo-input').click()" title="Envoyer une photo" style="font-size:16px">📷</button>
-    <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none" onchange="handlePhotoSelect(this)"/>
+    <button class="micbtn" id="photobtn" onclick="openPhotoModal()" title="Analyser une photo" style="font-size:16px">📷</button>
+    <input type="file" id="photo-input" accept="image/*" style="display:none" onchange="handlePhotoSelect(this)"/>
     <input class="cinp" id="cinp" placeholder="Parle a Sutur..." onkeydown="if(event.key==='Enter')sendMsg()"/>
     <div id="photo-preview-bar" style="display:none;align-items:center;gap:6px;flex-shrink:0">
       <img id="photo-thumb" style="width:32px;height:32px;border-radius:6px;object-fit:cover;border:1px solid var(--violet-glow)"/>
+      <button onclick="sendPhotoNow()" style="background:rgba(74,222,128,.15);border:1px solid rgba(74,222,128,.3);border-radius:6px;color:#4ade80;cursor:pointer;font-size:11px;padding:4px 8px;font-weight:600;white-space:nowrap;flex-shrink:0">✓ Analyser</button>
       <button onclick="clearPhoto()" style="background:none;border:none;color:rgba(248,113,113,.6);cursor:pointer;font-size:14px;flex-shrink:0">✕</button>
     </div>
     <button class="sbtn" id="stopbtn" onclick="stopSpeech()" style="display:none;background:rgba(248,113,113,.15);border-color:rgba(248,113,113,.35);color:#f87171">&#9646;&#9646;</button>
@@ -1799,10 +1800,9 @@ function unlock(){
       const termsOk = await checkTerms();
       if(!termsOk) return;
       greetUser(userName);
-      // Notifications sportives 2s après login
       setTimeout(loadSportNotifications, 2000);
-      // Rapports agents en attente
       setTimeout(deliverPendingNotifications, 3000);
+      setTimeout(checkAndRequestPermissions, 4000);
     });
   }
 }
@@ -2178,25 +2178,64 @@ function handleMediaCmd(app,msg){
 let currentPhotoB64 = null;
 let currentPhotoType = 'image/jpeg';
 
+function openPhotoModal(){
+  const modal = document.getElementById('photo-modal');
+  modal.style.display = 'flex';
+  // Reset
+  const img = document.getElementById('photo-modal-img');
+  const btn = document.getElementById('photo-validate-btn');
+  const q = document.getElementById('photo-question');
+  if(img) img.src = '';
+  if(btn){ btn.style.opacity='.4'; btn.style.pointerEvents='none'; }
+  if(q) q.value = '';
+  if(!currentPhotoB64) img.style.display='none';
+  else { img.src=currentPhotoB64; img.style.display='block'; btn.style.opacity='1'; btn.style.pointerEvents='auto'; }
+}
+
+function closePhotoModal(){
+  document.getElementById('photo-modal').style.display='none';
+}
+
 function handlePhotoSelect(input){
   const file = input.files[0];
   if(!file) return;
   currentPhotoType = file.type || 'image/jpeg';
   const reader = new FileReader();
   reader.onload = e => {
-    currentPhotoB64 = e.target.result; // data:image/jpeg;base64,...
-    // Afficher la miniature
-    const thumb = document.getElementById('photo-thumb');
-    const preview = document.getElementById('photo-preview-bar');
-    if(thumb) thumb.src = currentPhotoB64;
-    if(preview) preview.style.display = 'flex';
-    // Mettre le focus sur l'input et suggérer une question
-    const inp = document.getElementById('cinp');
-    if(inp && !inp.value) inp.placeholder = "Que veux-tu savoir sur cette photo ?";
+    currentPhotoB64 = e.target.result;
+    // Afficher dans le modal
+    const img = document.getElementById('photo-modal-img');
+    const btn = document.getElementById('photo-validate-btn');
+    if(img){ img.src=currentPhotoB64; img.style.display='block'; }
+    if(btn){ btn.style.opacity='1'; btn.style.pointerEvents='auto'; }
+    // Ouvrir le modal si pas déjà ouvert
+    document.getElementById('photo-modal').style.display='flex';
+    // Aussi mettre à jour la miniature dans la barre
+    const thumb=document.getElementById('photo-thumb');
+    const preview=document.getElementById('photo-preview-bar');
+    if(thumb) thumb.src=currentPhotoB64;
+    if(preview) preview.style.display='flex';
   };
   reader.readAsDataURL(file);
-  // Réinitialiser l'input pour permettre de resélectionner le même fichier
-  input.value = '';
+  input.value='';
+}
+
+async function validateAndSendPhoto(){
+  const q = document.getElementById('photo-question');
+  const question = q ? q.value.trim() : '';
+  closePhotoModal();
+  // Mettre la question dans l'input
+  const inp = document.getElementById('cinp');
+  if(inp) inp.value = question || 'Analyse cette image et dis-moi ce que tu vois.';
+  // Envoyer
+  await sendMsg();
+}
+
+function sendPhotoNow(){
+  // Envoi rapide depuis la barre sans modal
+  const inp = document.getElementById('cinp');
+  if(!inp.value) inp.value = 'Analyse cette image et dis-moi ce que tu vois.';
+  sendMsg();
 }
 
 function clearPhoto(){
@@ -2205,9 +2244,84 @@ function clearPhoto(){
   const preview = document.getElementById('photo-preview-bar');
   const thumb = document.getElementById('photo-thumb');
   const inp = document.getElementById('cinp');
-  if(preview) preview.style.display = 'none';
-  if(thumb) thumb.src = '';
+  if(preview) preview.style.display='none';
+  if(thumb) thumb.src='';
   if(inp) inp.placeholder = isTerminal() ? 'entrer commande...' : 'Parle a Sutur...';
+}
+
+// ── GESTION PERMISSIONS ───────────────────────────────────────────────────────
+let permsRequested = false;
+
+async function checkAndRequestPermissions(){
+  if(permsRequested || localStorage.getItem('s_perms_done')) return;
+  permsRequested = true;
+  // Vérifier quelles permissions sont nécessaires
+  const perms = [];
+  // Micro
+  try{
+    const mic = await navigator.permissions.query({name:'microphone'});
+    if(mic.state !== 'granted') perms.push({icon:'🎙️', name:'Microphone', desc:'Pour parler à Sutur à la voix', key:'microphone'});
+  }catch(e){ perms.push({icon:'🎙️', name:'Microphone', desc:'Pour parler à Sutur à la voix', key:'microphone'}); }
+  // Localisation
+  try{
+    const loc = await navigator.permissions.query({name:'geolocation'});
+    if(loc.state !== 'granted') perms.push({icon:'📍', name:'Localisation', desc:'Pour les réponses adaptées à ta position', key:'geolocation'});
+  }catch(e){ perms.push({icon:'📍', name:'Localisation', desc:'Pour les réponses adaptées à ta position', key:'geolocation'}); }
+  // Caméra
+  try{
+    const cam = await navigator.permissions.query({name:'camera'});
+    if(cam.state !== 'granted') perms.push({icon:'📷', name:'Caméra', desc:'Pour analyser des photos en temps réel', key:'camera'});
+  }catch(e){ perms.push({icon:'📷', name:'Caméra', desc:'Pour analyser des photos en temps réel', key:'camera'}); }
+
+  if(perms.length === 0){ localStorage.setItem('s_perms_done','1'); return; }
+
+  // Afficher le modal
+  const list = document.getElementById('perm-list');
+  if(list) list.innerHTML = perms.map(p=>`
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:10px">
+      <span style="font-size:22px">${p.icon}</span>
+      <div>
+        <div style="font-size:13px;color:#e8e4f8;font-weight:500">${p.name}</div>
+        <div style="font-size:11px;color:rgba(160,151,196,.5);margin-top:2px">${p.desc}</div>
+      </div>
+      <div id="perm-status-${p.key}" style="margin-left:auto;font-size:11px;color:rgba(201,162,39,.6)">En attente</div>
+    </div>`).join('');
+
+  document.getElementById('perm-modal').style.display='flex';
+  window._permsToRequest = perms;
+}
+
+async function requestAllPermissions(){
+  const perms = window._permsToRequest || [];
+  for(const perm of perms){
+    const statusEl = document.getElementById(`perm-status-${perm.key}`);
+    try{
+      if(perm.key === 'microphone' || perm.key === 'camera'){
+        const constraints = perm.key === 'microphone'
+          ? {audio:true}
+          : {video:true};
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        stream.getTracks().forEach(t=>t.stop());
+        if(statusEl){ statusEl.textContent='✅'; statusEl.style.color='#4ade80'; }
+      } else if(perm.key === 'geolocation'){
+        await new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(
+          pos=>{ getLocation(); res(pos); },
+          err=>rej(err),
+          {timeout:8000}
+        ));
+        if(statusEl){ statusEl.textContent='✅'; statusEl.style.color='#4ade80'; }
+      }
+    }catch(e){
+      if(statusEl){ statusEl.textContent='Refusé'; statusEl.style.color='#f87171'; }
+    }
+  }
+  localStorage.setItem('s_perms_done','1');
+  setTimeout(closePermModal, 1200);
+}
+
+function closePermModal(){
+  document.getElementById('perm-modal').style.display='none';
+  localStorage.setItem('s_perms_done','1');
 }
 
 async function sendMsg(){
@@ -3784,4 +3898,51 @@ if('serviceWorker' in navigator){
   });
 }
 </script>
+<!-- MODAL PHOTO PREVIEW -->
+<div id="photo-modal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.88);align-items:center;justify-content:center;padding:16px;flex-direction:column;gap:0">
+  <div style="background:#0d0a24;border:1px solid rgba(139,92,246,.35);border-radius:20px;max-width:420px;width:100%;overflow:hidden">
+    <!-- Header -->
+    <div style="padding:14px 18px;border-bottom:1px solid rgba(139,92,246,.15);display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:13px;font-weight:600;color:#e8e4f8;letter-spacing:1px">📷 ANALYSE PHOTO</div>
+      <button onclick="closePhotoModal()" style="background:none;border:none;color:rgba(160,151,196,.5);cursor:pointer;font-size:18px;line-height:1">✕</button>
+    </div>
+    <!-- Image preview -->
+    <div style="padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px">
+      <img id="photo-modal-img" style="max-width:100%;max-height:260px;border-radius:12px;object-fit:contain;border:1px solid rgba(139,92,246,.2)"/>
+      <!-- Choix source -->
+      <div style="display:flex;gap:8px;width:100%">
+        <button onclick="document.getElementById('photo-input-cam').click()" style="flex:1;padding:10px;border-radius:10px;border:1px solid rgba(139,92,246,.25);background:rgba(139,92,246,.08);color:#c8aaff;font-size:12px;cursor:pointer;font-family:var(--font-main)">📸 Caméra</button>
+        <button onclick="document.getElementById('photo-input').click()" style="flex:1;padding:10px;border-radius:10px;border:1px solid rgba(201,162,39,.25);background:rgba(201,162,39,.08);color:#c9a227;font-size:12px;cursor:pointer;font-family:var(--font-main)">🖼 Galerie</button>
+      </div>
+      <input type="file" id="photo-input-cam" accept="image/*" capture="environment" style="display:none" onchange="handlePhotoSelect(this)"/>
+      <!-- Question optionnelle -->
+      <div style="width:100%">
+        <div style="font-size:10px;color:rgba(160,151,196,.5);letter-spacing:1px;margin-bottom:6px">QUESTION SUR LA PHOTO (optionnelle)</div>
+        <input id="photo-question" class="finp" placeholder="Ex: C'est quoi ça ? Prix ? Traduis..." style="font-size:13px"/>
+      </div>
+    </div>
+    <!-- Actions -->
+    <div style="padding:12px 16px;border-top:1px solid rgba(139,92,246,.15);display:flex;gap:10px">
+      <button onclick="closePhotoModal()" style="flex:1;padding:12px;border-radius:10px;border:1px solid rgba(160,151,196,.15);background:transparent;color:rgba(160,151,196,.5);font-size:13px;cursor:pointer;font-family:var(--font-main)">Annuler</button>
+      <button id="photo-validate-btn" onclick="validateAndSendPhoto()" style="flex:2;padding:12px;border-radius:10px;border:1px solid rgba(74,222,128,.35);background:rgba(74,222,128,.12);color:#4ade80;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-main);letter-spacing:1px;opacity:.4;pointer-events:none">✓ ANALYSER</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PERMISSIONS -->
+<div id="perm-modal" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.9);align-items:center;justify-content:center;padding:16px">
+  <div style="background:#0d0a24;border:1px solid rgba(201,162,39,.3);border-radius:20px;max-width:400px;width:100%;padding:24px">
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:32px;margin-bottom:8px">🛡️</div>
+      <div style="font-size:15px;font-weight:600;color:#e8e4f8;letter-spacing:1px;margin-bottom:6px">ACCÈS REQUIS</div>
+      <div style="font-size:12px;color:rgba(160,151,196,.6);line-height:1.6">Pour fonctionner au maximum de ses capacités,<br>Sutur a besoin de ces autorisations.</div>
+    </div>
+    <div id="perm-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="closePermModal()" style="flex:1;padding:12px;border-radius:10px;border:1px solid rgba(160,151,196,.15);background:transparent;color:rgba(160,151,196,.5);font-size:13px;cursor:pointer;font-family:var(--font-main)">Plus tard</button>
+      <button onclick="requestAllPermissions()" style="flex:2;padding:12px;border-radius:10px;border:1px solid rgba(201,162,39,.4);background:rgba(201,162,39,.12);color:#c9a227;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-main);letter-spacing:1px">✓ AUTORISER TOUT</button>
+    </div>
+  </div>
+</div>
+
 </body></html>
