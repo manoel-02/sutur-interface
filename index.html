@@ -74,7 +74,7 @@ body.theme-terminal{
   --msg-ai-border: rgba(0,200,255,.1);
   --msg-user-bg: rgba(255,210,80,.05);
   --msg-user-border: rgba(255,210,80,.12);
-  --nav-active-bg: rgba(0,200,255,.08);
+  --nav-active-bg: rgba(0,200,255,.06);
   --nav-active-border: rgba(0,200,255,.2);
   --lbl-color: rgba(0,200,255,.45);
   --avatar-border: rgba(0,200,255,.35);
@@ -82,11 +82,33 @@ body.theme-terminal{
 }
 body.theme-terminal #app::before{
   content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
-  background-image:linear-gradient(rgba(0,200,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,200,255,.02) 1px,transparent 1px);
+  background-image:linear-gradient(rgba(0,200,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(0,200,255,.018) 1px,transparent 1px);
   background-size:36px 36px;
 }
-body.theme-terminal .hud{border-bottom-color:rgba(0,200,255,.1);}
-body.theme-terminal .tab.active{background:rgba(0,200,255,.08);border-color:rgba(0,200,255,.2);}
+body.theme-terminal #app::after{
+  content:'';position:fixed;left:0;right:0;height:1px;z-index:1;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(0,200,255,.12),transparent);
+  animation:tscan 6s linear infinite;
+}
+@keyframes tscan{from{top:-1px}to{top:100vh}}
+body.theme-terminal .hud{background:rgba(3,5,8,.97);border-bottom:1px solid rgba(0,200,255,.12);position:relative;}
+body.theme-terminal .hud::before{content:'';position:absolute;top:6px;left:8px;width:14px;height:14px;border-top:1px solid rgba(0,200,255,.4);border-left:1px solid rgba(0,200,255,.4);}
+body.theme-terminal .hud::after{content:'';position:absolute;top:6px;right:8px;width:14px;height:14px;border-top:1px solid rgba(0,200,255,.4);border-right:1px solid rgba(0,200,255,.4);}
+body.theme-terminal .tabs{background:rgba(3,5,8,.95);border-bottom:1px solid rgba(0,200,255,.08);}
+body.theme-terminal .tab{color:rgba(0,200,255,.3);font-family:'Courier New',monospace;font-size:9px;letter-spacing:1.5px;}
+body.theme-terminal .tab.active{background:rgba(0,200,255,.06);border-color:rgba(0,200,255,.2);color:rgba(0,200,255,.85);}
+body.theme-terminal .cinp{font-family:'Courier New',monospace!important;background:transparent!important;border-color:rgba(0,200,255,.15)!important;color:rgba(180,240,255,.8)!important;}
+body.theme-terminal .cinp::placeholder{color:rgba(0,200,255,.25)!important;font-family:'Courier New',monospace!important;}
+body.theme-terminal .sbtn{background:rgba(0,200,255,.06)!important;border-color:rgba(0,200,255,.2)!important;color:rgba(0,200,255,.7)!important;}
+body.theme-terminal .micbtn{background:rgba(0,200,255,.05)!important;border-color:rgba(0,200,255,.15)!important;color:rgba(0,200,255,.5)!important;}
+body.theme-terminal .inp-bar{background:rgba(3,5,8,.97)!important;border-top:1px solid rgba(0,200,255,.1)!important;}
+body.theme-terminal .bottom-nav{background:rgba(3,5,8,.97)!important;border-top:1px solid rgba(0,200,255,.08)!important;}
+body.theme-terminal .nav-label{font-family:'Courier New',monospace!important;font-size:8px!important;letter-spacing:1px!important;}
+body.theme-terminal .nav-item.active{background:rgba(0,200,255,.06)!important;border:1px solid rgba(0,200,255,.18)!important;}
+body.theme-terminal .glass{background:rgba(0,200,255,.03)!important;border-color:rgba(0,200,255,.08)!important;}
+body.theme-terminal .section-title{color:rgba(0,200,255,.5)!important;letter-spacing:3px!important;font-family:'Courier New',monospace!important;}
+body.theme-terminal #lock{background:#030508!important;}
+body.theme-terminal .lock-title{color:rgba(0,200,255,.8)!important;letter-spacing:8px!important;font-family:'Courier New',monospace!important;}
 
 #app{position:fixed;inset:0;height:100%;width:100%;background:var(--app-bg);font-family:var(--font-main);overflow:hidden}
 canvas#bgc{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.6}
@@ -1680,7 +1702,7 @@ function getLocation(){
   }
 }
 // ── THÈMES ────────────────────────────────────────────────────────────────────
-function setTheme(theme){
+function setTheme(theme, init){
   document.body.classList.remove('theme-terminal');
   if(theme==='terminal') document.body.classList.add('theme-terminal');
   localStorage.setItem('s_theme', theme);
@@ -1692,22 +1714,27 @@ function setTheme(theme){
   const btnT=document.getElementById('theme-terminal-btn');
   if(btnD)btnD.style.opacity=theme==='default'?'1':'0.4';
   if(btnT)btnT.style.opacity=theme==='terminal'?'1':'0.4';
-  // Input placeholder et prefix CMD
-  const inp=document.getElementById('chat-inp');
+  // Input
+  const inp=document.getElementById('cinp');
   const cmdPfx=document.getElementById('cmd-prefix');
-  if(inp)inp.placeholder=theme==='terminal'?'entrer commande...':'Message à Sutur...';
+  if(inp)inp.placeholder=theme==='terminal'?'entrer commande...':'Parle a Sutur...';
   if(cmdPfx)cmdPfx.style.display=theme==='terminal'?'flex':'none';
-  // Chatbox fond
-  const chatbox=document.getElementById('chatbox');
-  if(chatbox){
-    chatbox.style.fontFamily=theme==='terminal'?'\'Courier New\',monospace':'var(--font-main)';
+  // Vider le chat seulement si changement en live (pas au chargement)
+  if(!init){
+    const cb=document.getElementById('chatbox');
+    if(cb)cb.innerHTML='';
+    if(theme==='terminal'){
+      addMsg('ai','[SUTUR_OS v2.1] — Système initialisé. Connexions actives. En attente de commande.',false);
+    } else {
+      addMsg('ai','Interface Liquid Glass activée. Que puis-je faire pour toi ?',false);
+    }
   }
 }
 
-// Charger le thème sauvegardé
+// Charger le thème sauvegardé (init=true = pas de reset chatbox)
 (function(){
-  const t = localStorage.getItem('s_theme') || 'default';
-  setTheme(t);
+  const t=localStorage.getItem('s_theme')||'default';
+  if(t==='terminal') document.body.classList.add('theme-terminal');
 })();
 
 function unlock(){
@@ -1859,21 +1886,34 @@ function rejectTerms(){
 }
 
 async function greetUser(userName){
-  // Nouvel utilisateur — pas de nom ou profil vide
+  // Appliquer correctement le thème sauvegardé
+  const savedTheme=localStorage.getItem('s_theme')||'default';
+  setTheme(savedTheme, true); // init=true pour ne pas vider le chat
+  // Sync CMD prefix
+  const cmdPfx=document.getElementById('cmd-prefix');
+  const inp=document.getElementById('cinp');
+  if(cmdPfx)cmdPfx.style.display=savedTheme==='terminal'?'flex':'none';
+  if(inp)inp.placeholder=savedTheme==='terminal'?'entrer commande...':'Parle a Sutur...';
+
   if(!userName || userName === 'Utilisateur'){
-    // Lancer l'onboarding via le chat
     setTimeout(()=>{
-      addMsg('ai', 'Bonjour ! Je suis Sutur, ton assistant personnel. Je ne te connais pas encore — comment tu t\'appelles ?', true);
-      onboarding = true;
-      onboardingStep = 'name';
-    }, 400);
+      if(isTerminal()){
+        addMsg('ai','[SUTUR_OS] — Nouvel utilisateur détecté. Initialisation du profil. Quel est ton nom ?',true);
+      } else {
+        addMsg('ai','Bonjour ! Je suis Sutur, ton assistant personnel. Je ne te connais pas encore — comment tu t\'appelles ?',true);
+      }
+      onboarding=true;onboardingStep='name';
+    },400);
   } else {
-    // Utilisateur connu — salutation personnalisée
-    const hour = new Date().getHours();
-    const salut = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
+    const hour=new Date().getHours();
+    const salut=hour<12?'Bonjour':hour<18?'Bon après-midi':'Bonsoir';
     setTimeout(()=>{
-      addMsg('ai', `${salut} ${userName}. Sutur est opérationnel. Que puis-je faire pour toi ?`, true);
-    }, 400);
+      if(isTerminal()){
+        addMsg('ai',`[SUTUR_OS] — Authentification réussie. Bienvenue ${userName}. Systèmes en ligne. En attente de commande.`,true);
+      } else {
+        addMsg('ai',`${salut} ${userName}. Sutur est opérationnel. Que puis-je faire pour toi ?`,true);
+      }
+    },400);
   }
 }
 
