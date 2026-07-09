@@ -3262,6 +3262,23 @@ async function sendMsg(){
       showPersistentMap(data.map.lat,data.map.lng,data.map.location_name);
     }
 
+    // Image générée par IA — une nouvelle image par demande, insérée dans le fil
+    if(data.image && data.image.url){
+      const cbImg=document.getElementById('chatbox');
+      const imgWrap=document.createElement('div');
+      imgWrap.style.cssText='margin:8px 0 4px 46px;max-width:260px';
+      const img=document.createElement('img');
+      img.src=data.image.url;
+      img.loading='lazy';
+      img.alt='Image générée par IA';
+      img.style.cssText='width:100%;border-radius:12px;border:1px solid var(--border);display:block;cursor:pointer';
+      img.onerror=()=>{imgWrap.innerHTML='<div style="padding:12px;color:rgba(255,120,120,.7);font-size:11px;border:1px solid var(--border);border-radius:12px">Image indisponible (lien expiré ou erreur réseau)</div>';};
+      img.onclick=()=>window.open(data.image.url,'_blank');
+      imgWrap.appendChild(img);
+      cbImg.appendChild(imgWrap);
+      cbImg.scrollTop=cbImg.scrollHeight;
+    }
+
     document.getElementById('hmod').textContent=(data.model_used||'ORBIX').toUpperCase().replace('CLAUDE','ORBIX').replace('GPT-4O','ORBIX GPT');
     // Indicateur émotionnel
     const emotIcons={stress:'😤',joie:'😊',fatigue:'😴',motivation:'🔥',tristesse:'😔',colere:'😠',anxiete:'😰',neutre:''};
