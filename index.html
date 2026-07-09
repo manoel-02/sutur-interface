@@ -2632,24 +2632,159 @@ function detectMediaCmd(msg){
   return null;
 }
 
-// ── WEBTASK — Automation web ─────────────────────────────────────────────────
+// ── JARVIS CODE GENERATION ───────────────────────────────────────────────────
+async function generateCode(description, language='python'){
+  if(!TOKEN||!API_URL){addMsg('ai','Configure ton accès dabord.');return}
+  addMsg('ai',`💻 **Génération de code en cours...**\nLanguage: ${language}\nDescription: *${description}*`,false);
+  try{
+    const data = await apiCall('/code/generate','POST',{
+      description, language, save_to_pc:true, send_to_phone:true
+    });
+    if(data.status==='ok'){
+      let msg = `✅ **Code généré avec succès!**\n\n📄 **Fichier:** \`${data.filename}\`\n📊 **Lignes:** ${data.lines}\n`;
+      if(data.pc_saved) msg += `💾 **Sauvegardé sur ton PC:** \`${data.pc_path}\`\n`;
+      if(data.available_for_download) msg += `📱 **Disponible sur téléphone:** Remote Desktop → FICHIERS → télécharge \`${data.filename}\`\n`;
+      msg += `\n\`\`\`${language}\n${data.code.slice(0,500)}${data.code.length>500?'\n...(voir fichier complet)':''}\n\`\`\``;
+      addMsg('ai', msg, true);
+      // Rafraîchir la liste des fichiers
+      rdRefreshFiles();
+    }
+  }catch(e){
+    addMsg('ai',`❌ Erreur génération: ${e.message||''}`,false);
+  }
+}
+
+// ── NOTEBOOK LM ──────────────────────────────────────────────────────────────
+async function analyzeNotebook(content, action='analyze'){
+  if(!TOKEN||!API_URL) return;
+  addMsg('ai',`📚 **NotebookLM activé** — Analyse en cours...`,false);
+  try{
+    const data = await apiCall('/notebook/process','POST',{action, content, format:'structured'});
+    addMsg('ai', data.result, true);
+  }catch(e){
+    addMsg('ai',`❌ Erreur analyse: ${e.message||''}`,false);
+  }
+}
+
+// ── MACHINE LEARNING ─────────────────────────────────────────────────────────
+async function mlAnalyze(data_text, task='analyze_patterns'){
+  if(!TOKEN||!API_URL) return;
+  addMsg('ai',`🧠 **ML Engine activé** — Analyse des données...`,false);
+  try{
+    const data = await apiCall('/ml/analyze','POST',{task, data:data_text});
+    addMsg('ai', data.result, true);
+  }catch(e){
+    addMsg('ai',`❌ Erreur ML: ${e.message||''}`,false);
+  }
+}
+
+// ── DÉTECTION ACTIONS SPÉCIALES ──────────────────────────────────────────────
+function checkSpecialActions(message, reply){
+  const msg = message.toLowerCase();
+
+  // WebTask
+  const webtask_kw = ['crée-moi un compte','crée moi un compte','inscris-moi','va sur','ouvre le site',
+    'comme si c','à ma place','combien d\'abonné','mes stats','crée-moi une image','crée moi un site'];
+  if(webtask_kw.some(k=>msg.includes(k))){
+    setTimeout(()=>{
+      const cb=document.getElementById('chatbox');
+      const d=document.createElement('div');
+      d.style.cssText='display:flex;gap:8px;margin:4px 0 8px 44px';
+      d.innerHTML=`<button onclick="launchWebTask(${JSON.stringify(message)})" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(74,222,128,.35);background:rgba(74,222,128,.08);color:#4ade80;cursor:pointer;font-size:11px;font-family:var(--font-main)">🌐 Lancer WebTask automatiquement</button>`;
+      cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
+    },500);
+  }
+
+  // OrbixTeam
+  const team_kw = ['équipe','startup','business plan','lancer une entreprise','plusieurs agents','projet complet'];
+  if(team_kw.some(k=>msg.includes(k))){
+    setTimeout(()=>{
+      const cb=document.getElementById('chatbox');
+      const d=document.createElement('div');
+      d.style.cssText='display:flex;gap:8px;margin:4px 0 8px 44px;flex-wrap:wrap';
+      d.innerHTML=`
+        <button onclick="launchTeamMission(${JSON.stringify(message)},4)" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(139,92,246,.35);background:rgba(139,92,246,.08);color:#c8aaff;cursor:pointer;font-size:11px;font-family:var(--font-main)">🤖 OrbixTeam (4 agents)</button>
+        <button onclick="launchTeamMission(${JSON.stringify(message)},6)" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(201,162,39,.35);background:rgba(201,162,39,.06);color:rgba(201,162,39,.8);cursor:pointer;font-size:11px;font-family:var(--font-main)">⚡ OrbixTeam Complet (6 agents)</button>`;
+      cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
+    },500);
+  }
+
+  // Code Generation
+  const codeLangs = ['python','javascript','js','html','css','bash','react','flask','django','node'];
+  const codeKw = ['code','programme','script','application','app','développe','crée un','fais-moi'];
+  if(codeKw.some(k=>msg.includes(k)) && codeLangs.some(l=>msg.includes(l))){
+    const lang = codeLangs.find(l=>msg.includes(l)) || 'python';
+    setTimeout(()=>{
+      const cb=document.getElementById('chatbox');
+      const d=document.createElement('div');
+      d.style.cssText='display:flex;gap:8px;margin:4px 0 8px 44px;flex-wrap:wrap';
+      d.innerHTML=`<button onclick="generateCode(${JSON.stringify(message)},${JSON.stringify(lang)})" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(74,222,128,.35);background:rgba(74,222,128,.08);color:#4ade80;cursor:pointer;font-size:11px;font-family:var(--font-main)">💻 Générer le code ${lang}</button>`;
+      cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
+    },500);
+  }
+
+  // NotebookLM
+  const notebookKw = ['analyse ce','résume ce','points clés','synthèse','plan de'];
+  if(notebookKw.some(k=>msg.includes(k))){
+    setTimeout(()=>{
+      const cb=document.getElementById('chatbox');
+      const d=document.createElement('div');
+      d.style.cssText='display:flex;gap:6px;margin:4px 0 8px 44px;flex-wrap:wrap';
+      d.innerHTML=`
+        <button onclick="analyzeNotebook(${JSON.stringify(message)},'summarize')" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.07);color:#c8aaff;cursor:pointer;font-size:10px">📋 Résumé</button>
+        <button onclick="analyzeNotebook(${JSON.stringify(message)},'extract_key_points')" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.07);color:#c8aaff;cursor:pointer;font-size:10px">🎯 Points clés</button>
+        <button onclick="analyzeNotebook(${JSON.stringify(message)},'create_outline')" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.07);color:#c8aaff;cursor:pointer;font-size:10px">📑 Plan</button>`;
+      cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
+    },500);
+  }
+}
+
 async function launchWebTask(instruction){
   if(!TOKEN||!API_URL){addMsg('ai','Configure ton accès dabord.');return}
-  addMsg('ai',`🌐 **WebTask démarré** — Je vais effectuer cette tâche sur le web:\n*${instruction}*\n\nSuivez la progression dans Remote Desktop → onglet IA.`,false);
+
+  // Ouvrir le Remote Desktop pour voir en temps réel
+  openRemoteDesktop();
+  rdTab('ai');
+
+  // Message de démarrage
+  const logEl = document.getElementById('rd-cu-log');
+  if(logEl) logEl.innerHTML = `<div style="color:rgba(201,162,39,.8);margin-bottom:8px;font-size:12px">🤖 <strong>WebTask activé</strong><br><span style="color:rgba(200,190,230,.6)">${instruction}</span></div>`;
+
+  addMsg('ai', `🌐 **WebTask démarré**\nJ'effectue la tâche sur ton PC. Regarde le Remote Desktop pour voir en temps réel.\n\n*Tâche: ${instruction}*`, false);
+
+  // Démarrer le stream immédiatement
+  if(!rdStreaming) rdStartStream();
+
   try{
     const data = await apiCall('/webtask','POST',{instruction, max_steps:20, use_pc:true});
-    if(data.status==='needs_input'){
-      addMsg('ai',`❓ **Information requise:**\n${data.question}`,true);
-    }else if(data.status==='done'){
-      addMsg('ai',`✅ **WebTask accompli!**\n${data.message}\n\n*${data.steps_count} étapes effectuées.*`,true);
-    }else if(data.status==='failed'){
-      addMsg('ai',`❌ **WebTask échoué:**\n${data.message}`,false);
-    }else{
-      addMsg('ai',`⏱️ Tâche partiellement effectuée après ${data.steps_count} étapes. ${data.message||''}`,false);
+
+    // Afficher les étapes dans le log
+    if(logEl && data.steps){
+      let stepsHtml = data.steps.map((s,i)=>`
+        <div style="padding:5px 8px;margin-bottom:4px;background:rgba(255,255,255,.02);border-left:2px solid rgba(139,92,246,.3);border-radius:0 6px 6px 0">
+          <div style="font-size:9px;color:rgba(139,92,246,.5)">ÉTAPE ${s.step||i+1} · ${(s.action||'').toUpperCase()}</div>
+          <div style="font-size:10px;color:rgba(200,190,230,.6);margin-top:2px">${(s.thinking||'').slice(0,80)}</div>
+        </div>`).join('');
+      logEl.innerHTML += stepsHtml;
+      logEl.scrollTop = logEl.scrollHeight;
     }
+
+    // Screenshot final
     if(data.screenshot) rdUpdateScreen(data.screenshot);
+
+    // Rapport dans le chat
+    const stepsCount = data.steps_count || (data.steps ? data.steps.length : 0);
+    if(data.status==='done'){
+      addMsg('ai', `✅ **WebTask accompli !**\n\n${data.message||'Tâche effectuée avec succès.'}\n\n*${stepsCount} étapes exécutées.*`, true);
+    }else if(data.status==='needs_input'){
+      addMsg('ai', `❓ **Information requise:**\n\n${data.question}\n\nRéponds dans le chat et je reprends la tâche.`, true);
+    }else if(data.status==='failed'){
+      addMsg('ai', `❌ **WebTask échoué:**\n\n${data.message||'Impossible d\'accomplir la tâche.'}\n\n*${stepsCount} étapes tentées.*`, false);
+    }else{
+      addMsg('ai', `⏱️ **WebTask terminé** (${stepsCount} étapes)\n\n${data.message||'Tâche partiellement effectuée.'}`, false);
+    }
   }catch(e){
-    addMsg('ai',`❌ Erreur WebTask: ${e.message||'Vérifiez que le PC est connecté'}`,false);
+    addMsg('ai', `❌ **Erreur WebTask:** ${e.message||'PC non connecté ou timeout.'}\n\nVérifie que l'agent Sutur tourne sur ton PC.`, false);
   }
 }
 
@@ -2673,35 +2808,6 @@ async function launchTeamMission(mission, teamSize=4){
   }
 }
 
-// Détecter si un message nécessite WebTask ou OrbixTeam et proposer un bouton d'action
-function checkSpecialActions(message, reply){
-  const msg = message.toLowerCase();
-  const webtask_kw = ['crée-moi un compte','crée moi un compte','inscris-moi','va sur','ouvre le site',
-    'comme si c','à ma place','combien d\'abonné','mes stats','crée-moi une image','crée moi un site'];
-  const team_kw = ['équipe','startup','business plan','lancer une entreprise','plusieurs agents','projet complet'];
-
-  if(webtask_kw.some(k=>msg.includes(k))){
-    setTimeout(()=>{
-      const cb=document.getElementById('chatbox');
-      const d=document.createElement('div');
-      d.style.cssText='display:flex;gap:8px;margin:4px 0 8px 44px';
-      d.innerHTML=`<button onclick="launchWebTask(${JSON.stringify(message)})" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(74,222,128,.35);background:rgba(74,222,128,.08);color:#4ade80;cursor:pointer;font-size:11px;font-family:var(--font-main)">🌐 Lancer WebTask automatiquement</button>`;
-      cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
-    },500);
-  }
-  if(team_kw.some(k=>msg.includes(k))){
-    setTimeout(()=>{
-      const cb=document.getElementById('chatbox');
-      const d=document.createElement('div');
-      d.style.cssText='display:flex;gap:8px;margin:4px 0 8px 44px;flex-wrap:wrap';
-      d.innerHTML=`
-        <button onclick="launchTeamMission(${JSON.stringify(message)},4)" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(139,92,246,.35);background:rgba(139,92,246,.08);color:#c8aaff;cursor:pointer;font-size:11px;font-family:var(--font-main)">🤖 OrbixTeam (4 agents)</button>
-        <button onclick="launchTeamMission(${JSON.stringify(message)},6)" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(201,162,39,.35);background:rgba(201,162,39,.06);color:rgba(201,162,39,.8);cursor:pointer;font-size:11px;font-family:var(--font-main)">⚡ OrbixTeam Complet (6 agents)</button>`;
-      cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
-    },500);
-  }
-}
-
 function handleMediaCmd(app,msg){
   const q=msg.replace(/youtube|spotify|instagram|tiktok|twitter|\bx\b|video|musique|mets|lance|ouvre|cherche|sur|une/gi,'').trim()||'tendances';
   const urls={youtube:'https://www.youtube.com/results?search_query=',spotify:'https://open.spotify.com/search/',instagram:'https://www.instagram.com/explore/tags/',tiktok:'https://www.tiktok.com/search?q=',x:'https://x.com/search?q='};
@@ -2714,20 +2820,26 @@ let currentPhotoType = 'image/jpeg';
 
 function openPhotoModal(){
   const modal = document.getElementById('photo-modal');
-  modal.style.display = 'flex';
-  // Reset
+  if(!modal){ console.error('photo-modal introuvable'); return; }
+  // S'assurer que le modal s'affiche correctement
+  modal.style.cssText = 'display:flex;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.88);align-items:center;justify-content:center;padding:16px;flex-direction:column;gap:0';
   const img = document.getElementById('photo-modal-img');
   const btn = document.getElementById('photo-validate-btn');
   const q = document.getElementById('photo-question');
-  if(img) img.src = '';
-  if(btn){ btn.style.opacity='.4'; btn.style.pointerEvents='none'; }
-  if(q) q.value = '';
-  if(!currentPhotoB64) img.style.display='none';
-  else { img.src=currentPhotoB64; img.style.display='block'; btn.style.opacity='1'; btn.style.pointerEvents='auto'; }
+  if(q) q.value='';
+  if(currentPhotoB64 && img){
+    img.src = currentPhotoB64;
+    img.style.display = 'block';
+    if(btn){ btn.style.opacity='1'; btn.style.pointerEvents='auto'; }
+  } else {
+    if(img) img.style.display='none';
+    if(btn){ btn.style.opacity='0.4'; btn.style.pointerEvents='none'; }
+  }
 }
 
 function closePhotoModal(){
-  document.getElementById('photo-modal').style.display='none';
+  const modal = document.getElementById('photo-modal');
+  if(modal) modal.style.display='none';
 }
 
 function handlePhotoSelect(input){
@@ -4269,19 +4381,6 @@ function saveConfig(){
   if(el){localStorage.setItem('s_el',el);EL_KEY=el}
   if(a){localStorage.setItem('s_api',a);API_URL=a}
   addMsg('ai','Configuration mise a jour.');
-}
-
-async function connectGoogle(){
-  if(!TOKEN||!API_URL){addMsg('ai','Configure ton token et URL API dabord.');return}
-  try{
-    const data=await apiCall('/google/auth','GET');
-    if(data.auth_url){
-      addMsg('ai','Ouverture de la page d\'autorisation Google. Autorise l\'accès à ton Calendar et Gmail.');
-      window.open(data.auth_url,'_blank');
-      // Vérifie le statut après 10 secondes
-      setTimeout(()=>checkGoogleStatus(),10000);
-    }
-  }catch(e){addMsg('ai','Erreur: '+( e.message||'Connexion Google impossible'));}
 }
 
 async function connectGoogle(){
