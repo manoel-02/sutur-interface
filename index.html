@@ -470,6 +470,13 @@ select.finp option,select.cinp option,select.sinp option{
       <div id="voice-caption" style="display:none;max-width:280px;text-align:center;font-size:12px;color:rgba(232,228,248,.75);margin-top:12px;line-height:1.5;padding:0 20px"></div>
     </div>
 
+    <!-- Carte persistante — un seul point d'entrée pour toute la session, mise à jour en place -->
+    <div id="persistent-map-wrap" style="display:none;flex-shrink:0;position:relative;width:100%;padding:0 12px 8px;box-sizing:border-box">
+      <div id="persistent-map" style="height:190px;width:100%;border-radius:14px;overflow:hidden;border:1px solid var(--border)"></div>
+      <div id="persistent-map-label" style="position:absolute;top:8px;left:20px;background:rgba(10,8,24,.75);backdrop-filter:blur(6px);padding:4px 10px;border-radius:8px;font-size:11px;color:#e8e4f8;border:1px solid rgba(139,92,246,.25);max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+      <button onclick="hidePersistentMap()" style="position:absolute;top:8px;right:20px;background:rgba(10,8,24,.75);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);width:24px;height:24px;border-radius:8px;font-size:12px;cursor:pointer;line-height:1">✕</button>
+    </div>
+
     <!-- Panels de contenu -->
     <div class="panels" style="flex:1;overflow:hidden;position:relative">
       <!-- CHAT -->
@@ -1416,7 +1423,10 @@ function toggleVoiceMode(){
     const globeArea=document.getElementById('globe-area');
     if(globeArea)globeArea.style.display='flex';
     const cap=document.getElementById('voice-caption');
-    if(cap)cap.textContent=history.length?history[history.length-1].content.slice(0,240):'Appuie sur le micro pour me parler.';
+    if(cap)cap.textContent=history.length?history[history.length-1].content.slice(0,240):'Je t\'écoute...';
+    startVoiceLoop();
+  }else{
+    stopVoiceLoop();
   }
 }
 
@@ -1687,6 +1697,7 @@ function selectGender(g){
 }
 
 let TOKEN='',API_URL='',EL_KEY='',PASS='',history=[],busy=false,micActive=false,selApp='youtube',currentBrief='',userIsOwner=false,userLocation=null,currentUserName='',onboarding=false,onboardingStep='';
+let voiceLoopActive=false,voiceRecognition=null,voiceLoopErrorCount=0;
 
 function loadCfg(){
   const p=new URLSearchParams(window.location.search);
@@ -2519,7 +2530,7 @@ async function greetUser(userName){
   }
 }
 
-function logout(){document.getElementById('main').style.display='none';document.getElementById('lock').style.display='flex';gActive=false;history=[];document.getElementById('chatbox').innerHTML='';document.getElementById('pass-inp').value=''}
+function logout(){stopVoiceLoop();document.getElementById('main').style.display='none';document.getElementById('lock').style.display='flex';gActive=false;history=[];document.getElementById('chatbox').innerHTML='';document.getElementById('pass-inp').value=''}
 
 // ── NAVIGATION 4 ZONES ───────────────────────────────────────────────────────
 let currentPage=null;
@@ -3246,16 +3257,9 @@ async function sendMsg(){
       addMsg('ai',reply,true);
     }
 
-    // Carte inline — quand Sutur détecte une demande de localisation
+    // Carte persistante — reste ouverte, se met juste à jour à chaque nouvelle demande de lieu
     if(data.map && data.map.lat!=null && data.map.lng!=null){
-      const cb=document.getElementById('chatbox');
-      const mapId='chatmap-'+Date.now();
-      const mapDiv=document.createElement('div');
-      mapDiv.id=mapId;
-      mapDiv.style.cssText='height:160px;border-radius:12px;overflow:hidden;margin:8px 0 4px 46px;max-width:280px;border:1px solid var(--border);background:rgba(255,255,255,.02)';
-      cb.appendChild(mapDiv);
-      cb.scrollTop=cb.scrollHeight;
-      renderInlineMap(mapId,data.map.lat,data.map.lng,data.map.location_name);
+      showPersistentMap(data.map.lat,data.map.lng,data.map.location_name);
     }
 
     document.getElementById('hmod').textContent=(data.model_used||'ORBIX').toUpperCase().replace('CLAUDE','ORBIX').replace('GPT-4O','ORBIX GPT');
@@ -4235,22 +4239,39 @@ function ensureLeaflet(){
 }
 
 let agentsMapInstance=null,agentsMapMarkers=[];
-// Mini-carte ponctuelle affichée directement dans une bulle de chat (ex: "affiche-moi la carte de Londres")
-async function renderInlineMap(mapId,lat,lng,label){
+// Carte persistante — ouverte une fois, puis mise à jour en place (flyTo) sur chaque nouvelle demande de lieu
+let persistentMapInstance=null,persistentMapMarker=null;
+async function showPersistentMap(lat,lng,label){
+  const wrap=document.getElementById('persistent-map-wrap');
+  if(!wrap)return;
+  wrap.style.display='block';
   try{
     await ensureLeaflet();
   }catch(e){
-    const el=document.getElementById(mapId);
-    if(el)el.outerHTML='';
+    wrap.style.display='none';
     return;
   }
-  const el=document.getElementById(mapId);
-  if(!el)return; // la conversation a peut-être changé entre-temps
-  const map=L.map(mapId,{zoomControl:false,attributionControl:false,scrollWheelZoom:false}).setView([lat,lng],11);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:18,subdomains:'abcd'}).addTo(map);
-  const marker=L.circleMarker([lat,lng],{radius:8,color:'#8b5cf6',fillColor:'#c9a227',fillOpacity:.9,weight:2}).addTo(map);
-  if(label)marker.bindTooltip(label,{permanent:true,direction:'top',offset:[0,-8]}).openTooltip();
-  setTimeout(()=>{if(map)map.invalidateSize()},120);
+  const labelEl=document.getElementById('persistent-map-label');
+  if(labelEl)labelEl.textContent=label||'';
+  if(!persistentMapInstance){
+    persistentMapInstance=L.map('persistent-map',{zoomControl:false,attributionControl:false}).setView([20,0],2);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:18,subdomains:'abcd'}).addTo(persistentMapInstance);
+    persistentMapMarker=L.circleMarker([lat,lng],{radius:8,color:'#8b5cf6',fillColor:'#c9a227',fillOpacity:.9,weight:2}).addTo(persistentMapInstance);
+    setTimeout(()=>{
+      if(!persistentMapInstance)return;
+      persistentMapInstance.invalidateSize();
+      persistentMapInstance.flyTo([lat,lng],4,{duration:1.4});
+    },80);
+  }else{
+    // La carte reste ouverte — on ne fait que déplacer le marqueur et recentrer la vue
+    persistentMapMarker.setLatLng([lat,lng]);
+    persistentMapInstance.invalidateSize();
+    persistentMapInstance.flyTo([lat,lng],4,{duration:1});
+  }
+}
+function hidePersistentMap(){
+  const wrap=document.getElementById('persistent-map-wrap');
+  if(wrap)wrap.style.display='none';
 }
 
 async function loadAgentsMap(){
@@ -4758,7 +4779,108 @@ function setAF(el,app){document.querySelectorAll('.af').forEach(a=>a.classList.r
 function smartSearch(){const q=document.getElementById('search-inp').value.trim();if(!q)return;const urls={youtube:'https://www.youtube.com/results?search_query=',spotify:'https://open.spotify.com/search/',tiktok:'https://www.tiktok.com/search?q=',x:'https://x.com/search?q=',instagram:'https://www.instagram.com/explore/tags/'};speakText(`Je recherche ${q} sur ${selApp}.`);window.open(urls[selApp]+encodeURIComponent(q),'_blank')}
 function openTrend(topic){speakText(`Je lance une recherche sur ${topic}.`);window.open('https://www.youtube.com/results?search_query='+encodeURIComponent(topic),'_blank');if(TOKEN&&API_URL){busy=true;addMsg('user','Resume: '+topic);addTyping();sw('chat',document.querySelectorAll('.tab')[0]);setStatus('TRAITEMENT...','think');apiCall('/chat','POST',{message:'Resume concis et interessant: '+topic,model:'claude',history:[]}).then(data=>{rmTyping();addMsg('ai',data.reply||'',true);setStatus('EN LIGNE','idle');busy=false}).catch(()=>{rmTyping();setStatus('EN LIGNE','idle');busy=false})}}
 function qa(msg){sw('chat',document.querySelectorAll('.tab')[0]);document.getElementById('cinp').value=msg;sendMsg()}
-function toggleMic(){if(!('webkitSpeechRecognition'in window||'SpeechRecognition'in window)){addMsg('ai','Micro non supporte.');return}const btn=document.getElementById('micbtn');if(micActive){micActive=false;btn.classList.remove('active');stopMicVisualizer();setGlobeMode(0);return}micActive=true;btn.classList.add('active');setGlobeMode(4);startMicVisualizer();const SR=window.SpeechRecognition||window.webkitSpeechRecognition,rec=new SR();rec.lang='fr-FR';rec.continuous=false;rec.interimResults=false;rec.onresult=e=>{document.getElementById('cinp').value=e.results[0][0].transcript;sendMsg()};rec.onend=()=>{micActive=false;btn.classList.remove('active');stopMicVisualizer();setGlobeMode(0)};rec.start()}
+// ── CONVERSATION VOCALE CONTINUE ──────────────────────────────────────────────
+// Boucle : écoute → envoi → réponse parlée → écoute à nouveau, sans retoucher l'écran.
+// Pas un vrai full-duplex (impossible sans serveur dédié), mais plus besoin de retaper sur le micro à chaque tour.
+function startVoiceLoop(){
+  if(!('webkitSpeechRecognition'in window||'SpeechRecognition'in window)){
+    addMsg('ai','La conversation continue nécessite un navigateur compatible (Chrome/Edge). Le micro ponctuel reste disponible.');
+    return;
+  }
+  const tv=document.getElementById('t-voice'),ta=document.getElementById('t-autospeak');
+  if(tv&&!tv.classList.contains('on')){tv.classList.add('on');tv.classList.remove('off');}
+  if(ta&&!ta.classList.contains('on')){ta.classList.add('on');ta.classList.remove('off');}
+  voiceLoopActive=true;
+  voiceLoopErrorCount=0;
+  listenLoopCycle();
+}
+
+function stopVoiceLoop(){
+  voiceLoopActive=false;
+  if(voiceRecognition){
+    voiceRecognition.onend=null;
+    voiceRecognition.onresult=null;
+    voiceRecognition.onerror=null;
+    try{voiceRecognition.stop();}catch(e){}
+    voiceRecognition=null;
+  }
+  if(micActive){
+    micActive=false;
+    const btn=document.getElementById('micbtn');
+    if(btn)btn.classList.remove('active');
+    stopMicVisualizer();
+  }
+  if(!ttsPlaying)setGlobeMode(0);
+}
+
+function listenLoopCycle(){
+  if(!voiceLoopActive)return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  const rec=new SR();
+  voiceRecognition=rec;
+  rec.lang='fr-FR';
+  rec.continuous=false;
+  rec.interimResults=false;
+  micActive=true;
+  const btn=document.getElementById('micbtn');
+  if(btn)btn.classList.add('active');
+  setGlobeMode(4);
+  startMicVisualizer();
+  rec.onresult=(e)=>{
+    voiceLoopErrorCount=0;
+    const transcript=e.results[0][0].transcript;
+    if(transcript&&transcript.trim())voiceLoopTurn(transcript.trim());
+  };
+  rec.onerror=(e)=>{
+    if(e.error==='not-allowed'||e.error==='service-not-allowed'){
+      voiceLoopActive=false;
+      addMsg('ai','Micro refusé — impossible de continuer la conversation vocale. Autorise le micro dans les réglages du navigateur.');
+      return;
+    }
+    if(e.error!=='no-speech'){
+      voiceLoopErrorCount++;
+      if(voiceLoopErrorCount>=5){
+        voiceLoopActive=false;
+        addMsg('ai','La conversation continue a rencontré trop d\'erreurs micro et s\'est arrêtée. Réessaie avec le bouton vocal.');
+      }
+    }
+  };
+  rec.onend=()=>{
+    micActive=false;
+    if(btn)btn.classList.remove('active');
+    stopMicVisualizer();
+    if(voiceLoopActive&&!busy){
+      setTimeout(()=>{if(voiceLoopActive&&!busy)listenLoopCycle();},400);
+    }
+  };
+  try{rec.start();}catch(e){
+    setTimeout(()=>{if(voiceLoopActive)listenLoopCycle();},600);
+  }
+}
+
+async function voiceLoopTurn(transcript){
+  document.getElementById('cinp').value=transcript;
+  await sendMsg();
+  // addMsg déclenche speakText avec 200ms de délai — on laisse le temps au TTS de démarrer puis on attend la fin
+  await new Promise(r=>setTimeout(r,350));
+  while(ttsPlaying){
+    await new Promise(r=>setTimeout(r,200));
+  }
+  if(voiceLoopActive)listenLoopCycle();
+}
+
+function toggleMic(){
+  if(voiceLoopActive){
+    // En conversation continue : le bouton sert à couper Sutur et reprendre la parole tout de suite
+    if(ttsPlaying)stopSpeech();
+    if(voiceRecognition){
+      voiceRecognition.onend=null; // évite un double redémarrage avec celui programmé juste en dessous
+      try{voiceRecognition.stop();}catch(e){}
+    }
+    setTimeout(()=>{if(voiceLoopActive)listenLoopCycle();},150);
+    return;
+  }
+  if(!('webkitSpeechRecognition'in window||'SpeechRecognition'in window)){addMsg('ai','Micro non supporte.');return}const btn=document.getElementById('micbtn');if(micActive){micActive=false;btn.classList.remove('active');stopMicVisualizer();setGlobeMode(0);return}micActive=true;btn.classList.add('active');setGlobeMode(4);startMicVisualizer();const SR=window.SpeechRecognition||window.webkitSpeechRecognition,rec=new SR();rec.lang='fr-FR';rec.continuous=false;rec.interimResults=false;rec.onresult=e=>{document.getElementById('cinp').value=e.results[0][0].transcript;sendMsg()};rec.onend=()=>{micActive=false;btn.classList.remove('active');stopMicVisualizer();setGlobeMode(0)};rec.start()}
 </script>
 <script>
 if('serviceWorker' in navigator){
