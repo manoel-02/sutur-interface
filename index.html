@@ -2632,6 +2632,76 @@ function detectMediaCmd(msg){
   return null;
 }
 
+// ── WEBTASK — Automation web ─────────────────────────────────────────────────
+async function launchWebTask(instruction){
+  if(!TOKEN||!API_URL){addMsg('ai','Configure ton accès dabord.');return}
+  addMsg('ai',`🌐 **WebTask démarré** — Je vais effectuer cette tâche sur le web:\n*${instruction}*\n\nSuivez la progression dans Remote Desktop → onglet IA.`,false);
+  try{
+    const data = await apiCall('/webtask','POST',{instruction, max_steps:20, use_pc:true});
+    if(data.status==='needs_input'){
+      addMsg('ai',`❓ **Information requise:**\n${data.question}`,true);
+    }else if(data.status==='done'){
+      addMsg('ai',`✅ **WebTask accompli!**\n${data.message}\n\n*${data.steps_count} étapes effectuées.*`,true);
+    }else if(data.status==='failed'){
+      addMsg('ai',`❌ **WebTask échoué:**\n${data.message}`,false);
+    }else{
+      addMsg('ai',`⏱️ Tâche partiellement effectuée après ${data.steps_count} étapes. ${data.message||''}`,false);
+    }
+    if(data.screenshot) rdUpdateScreen(data.screenshot);
+  }catch(e){
+    addMsg('ai',`❌ Erreur WebTask: ${e.message||'Vérifiez que le PC est connecté'}`,false);
+  }
+}
+
+// ── ORBIXTEAM — Multi-agents ─────────────────────────────────────────────────
+async function launchTeamMission(mission, teamSize=4){
+  if(!TOKEN||!API_URL){addMsg('ai','Configure ton accès dabord.');return}
+  addMsg('ai',`🤖 **OrbixTeam activé!**\n\nJe constitue une équipe de ${teamSize} agents pour:\n*"${mission}"*\n\n⏳ Les agents travaillent... (30-60 secondes)`,false);
+  try{
+    const data = await apiCall('/team/start','POST',{mission, team_size:teamSize});
+    if(data.status==='done'){
+      // Afficher le rapport complet
+      const agentsList = Object.values(data.agent_results||{})
+        .map(a=>`${a.emoji} **${a.name}** — ${a.task.slice(0,50)}`)
+        .join('\n');
+      addMsg('ai',`📊 **Rapport OrbixTeam**\n\n**Équipe constituée:**\n${agentsList}\n\n---\n${data.report}`,true);
+    }else{
+      addMsg('ai',`❌ Erreur mission: ${data.message||'Erreur inconnue'}`,false);
+    }
+  }catch(e){
+    addMsg('ai',`❌ Erreur OrbixTeam: ${e.message||''}`,false);
+  }
+}
+
+// Détecter si un message nécessite WebTask ou OrbixTeam et proposer un bouton d'action
+function checkSpecialActions(message, reply){
+  const msg = message.toLowerCase();
+  const webtask_kw = ['crée-moi un compte','crée moi un compte','inscris-moi','va sur','ouvre le site',
+    'comme si c','à ma place','combien d\'abonné','mes stats','crée-moi une image','crée moi un site'];
+  const team_kw = ['équipe','startup','business plan','lancer une entreprise','plusieurs agents','projet complet'];
+
+  if(webtask_kw.some(k=>msg.includes(k))){
+    setTimeout(()=>{
+      const cb=document.getElementById('chatbox');
+      const d=document.createElement('div');
+      d.style.cssText='display:flex;gap:8px;margin:4px 0 8px 44px';
+      d.innerHTML=`<button onclick="launchWebTask(${JSON.stringify(message)})" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(74,222,128,.35);background:rgba(74,222,128,.08);color:#4ade80;cursor:pointer;font-size:11px;font-family:var(--font-main)">🌐 Lancer WebTask automatiquement</button>`;
+      cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
+    },500);
+  }
+  if(team_kw.some(k=>msg.includes(k))){
+    setTimeout(()=>{
+      const cb=document.getElementById('chatbox');
+      const d=document.createElement('div');
+      d.style.cssText='display:flex;gap:8px;margin:4px 0 8px 44px;flex-wrap:wrap';
+      d.innerHTML=`
+        <button onclick="launchTeamMission(${JSON.stringify(message)},4)" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(139,92,246,.35);background:rgba(139,92,246,.08);color:#c8aaff;cursor:pointer;font-size:11px;font-family:var(--font-main)">🤖 OrbixTeam (4 agents)</button>
+        <button onclick="launchTeamMission(${JSON.stringify(message)},6)" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(201,162,39,.35);background:rgba(201,162,39,.06);color:rgba(201,162,39,.8);cursor:pointer;font-size:11px;font-family:var(--font-main)">⚡ OrbixTeam Complet (6 agents)</button>`;
+      cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
+    },500);
+  }
+}
+
 function handleMediaCmd(app,msg){
   const q=msg.replace(/youtube|spotify|instagram|tiktok|twitter|\bx\b|video|musique|mets|lance|ouvre|cherche|sur|une/gi,'').trim()||'tendances';
   const urls={youtube:'https://www.youtube.com/results?search_query=',spotify:'https://open.spotify.com/search/',instagram:'https://www.instagram.com/explore/tags/',tiktok:'https://www.tiktok.com/search?q=',x:'https://x.com/search?q='};
@@ -2905,6 +2975,8 @@ async function sendMsg(){
     history.push({role:'assistant',content:reply});
     // Nettoyer la photo après envoi
     clearPhoto();
+    // Vérifier si des actions spéciales sont disponibles
+    checkSpecialActions(msg, reply);
 
     // Brouillon d'email — afficher interface de confirmation
     if(data.draft_email && data.draft_email.draft_email){
