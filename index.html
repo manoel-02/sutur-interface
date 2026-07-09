@@ -145,6 +145,12 @@ canvas#bgc{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-
 /* HUD */
 .hud{width:100%;display:flex;justify-content:space-between;align-items:center;padding:8px 16px;background:rgba(7,5,26,.92);border-bottom:1px solid var(--border);flex-shrink:0;backdrop-filter:blur(8px)}
 .hud-s{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-muted);letter-spacing:.5px}
+.statusdot{width:6px;height:6px;border-radius:50%;display:inline-block;background:rgba(248,113,113,.55)}
+.statusdot.ok{background:#4ade80;box-shadow:0 0 6px rgba(74,222,128,.7)}
+body.voice-mode-active #chatbox{display:none!important}
+body.voice-mode-active #globe-area{flex:1;padding:10px 0!important}
+body.voice-mode-active #voice-caption{display:block!important}
+body.voice-mode-active .inp-bar{background:rgba(7,5,26,.6)}
 .hdot{width:7px;height:7px;border-radius:50%;background:#4ade80;animation:hp 2s infinite;flex-shrink:0;box-shadow:0 0 6px rgba(74,222,128,.5)}
 @keyframes hp{0%,100%{opacity:1}50%{opacity:.4}}
 .globe-wrap{flex-shrink:0;margin:2px 0}
@@ -438,15 +444,24 @@ select.finp option,select.cinp option,select.sinp option{
       <span style="font-size:9px;letter-spacing:1px" id="hemot"></span>
       <span style="font-size:10px;color:var(--gold);letter-spacing:2px;font-weight:600" id="hmod">ORBIX</span>
       <span style="font-size:9px;color:var(--text-muted)" id="htime">--:--</span>
+      <button id="voice-toggle-btn" onclick="toggleVoiceMode()" title="Mode vocal plein écran" style="background:none;border:none;color:var(--gold);font-size:14px;cursor:pointer;padding:0;line-height:1">🎙️</button>
     </div>
   </div>
 
+  <!-- BARRE DE STATUT DES CONNEXIONS — toujours visible -->
+  <div id="conn-statusbar" onclick="sw('cfg')" style="width:100%;display:flex;align-items:center;justify-content:center;gap:16px;padding:5px 10px;background:rgba(7,5,26,.75);border-bottom:1px solid var(--border);flex-shrink:0;cursor:pointer">
+    <span style="display:flex;align-items:center;gap:4px;font-size:9px;letter-spacing:.5px;color:var(--text-muted)"><span class="statusdot ko" id="sb-google"></span>Google</span>
+    <span style="display:flex;align-items:center;gap:4px;font-size:9px;letter-spacing:.5px;color:var(--text-muted)"><span class="statusdot ko" id="sb-spotify"></span>Spotify</span>
+    <span style="display:flex;align-items:center;gap:4px;font-size:9px;letter-spacing:.5px;color:var(--text-muted)"><span class="statusdot ko" id="sb-notion"></span>Notion</span>
+  </div>
+
   <!-- ZONE CHAT (panel actif par défaut) -->
-  <div id="chat-zone" style="display:flex;flex-direction:column;position:fixed;inset:0;top:44px;bottom:120px;width:100%;overflow:hidden;z-index:1">
+  <div id="chat-zone" style="display:flex;flex-direction:column;position:fixed;inset:0;top:66px;bottom:120px;width:100%;overflow:hidden;z-index:1">
 
     <!-- Globe orbital — visible sur l'écran d'accueil chat -->
-    <div id="globe-area" style="flex-shrink:0;display:none;justify-content:center;padding:4px 0 0">
+    <div id="globe-area" style="flex-shrink:0;display:none;flex-direction:column;justify-content:center;align-items:center;padding:4px 0 0">
       <canvas id="globe" width="200" height="200" style="touch-action:none"></canvas>
+      <div id="voice-caption" style="display:none;max-width:280px;text-align:center;font-size:12px;color:rgba(232,228,248,.75);margin-top:12px;line-height:1.5;padding:0 20px"></div>
     </div>
 
     <!-- Panels de contenu -->
@@ -1369,24 +1384,115 @@ function drawBg(t){
 // ── GLOBE ORBITAL CENTRAL ─────────────────────────────────────────────────────
 const gc=document.getElementById('globe');
 const gctx=gc.getContext('2d');
-let GW=200,GH=200,gMode=0,gT=0;
+let GW=200,GH=200,gMode=0,gT=0,voiceModeActive=false;
 
 function resizeGlobe(){
   const isMobile=window.innerWidth<600;
-  GW=GH=isMobile?160:200;
+  if(voiceModeActive){
+    GW=GH=isMobile?240:280;
+  }else{
+    GW=GH=isMobile?160:200;
+  }
   gc.width=GW;gc.height=GH;
 }
 resizeGlobe();
 window.addEventListener('resize',resizeGlobe);
+
+function toggleVoiceMode(){
+  voiceModeActive=!voiceModeActive;
+  document.body.classList.toggle('voice-mode-active',voiceModeActive);
+  const btn=document.getElementById('voice-toggle-btn');
+  if(btn){btn.textContent=voiceModeActive?'💬':'🎙️';btn.title=voiceModeActive?'Revenir au chat':'Mode vocal plein écran';}
+  resizeGlobe();
+  if(voiceModeActive){
+    sw('chat');
+    const globeArea=document.getElementById('globe-area');
+    if(globeArea)globeArea.style.display='flex';
+    const cap=document.getElementById('voice-caption');
+    if(cap)cap.textContent=history.length?history[history.length-1].content.slice(0,240):'Appuie sur le micro pour me parler.';
+  }
+}
 
 const GMODES=[
   {name:'VEILLE',col:'#8b5cf6',glow:'139,92,246',gold:'201,162,39',speed:1},
   {name:'RÉFLEXION',col:'#c9a227',glow:'201,162,39',gold:'139,92,246',speed:2.8},
   {name:'PAROLE',col:'#4ade80',glow:'74,222,128',gold:'201,162,39',speed:1.8},
   {name:'ALERTE',col:'#f87171',glow:'248,113,113',gold:'201,162,39',speed:3.5},
+  {name:'ÉCOUTE',col:'#00d4ff',glow:'0,212,255',gold:'201,162,39',speed:1.4},
 ];
 
 let gActive=false,gThink=false;
+
+// ── AMPLITUDE AUDIO RÉELLE (micro + TTS) — alimente le globe ─────────────────
+let micAmplitude=0,ttsAmplitude=0;
+let micAudioCtx=null,micAnalyser=null,micDataArray=null,micRafId=null,micVisStream=null;
+let ttsDecodeCtx=null,ttsPcm=null,ttsSampleRate=44100,ttsRafId=null;
+
+function getRMSAmplitude(analyser,dataArray){
+  analyser.getByteTimeDomainData(dataArray);
+  let sum=0;
+  for(let i=0;i<dataArray.length;i++){const v=(dataArray[i]-128)/128;sum+=v*v;}
+  return Math.min(1,Math.sqrt(sum/dataArray.length)*4);
+}
+
+async function startMicVisualizer(){
+  try{
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return;
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    if(!micActive){stream.getTracks().forEach(t=>t.stop());return;} // micro coupé pendant la demande de permission
+    micVisStream=stream;
+    micAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    const src=micAudioCtx.createMediaStreamSource(micVisStream);
+    micAnalyser=micAudioCtx.createAnalyser();
+    micAnalyser.fftSize=256;
+    micDataArray=new Uint8Array(micAnalyser.frequencyBinCount);
+    src.connect(micAnalyser);
+    const tick=()=>{
+      if(!micAnalyser)return;
+      micAmplitude=getRMSAmplitude(micAnalyser,micDataArray);
+      micRafId=requestAnimationFrame(tick);
+    };
+    tick();
+  }catch(e){/* micro indisponible pour la visu — la reconnaissance vocale continue quand même */}
+}
+function stopMicVisualizer(){
+  if(micRafId)cancelAnimationFrame(micRafId);
+  micRafId=null;micAmplitude=0;micAnalyser=null;
+  if(micVisStream){micVisStream.getTracks().forEach(t=>t.stop());micVisStream=null;}
+  if(micAudioCtx){micAudioCtx.close().catch(()=>{});micAudioCtx=null;}
+}
+
+// Analyse le PCM du MP3 reçu du TTS, sans jamais toucher au flux de lecture réel
+// (aucun risque de couper le son : l'élément <audio> joue normalement en parallèle)
+let ttsAnalysisId=0;
+async function analyzeTtsAudio(arrayBuffer){
+  const myId=++ttsAnalysisId;
+  try{
+    if(!ttsDecodeCtx)ttsDecodeCtx=new (window.AudioContext||window.webkitAudioContext)();
+    const buf=await ttsDecodeCtx.decodeAudioData(arrayBuffer);
+    if(myId!==ttsAnalysisId)return; // une lecture plus récente a démarré entre-temps, on ignore ce résultat périmé
+    ttsPcm=buf.getChannelData(0);
+    ttsSampleRate=buf.sampleRate;
+  }catch(e){ttsPcm=null;}
+}
+function startTtsAmplitudeLoop(audioEl){
+  const windowSize=1024;
+  const tick=()=>{
+    if(!audioEl||audioEl.paused||audioEl.ended){ttsAmplitude=0;ttsRafId=null;return;}
+    if(ttsPcm){
+      const idx=Math.floor(audioEl.currentTime*ttsSampleRate);
+      let sum=0,count=0;
+      for(let i=idx;i<Math.min(idx+windowSize,ttsPcm.length);i++){sum+=ttsPcm[i]*ttsPcm[i];count++;}
+      ttsAmplitude=count?Math.min(1,Math.sqrt(sum/count)*3.5):0;
+    }
+    ttsRafId=requestAnimationFrame(tick);
+  };
+  tick();
+}
+function stopTtsAmplitudeLoop(){
+  if(ttsRafId)cancelAnimationFrame(ttsRafId);
+  ttsRafId=null;ttsAmplitude=0;ttsPcm=null;
+}
 
 function drawGlobe(t){
   gctx.clearRect(0,0,GW,GH);
@@ -1394,7 +1500,8 @@ function drawGlobe(t){
   const m=GMODES[gMode];
   const sp=m.speed;
   const R=GW*.38; // rayon globe
-  const pulse=1+.04*Math.sin(t*.04);
+  const liveAmp=gMode===4?micAmplitude:(gMode===2?ttsAmplitude:0);
+  const pulse=1+.04*Math.sin(t*.04)+liveAmp*.4;
 
   // ── Halos lumineux multicouches (comme sur la photo)
   [[R*3,.04],[R*2.2,.08],[R*1.5,.14],[R*1.1,.2]].forEach(([r,a])=>{
@@ -1481,13 +1588,23 @@ function drawGlobe(t){
       gctx.fillStyle=`rgba(201,162,39,${.3+.5*Math.sin(t*.09+i)})`;gctx.fill();
     }
   }
-  if(gMode===2){ // PAROLE — ondes sonores
+  if(gMode===2){ // PAROLE — ondes sonores réactives au volume réel du TTS
     for(let i=1;i<=5;i++){
-      const wr=(R+i*10+5*Math.sin(t*.06+i*.7))*pulse;
-      const wa=.2-i*.035;
+      const wr=(R+i*10+(5+22*ttsAmplitude)*Math.sin(t*.06+i*.7))*pulse;
+      const wa=(.2-i*.035)*(0.45+ttsAmplitude*1.3);
       gctx.beginPath();gctx.arc(cx,cy,wr,0,Math.PI*2);
       gctx.strokeStyle=`rgba(74,222,128,${Math.max(0,wa*Math.abs(Math.sin(t*.05+i)))})`;
-      gctx.lineWidth=1;gctx.stroke();
+      gctx.lineWidth=1+ttsAmplitude*2;gctx.stroke();
+    }
+  }
+  if(gMode===4){ // ÉCOUTE — points qui pulsent au rythme du micro
+    for(let i=0;i<8;i++){
+      const a=(i/8)*Math.PI*2+t*.01;
+      const dr=(R+16)*pulse;
+      const px=cx+Math.cos(a)*dr,py=cy+Math.sin(a)*dr*.38;
+      const dotR=2+micAmplitude*7;
+      gctx.beginPath();gctx.arc(px,py,dotR,0,Math.PI*2);
+      gctx.fillStyle=`rgba(0,212,255,${.3+micAmplitude*.6})`;gctx.fill();
     }
   }
   if(gMode===3){ // ALERTE — flash rouge pulsant
@@ -2451,7 +2568,7 @@ function sw(name,el){
 
 function setGlobeMode(n){
   gMode=n;
-  document.getElementById('hmod').textContent=['ORBIX','RÉFLEXION','PAROLE','ALERTE'][n];
+  document.getElementById('hmod').textContent=['ORBIX','RÉFLEXION','PAROLE','ALERTE','ÉCOUTE'][n];
 }
 
 // Rend le markdown basique en HTML sûr
@@ -2529,6 +2646,10 @@ function addMsg(role,text,speak=false){
     }
   }
   cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
+  if(voiceModeActive){
+    const cap=document.getElementById('voice-caption');
+    if(cap)cap.textContent=text.slice(0,240);
+  }
   if(speak&&role==='ai'&&document.getElementById('t-autospeak').classList.contains('on'))setTimeout(()=>speakText(text),200);
 }
 
@@ -2555,7 +2676,7 @@ function addTyping(){
   cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
 }
 function rmTyping(){const t=document.getElementById('tymsg');if(t){if(t._interval)clearInterval(t._interval);t.remove();}}
-function setStatus(s,state){document.getElementById('hst').textContent=s;document.getElementById('hdot').style.background=state==='think'?'#ffaa00':state==='talk'?'#00ff88':'#00d4ff';gThink=state==='think'}
+function setStatus(s,state){document.getElementById('hst').textContent=s;document.getElementById('hdot').style.background=state==='think'?'#ffaa00':state==='talk'?'#00ff88':'#00d4ff';gThink=state==='think';if(!micActive&&!ttsPlaying)setGlobeMode(state==='think'?1:0)}
 
 // ── MOTEUR VOCAL ElevenLabs EXCLUSIF ─────────────────────────────────────────
 let currentAudio=null;
@@ -2564,6 +2685,8 @@ let ttsPlaying=false;
 function stopSpeech(){
   if(currentAudio){currentAudio.pause();currentAudio.src='';currentAudio=null;}
   ttsPlaying=false;
+  stopTtsAmplitudeLoop();
+  if(!micActive)setGlobeMode(0);
   const stopBtn=document.getElementById('stopbtn');
   if(stopBtn)stopBtn.style.display='none';
 }
@@ -2595,13 +2718,17 @@ async function speakText(text){
     for(let i=0;i<bytes.length;i++)arr[i]=bytes.charCodeAt(i);
     const blob=new Blob([arr],{type:'audio/mpeg'});
     const url=URL.createObjectURL(blob);
+    analyzeTtsAudio(arr.buffer.slice(0)); // analyse en parallèle, ne touche jamais à la lecture réelle
+    setGlobeMode(2);
     await new Promise((resolve)=>{
       const audio=new Audio(url);
       currentAudio=audio;
-      audio.onended=()=>{URL.revokeObjectURL(url);currentAudio=null;resolve();};
-      audio.onerror=()=>{URL.revokeObjectURL(url);currentAudio=null;resolve();};
+      audio.onplay=()=>startTtsAmplitudeLoop(audio);
+      audio.onended=()=>{URL.revokeObjectURL(url);currentAudio=null;stopTtsAmplitudeLoop();resolve();};
+      audio.onerror=()=>{URL.revokeObjectURL(url);currentAudio=null;stopTtsAmplitudeLoop();resolve();};
       audio.play().catch(()=>resolve());
     });
+    if(!micActive)setGlobeMode(0);
   }catch(e){}
   ttsPlaying=false;
   if(stopBtn)stopBtn.style.display='none';
@@ -4409,10 +4536,16 @@ async function disconnectGoogle(){
   }catch(e){addMsg('ai','Erreur déconnexion Google.',false);}
 }
 
+function updateStatusDot(id,connected){
+  const dot=document.getElementById(id);
+  if(dot)dot.className='statusdot '+(connected?'ok':'ko');
+}
+
 async function checkGoogleStatus(){
   if(!TOKEN||!API_URL)return;
   try{
     const data=await apiCall('/google/status','GET');
+    updateStatusDot('sb-google',data.connected);
     const calSt=document.getElementById('goog-cal-status');
     const calBtn=document.getElementById('goog-cal-btn');
     const gmailSt=document.getElementById('goog-gmail-status');
@@ -4464,6 +4597,7 @@ async function checkSpotifyStatus(){
   if(!TOKEN||!API_URL)return;
   try{
     const data=await apiCall('/spotify/status','GET');
+    updateStatusDot('sb-spotify',data.connected);
     const st=document.getElementById('spotify-status');
     const btn=document.getElementById('spotify-btn');
     if(data.connected){
@@ -4506,6 +4640,7 @@ async function checkNotionStatus(){
   if(!TOKEN||!API_URL)return;
   try{
     const data=await apiCall('/notion/status','GET');
+    updateStatusDot('sb-notion',data.connected);
     const st=document.getElementById('notion-status');
     const btn=document.getElementById('notion-btn');
     if(data.connected){
@@ -4527,7 +4662,7 @@ function setAF(el,app){document.querySelectorAll('.af').forEach(a=>a.classList.r
 function smartSearch(){const q=document.getElementById('search-inp').value.trim();if(!q)return;const urls={youtube:'https://www.youtube.com/results?search_query=',spotify:'https://open.spotify.com/search/',tiktok:'https://www.tiktok.com/search?q=',x:'https://x.com/search?q=',instagram:'https://www.instagram.com/explore/tags/'};speakText(`Je recherche ${q} sur ${selApp}.`);window.open(urls[selApp]+encodeURIComponent(q),'_blank')}
 function openTrend(topic){speakText(`Je lance une recherche sur ${topic}.`);window.open('https://www.youtube.com/results?search_query='+encodeURIComponent(topic),'_blank');if(TOKEN&&API_URL){busy=true;addMsg('user','Resume: '+topic);addTyping();sw('chat',document.querySelectorAll('.tab')[0]);setStatus('TRAITEMENT...','think');apiCall('/chat','POST',{message:'Resume concis et interessant: '+topic,model:'claude',history:[]}).then(data=>{rmTyping();addMsg('ai',data.reply||'',true);setStatus('EN LIGNE','idle');busy=false}).catch(()=>{rmTyping();setStatus('EN LIGNE','idle');busy=false})}}
 function qa(msg){sw('chat',document.querySelectorAll('.tab')[0]);document.getElementById('cinp').value=msg;sendMsg()}
-function toggleMic(){if(!('webkitSpeechRecognition'in window||'SpeechRecognition'in window)){addMsg('ai','Micro non supporte.');return}const btn=document.getElementById('micbtn');if(micActive){micActive=false;btn.classList.remove('active');return}micActive=true;btn.classList.add('active');const SR=window.SpeechRecognition||window.webkitSpeechRecognition,rec=new SR();rec.lang='fr-FR';rec.continuous=false;rec.interimResults=false;rec.onresult=e=>{document.getElementById('cinp').value=e.results[0][0].transcript;sendMsg()};rec.onend=()=>{micActive=false;btn.classList.remove('active')};rec.start()}
+function toggleMic(){if(!('webkitSpeechRecognition'in window||'SpeechRecognition'in window)){addMsg('ai','Micro non supporte.');return}const btn=document.getElementById('micbtn');if(micActive){micActive=false;btn.classList.remove('active');stopMicVisualizer();setGlobeMode(0);return}micActive=true;btn.classList.add('active');setGlobeMode(4);startMicVisualizer();const SR=window.SpeechRecognition||window.webkitSpeechRecognition,rec=new SR();rec.lang='fr-FR';rec.continuous=false;rec.interimResults=false;rec.onresult=e=>{document.getElementById('cinp').value=e.results[0][0].transcript;sendMsg()};rec.onend=()=>{micActive=false;btn.classList.remove('active');stopMicVisualizer();setGlobeMode(0)};rec.start()}
 </script>
 <script>
 if('serviceWorker' in navigator){
