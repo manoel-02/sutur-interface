@@ -151,6 +151,8 @@ canvas#bgc{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-
 .leaflet-popup-content{font-size:11px;line-height:1.5;font-family:system-ui}
 .leaflet-popup-content b{color:#c9a227}
 .leaflet-container{background:#0a0818!important;font-family:system-ui}
+.leaflet-tooltip{background:#151030;color:#e8e4f8;border:1px solid rgba(139,92,246,.3);font-size:10px;padding:3px 8px;box-shadow:0 2px 10px rgba(0,0,0,.4)}
+.leaflet-tooltip-top:before{border-top-color:#151030}
 body.voice-mode-active #chatbox{display:none!important}
 body.voice-mode-active #globe-area{flex:1;padding:10px 0!important}
 body.voice-mode-active #voice-caption{display:block!important}
@@ -3244,6 +3246,18 @@ async function sendMsg(){
       addMsg('ai',reply,true);
     }
 
+    // Carte inline — quand Sutur détecte une demande de localisation
+    if(data.map && data.map.lat!=null && data.map.lng!=null){
+      const cb=document.getElementById('chatbox');
+      const mapId='chatmap-'+Date.now();
+      const mapDiv=document.createElement('div');
+      mapDiv.id=mapId;
+      mapDiv.style.cssText='height:160px;border-radius:12px;overflow:hidden;margin:8px 0 4px 46px;max-width:280px;border:1px solid var(--border);background:rgba(255,255,255,.02)';
+      cb.appendChild(mapDiv);
+      cb.scrollTop=cb.scrollHeight;
+      renderInlineMap(mapId,data.map.lat,data.map.lng,data.map.location_name);
+    }
+
     document.getElementById('hmod').textContent=(data.model_used||'ORBIX').toUpperCase().replace('CLAUDE','ORBIX').replace('GPT-4O','ORBIX GPT');
     // Indicateur émotionnel
     const emotIcons={stress:'😤',joie:'😊',fatigue:'😴',motivation:'🔥',tristesse:'😔',colere:'😠',anxiete:'😰',neutre:''};
@@ -4221,6 +4235,24 @@ function ensureLeaflet(){
 }
 
 let agentsMapInstance=null,agentsMapMarkers=[];
+// Mini-carte ponctuelle affichée directement dans une bulle de chat (ex: "affiche-moi la carte de Londres")
+async function renderInlineMap(mapId,lat,lng,label){
+  try{
+    await ensureLeaflet();
+  }catch(e){
+    const el=document.getElementById(mapId);
+    if(el)el.outerHTML='';
+    return;
+  }
+  const el=document.getElementById(mapId);
+  if(!el)return; // la conversation a peut-être changé entre-temps
+  const map=L.map(mapId,{zoomControl:false,attributionControl:false,scrollWheelZoom:false}).setView([lat,lng],11);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:18,subdomains:'abcd'}).addTo(map);
+  const marker=L.circleMarker([lat,lng],{radius:8,color:'#8b5cf6',fillColor:'#c9a227',fillOpacity:.9,weight:2}).addTo(map);
+  if(label)marker.bindTooltip(label,{permanent:true,direction:'top',offset:[0,-8]}).openTooltip();
+  setTimeout(()=>{if(map)map.invalidateSize()},120);
+}
+
 async function loadAgentsMap(){
   const mapEl=document.getElementById('agents-map');
   if(!mapEl)return;
