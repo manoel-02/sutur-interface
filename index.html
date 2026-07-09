@@ -1744,12 +1744,13 @@ let rdLastFrameTs = 0;
 let rdConnected = false;
 
 function rdTab(name){
-  ['terminal','ai'].forEach(t=>{
+  ['terminal','ai','files'].forEach(t=>{
     const panel = document.getElementById('rdpanel-'+t);
     if(panel) panel.style.display = t===name ? 'flex' : 'none';
     const btn = document.getElementById('rdtab-'+t);
     if(btn) btn.className = 'rdtab' + (t===name ? ' rdtab-active' : '');
   });
+  if(name==='files') rdRefreshFiles();
 }
 
 async function checkRemoteStatus(){
@@ -2665,18 +2666,21 @@ function handlePhotoSelect(input){
   currentPhotoType = file.type || 'image/jpeg';
   const reader = new FileReader();
   reader.onload = e => {
-    currentPhotoB64 = e.target.result;
+    const dataUrl = e.target.result;
+    // Stocker le data URL complet pour l'affichage
+    currentPhotoB64 = dataUrl;
     // Afficher dans le modal
     const img = document.getElementById('photo-modal-img');
     const btn = document.getElementById('photo-validate-btn');
-    if(img){ img.src=currentPhotoB64; img.style.display='block'; }
+    if(img){ img.src=dataUrl; img.style.display='block'; }
     if(btn){ btn.style.opacity='1'; btn.style.pointerEvents='auto'; }
     // Ouvrir le modal si pas déjà ouvert
-    document.getElementById('photo-modal').style.display='flex';
-    // Aussi mettre à jour la miniature dans la barre
+    const modal = document.getElementById('photo-modal');
+    if(modal) modal.style.display='flex';
+    // Miniature dans la barre
     const thumb=document.getElementById('photo-thumb');
     const preview=document.getElementById('photo-preview-bar');
-    if(thumb) thumb.src=currentPhotoB64;
+    if(thumb) thumb.src=dataUrl;
     if(preview) preview.style.display='flex';
   };
   reader.readAsDataURL(file);
@@ -2894,7 +2898,7 @@ async function sendMsg(){
       model,
       history:history.slice(-8),
       location:userLocation,
-      image_data: currentPhotoB64 || null,
+      image_data: currentPhotoB64 ? (currentPhotoB64.includes(',') ? currentPhotoB64.split(',')[1] : currentPhotoB64) : null,
       image_type: currentPhotoType || 'image/jpeg'
     });
     rmTyping();const reply=data.reply||data.detail||'Erreur';
