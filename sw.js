@@ -1,38 +1,51 @@
-// Sutur Service Worker — OrbixLabs v2.1
-const CACHE = 'sutur-v2';
+// sw.js — Service Worker Sutur
+// Rôle : recevoir les notifications push envoyées par le serveur et les afficher
+// avec l'avatar Sutur (comme une notification Instagram), pas une notif générique.
 
-self.addEventListener('install', e => {
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(clients.claim());
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
 });
 
-// Notification push reçue
-self.addEventListener('push', e => {
-  if(!e.data) return;
-  let data;
-  try { data = e.data.json(); } catch { data = {title:'Sutur', body: e.data.text()}; }
-  e.waitUntil(
-    self.registration.showNotification(data.title || 'Sutur', {
-      body: data.body || '',
-      icon: data.icon || '/icon-192.png',
-      badge: '/icon-192.png',
-      tag: 'sutur-notif',
-      renotify: true,
-      data: { url: data.url || '/' }
-    })
-  );
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    data = { title: 'Sutur', body: event.data ? event.data.text() : 'Nouvelle notification' };
+  }
+
+  const title = data.title || 'Sutur';
+  const options = {
+    body: data.body || '',
+    icon: data.icon || '/icon-192.png',    // l'avatar affiché à côté de la notification
+    badge: '/icon-96.png',                  // petite icône monochrome (barre de statut Android)
+    tag: data.tag || 'sutur-' + Date.now(), // évite d'empiler des notifs identiques
+    renotify: false,
+    vibrate: [100, 50, 100],
+    data: { url: data.url || '/' }
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Clic sur la notification
-self.addEventListener('notificationclick', e => {
-  e.notification.close();
-  e.waitUntil(
-    clients.matchAll({type:'window'}).then(list => {
-      if(list.length > 0) return list[0].focus();
-      return clients.openWindow(e.notification.data?.url || '/');
+// Clic sur la notification → ramène sur l'app déjà ouverte, ou en ouvre une nouvelle
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(url);
+      }
     })
   );
 });
