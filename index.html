@@ -2709,6 +2709,14 @@ function stopSpeech(){
   if(stopBtn)stopBtn.style.display='none';
 }
 
+function flashVoiceFailure(msg){
+  const hst=document.getElementById('hst');
+  if(!hst)return;
+  hst.textContent=msg;
+  hst.style.color='#f87171';
+  setTimeout(()=>{hst.textContent='EN LIGNE';hst.style.color='';},3000);
+}
+
 async function speakText(text){
   if(!text)return;
   const voiceOn=document.getElementById('t-voice').classList.contains('on');
@@ -2728,9 +2736,18 @@ async function speakText(text){
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},
       body:JSON.stringify({text:toSpeak})
     });
-    if(!r.ok){ttsPlaying=false;if(stopBtn)stopBtn.style.display='none';return;}
+    if(!r.ok){
+      const errBody=await r.text().catch(()=>'');
+      console.warn('[TTS] échec HTTP',r.status,errBody.slice(0,300));
+      flashVoiceFailure(`🔇 Voix indisponible (${r.status})`);
+      ttsPlaying=false;if(stopBtn)stopBtn.style.display='none';return;
+    }
     const data=await r.json();
-    if(!data.audio){ttsPlaying=false;if(stopBtn)stopBtn.style.display='none';return;}
+    if(!data.audio){
+      console.warn('[TTS] réponse sans audio',JSON.stringify(data).slice(0,300));
+      flashVoiceFailure('🔇 Voix indisponible');
+      ttsPlaying=false;if(stopBtn)stopBtn.style.display='none';return;
+    }
     const bytes=atob(data.audio);
     const arr=new Uint8Array(bytes.length);
     for(let i=0;i<bytes.length;i++)arr[i]=bytes.charCodeAt(i);
@@ -2747,7 +2764,10 @@ async function speakText(text){
       audio.play().catch(()=>resolve());
     });
     if(!micActive)setGlobeMode(0);
-  }catch(e){}
+  }catch(e){
+    console.warn('[TTS] exception',e);
+    flashVoiceFailure('🔇 Voix indisponible (réseau)');
+  }
   ttsPlaying=false;
   if(stopBtn)stopBtn.style.display='none';
 }
@@ -4854,7 +4874,9 @@ function listenLoopCycle(){
       addMsg('ai','Micro refusé — impossible de continuer la conversation vocale. Autorise le micro dans les réglages du navigateur.');
       return;
     }
-    if(e.error!=='no-speech'){
+    // 'no-speech' (silence normal entre 2 tours) et 'aborted' (arrêt volontaire via le bouton d'interruption
+    // ou stopVoiceLoop) sont des artefacts attendus du fonctionnement normal — jamais de vraies erreurs.
+    if(e.error!=='no-speech'&&e.error!=='aborted'){
       voiceLoopErrorCount++;
       if(voiceLoopErrorCount>=5){
         voiceLoopActive=false;
