@@ -1082,6 +1082,7 @@ select.finp option,select.cinp option,select.sinp option{
       <div class="cfg-row"><div><div class="cfg-lbl">Lecture auto des reponses</div><div class="cfg-sub2">Sutur lit chaque reponse</div></div><button class="tog on" id="t-autospeak" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
       <div class="cfg-row"><div><div class="cfg-lbl">Geolocalisation</div><div class="cfg-sub2">Reponses adaptees a ta position</div></div><button class="tog on" id="t-geo" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button></div>
       <div class="cfg-row"><div><div class="cfg-lbl">Notifications push</div><div class="cfg-sub2">Alertes meme quand Sutur est ferme</div></div><button class="tog off" id="t-push" onclick="togglePushNotifications(this)"></button></div>
+      <div class="cfg-row"><div><div class="cfg-lbl">Tester la notification</div><div class="cfg-sub2">Envoie une vraie notif maintenant</div></div><button class="access-btn" style="padding:6px 14px;font-size:11px" onclick="testPushNotification()">TESTER</button></div>
       <div class="section-title" style="margin-top:12px">APPARENCE</div>
       <div style="display:flex;gap:8px;margin-bottom:8px">
         <button onclick="setTheme('default')" id="theme-default" class="access-btn" style="flex:1;padding:10px;font-size:11px;letter-spacing:1px;border-color:rgba(139,92,246,.5);background:rgba(139,92,246,.15)">🌌 LIQUID GLASS</button>
@@ -4426,6 +4427,19 @@ async function togglePushNotifications(btn){
   }catch(e){
     btn.classList.remove('on');btn.classList.add('off');
     addMsg('ai','Erreur activation push: '+e.message,false);
+  }
+}
+
+async function testPushNotification(){
+  if(!localStorage.getItem('s_push') && !document.getElementById('t-push').classList.contains('on')){
+    addMsg('ai','Active d\'abord les notifications push juste au-dessus, sinon il n\'y a rien à tester.',false);
+    return;
+  }
+  try{
+    const data=await apiCall('/push/send','POST');
+    addMsg('ai','📨 '+(data.message||'Notification de test envoyée — regarde ton écran/téléphone.'),false);
+  }catch(e){
+    addMsg('ai','Erreur envoi test: '+e.message,false);
   }
 }
 
