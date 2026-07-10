@@ -1697,7 +1697,7 @@ function selectGender(g){
 }
 
 let TOKEN='',API_URL='',EL_KEY='',PASS='',history=[],busy=false,micActive=false,selApp='youtube',currentBrief='',userIsOwner=false,userLocation=null,currentUserName='',onboarding=false,onboardingStep='';
-let voiceLoopActive=false,voiceRecognition=null,voiceLoopErrorCount=0;
+let voiceLoopActive=false,voiceRecognition=null,voiceLoopErrorCount=0,voiceNetworkBackoff=false;
 
 function loadCfg(){
   const p=new URLSearchParams(window.location.search);
@@ -4876,12 +4876,17 @@ function listenLoopCycle(){
     }
     // 'no-speech' (silence normal entre 2 tours) et 'aborted' (arrêt volontaire via le bouton d'interruption
     // ou stopVoiceLoop) sont des artefacts attendus du fonctionnement normal — jamais de vraies erreurs.
-    if(e.error!=='no-speech'&&e.error!=='aborted'){
+    if(e.error==='network'){
+      // Souvent un hoquet transitoire du moteur de reconnaissance — tolérance élargie,
+      // et on laisse un peu plus de temps avant de relancer (voir onend).
+      voiceLoopErrorCount+=0.5;
+      voiceNetworkBackoff=true;
+    }else if(e.error!=='no-speech'&&e.error!=='aborted'){
       voiceLoopErrorCount++;
-      if(voiceLoopErrorCount>=5){
-        voiceLoopActive=false;
-        addMsg('ai','La conversation continue a rencontré trop d\'erreurs micro et s\'est arrêtée. Réessaie avec le bouton vocal.');
-      }
+    }
+    if(voiceLoopErrorCount>=5){
+      voiceLoopActive=false;
+      addMsg('ai','La conversation continue a rencontré trop d\'erreurs micro et s\'est arrêtée. Réessaie avec le bouton vocal.');
     }
   };
   rec.onend=()=>{
@@ -4889,7 +4894,9 @@ function listenLoopCycle(){
     if(btn)btn.classList.remove('active');
     stopMicVisualizer();
     if(voiceLoopActive&&!busy){
-      setTimeout(()=>{if(voiceLoopActive&&!busy)listenLoopCycle();},400);
+      const delay=voiceNetworkBackoff?1500:400;
+      voiceNetworkBackoff=false;
+      setTimeout(()=>{if(voiceLoopActive&&!busy)listenLoopCycle();},delay);
     }
   };
   try{rec.start();}catch(e){
