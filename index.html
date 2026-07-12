@@ -2583,6 +2583,13 @@ function sw(name,el){
   // Montrer/cacher le globe
   const globeArea=document.getElementById('globe-area');
   if(globeArea)globeArea.style.display=name==='chat'?'flex':'none';
+  // Montrer/cacher la carte persistante — uniquement sur l'onglet chat, jamais ailleurs
+  const mapWrap=document.getElementById('persistent-map-wrap');
+  if(mapWrap){
+    const showMap=(name==='chat'&&mapIsActive);
+    mapWrap.style.display=showMap?'block':'none';
+    if(showMap&&persistentMapInstance)setTimeout(()=>persistentMapInstance.invalidateSize(),50);
+  }
 }
 
 function setGlobeMode(n){
@@ -4279,9 +4286,14 @@ function ensureLeaflet(){
 let agentsMapInstance=null,agentsMapMarkers=[];
 // Carte persistante — ouverte une fois, puis mise à jour en place (flyTo) sur chaque nouvelle demande de lieu
 let persistentMapInstance=null,persistentMapMarker=null;
+let mapIsActive=false;
 async function showPersistentMap(lat,lng,label){
   const wrap=document.getElementById('persistent-map-wrap');
   if(!wrap)return;
+  mapIsActive=true;
+  const onChatTab=document.getElementById('tab-chat')?.classList.contains('active');
+  // Leaflet a besoin d'un conteneur visible pour s'initialiser correctement — on l'affiche
+  // temporairement le temps de la préparer, puis on applique la vraie visibilité à la fin.
   wrap.style.display='block';
   try{
     await ensureLeaflet();
@@ -4306,8 +4318,11 @@ async function showPersistentMap(lat,lng,label){
     persistentMapInstance.invalidateSize();
     persistentMapInstance.flyTo([lat,lng],4,{duration:1});
   }
+  // Visibilité finale : uniquement si on est bien sur l'onglet chat
+  wrap.style.display=onChatTab?'block':'none';
 }
 function hidePersistentMap(){
+  mapIsActive=false;
   const wrap=document.getElementById('persistent-map-wrap');
   if(wrap)wrap.style.display='none';
 }
