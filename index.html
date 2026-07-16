@@ -3052,11 +3052,11 @@ async function launchWebTask(instruction){
   if(!rdStreaming) rdStartStream();
 
   try{
-    const data = await apiCall('/webtask','POST',{instruction, max_steps:20, use_pc:true});
+    const data = await apiCall('/remote/computer_use','POST',{instruction, max_steps:20});
 
     // Afficher les étapes dans le log
-    if(logEl && data.steps){
-      let stepsHtml = data.steps.map((s,i)=>`
+    if(logEl && data.actions){
+      let stepsHtml = data.actions.map((s,i)=>`
         <div style="padding:5px 8px;margin-bottom:4px;background:rgba(255,255,255,.02);border-left:2px solid rgba(139,92,246,.3);border-radius:0 6px 6px 0">
           <div style="font-size:9px;color:rgba(139,92,246,.5)">ÉTAPE ${s.step||i+1} · ${(s.action||'').toUpperCase()}</div>
           <div style="font-size:10px;color:rgba(200,190,230,.6);margin-top:2px">${(s.thinking||'').slice(0,80)}</div>
@@ -3065,15 +3065,10 @@ async function launchWebTask(instruction){
       logEl.scrollTop = logEl.scrollHeight;
     }
 
-    // Screenshot final
-    if(data.screenshot) rdUpdateScreen(data.screenshot);
-
     // Rapport dans le chat
-    const stepsCount = data.steps_count || (data.steps ? data.steps.length : 0);
+    const stepsCount = data.steps || 0;
     if(data.status==='done'){
       addMsg('ai', `✅ **WebTask accompli !**\n\n${data.message||'Tâche effectuée avec succès.'}\n\n*${stepsCount} étapes exécutées.*`, true);
-    }else if(data.status==='needs_input'){
-      addMsg('ai', `❓ **Information requise:**\n\n${data.question}\n\nRéponds dans le chat et je reprends la tâche.`, true);
     }else if(data.status==='failed'){
       addMsg('ai', `❌ **WebTask échoué:**\n\n${data.message||'Impossible d\'accomplir la tâche.'}\n\n*${stepsCount} étapes tentées.*`, false);
     }else{
@@ -4870,7 +4865,8 @@ async function checkGoogleStatus(){
     const gmailBtn=document.getElementById('goog-gmail-btn');
     if(data.connected){
       const since=data.updated_at?new Date(data.updated_at).toLocaleDateString('fr'):'';
-      calSt.textContent='✓ Connecté'+(since?' · '+since:'');
+      const reconnectWarning=data.needs_reconnect?' · ⚠️ reconnecte pour Docs/Sheets':'';
+      calSt.innerHTML='✓ Connecté'+(since?' · '+since:'')+(reconnectWarning?'<br><span style="color:#e0c060;font-size:9px">⚠️ Docs/Sheets non autorisés — déconnecte puis reconnecte</span>':'');
       calSt.className='conn-status ok';
       calBtn.textContent='DÉCONNECTER';
       calBtn.className='conn-btn connected';
