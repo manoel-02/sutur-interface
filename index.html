@@ -1889,6 +1889,7 @@ function getLocation(){
 // ── REMOTE DESKTOP v3 — COMPUTER USE ─────────────────────────────────────────
 let rdStreaming = false;
 let rdStreamInterval = null;
+let rdStatusInterval = null;
 let rdFrameCount = 0;
 let rdLastFrameTs = 0;
 let rdConnected = false;
@@ -1935,12 +1936,32 @@ function closeRemoteDesktop(){
   rdStopStream();
 }
 
+let rdConsecutiveFailures = 0;
 async function rdScreenshot(){
   if(!TOKEN||!API_URL) return;
   try{
     const data = await apiCall('/remote/screenshot','GET');
-    if(data.screenshot) rdUpdateScreen(data.screenshot);
-  }catch(e){}
+    if(data.screenshot){
+      rdUpdateScreen(data.screenshot);
+      rdConsecutiveFailures = 0;
+      const noScreen = document.getElementById('rd-no-screen');
+      if(noScreen) noScreen.style.display = 'none';
+    }
+  }catch(e){
+    rdConsecutiveFailures++;
+    if(rdConsecutiveFailures >= 3){
+      // Après plusieurs échecs d'affilée, on arrête de tenter en silence et on le montre clairement
+      rdStopStream();
+      const noScreen = document.getElementById('rd-no-screen');
+      const img = document.getElementById('rd-screen');
+      if(img) img.style.display = 'none';
+      if(noScreen){
+        noScreen.style.display = 'block';
+        noScreen.innerHTML = '<div style="font-size:48px;margin-bottom:16px">📡</div><div style="font-size:12px;letter-spacing:3px;color:rgba(248,113,113,.5)">CONNEXION PERDUE</div><div style="font-size:10px;margin-top:10px;color:rgba(160,151,196,.35);max-width:220px;line-height:1.6">Vérifie que l\'agent tourne toujours sur ton PC, puis relance le stream</div>';
+      }
+      checkRemoteStatus();
+    }
+  }
 }
 
 function rdUpdateScreen(b64){
@@ -1962,17 +1983,21 @@ function rdUpdateScreen(b64){
 
 function rdStartStream(){
   rdStreaming = true;
+  rdConsecutiveFailures = 0;
   const btn = document.getElementById('rd-stream-btn');
   if(btn) btn.textContent = '⏸ PAUSE';
   if(rdStreamInterval) clearInterval(rdStreamInterval);
+  if(rdStatusInterval) clearInterval(rdStatusInterval);
   rdLastFrameTs = Date.now();
   rdStreamInterval = setInterval(rdScreenshot, 600);
+  rdStatusInterval = setInterval(checkRemoteStatus, 5000); // détecte une déconnexion en direct
   apiCall('/remote/stream/start','POST').catch(()=>{});
 }
 
 function rdStopStream(){
   rdStreaming = false;
   if(rdStreamInterval){ clearInterval(rdStreamInterval); rdStreamInterval = null; }
+  if(rdStatusInterval){ clearInterval(rdStatusInterval); rdStatusInterval = null; }
   apiCall('/remote/stream/stop','POST').catch(()=>{});
   const btn = document.getElementById('rd-stream-btn');
   if(btn) btn.textContent = '▶ STREAM';
@@ -1980,6 +2005,24 @@ function rdStopStream(){
 
 function rdToggleStream(){
   if(rdStreaming) rdStopStream(); else rdStartStream();
+}
+
+function rdTogglePowerMenu(){
+  const menu=document.getElementById('rd-power-menu');
+  if(!menu)return;
+  const willShow=menu.style.display!=='block';
+  menu.style.display=willShow?'block':'none';
+  if(willShow){
+    setTimeout(()=>{
+      const closeOnOutsideClick=(e)=>{
+        if(!menu.contains(e.target)&&e.target.id!=='rd-power-btn'){
+          menu.style.display='none';
+          document.removeEventListener('click',closeOnOutsideClick);
+        }
+      };
+      document.addEventListener('click',closeOnOutsideClick);
+    },10);
+  }
 }
 
 const RD_LOCK_ACTIONS={
@@ -2862,7 +2905,12 @@ async function apiCall(path,method='GET',body=null){
     const r=await fetch(API_URL+path,opts);
     if(!r.ok){
       const errText=await r.text().catch(()=>'Erreur serveur');
-      throw new Error(errText);
+      let cleanMsg=errText;
+      try{
+        const parsed=JSON.parse(errText);
+        if(parsed&&parsed.detail)cleanMsg=typeof parsed.detail==='string'?parsed.detail:JSON.stringify(parsed.detail);
+      }catch(_){/* la réponse n'est pas du JSON — on garde le texte brut */}
+      throw new Error(cleanMsg);
     }
     return await r.json();
   }catch(e){
@@ -5144,7 +5192,7 @@ if('serviceWorker' in navigator){
 <div id="remote-modal" style="display:none;position:fixed;inset:0;z-index:200;background:#0a0a12;flex-direction:column;font-family:'Courier New',monospace">
 
   <!-- Barre du haut -->
-  <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#0d0b1e;border-bottom:1px solid rgba(139,92,246,.2);flex-shrink:0">
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#0d0b1e;border-bottom:1px solid rgba(139,92,246,.2);flex-shrink:0;position:relative">
     <!-- Indicateur connexion -->
     <div style="display:flex;align-items:center;gap:6px">
       <div id="rd-dot" style="width:8px;height:8px;border-radius:50%;background:#f87171;transition:background .3s"></div>
@@ -5153,10 +5201,15 @@ if('serviceWorker' in navigator){
     <div style="width:1px;height:16px;background:rgba(255,255,255,.08)"></div>
     <!-- Nom session -->
     <span style="font-size:11px;color:rgba(200,190,230,.7);letter-spacing:1px;flex:1">🖥️ SUTUR REMOTE DESKTOP</span>
-    <!-- Contrôles stream -->
-    <button id="rd-unlock-btn" onclick="rdShowUnlockPrompt('unlock')" style="background:rgba(201,162,39,.1);border:1px solid rgba(201,162,39,.3);border-radius:6px;color:#e0c060;cursor:pointer;font-size:10px;padding:5px 10px;letter-spacing:1px">🔓 DÉVERROUILLER</button>
-    <button id="rd-lock-btn" onclick="rdShowUnlockPrompt('lock')" style="background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.3);border-radius:6px;color:#c8aaff;cursor:pointer;font-size:10px;padding:5px 10px;letter-spacing:1px">🔒 VERROUILLER</button>
-    <button id="rd-sleep-btn" onclick="rdShowUnlockPrompt('sleep')" style="background:rgba(100,100,140,.1);border:1px solid rgba(139,132,180,.3);border-radius:6px;color:rgba(200,195,220,.8);cursor:pointer;font-size:10px;padding:5px 10px;letter-spacing:1px">💤 VEILLE</button>
+    <!-- Menu alimentation (déverrouiller/verrouiller/veille regroupés) -->
+    <div style="position:relative">
+      <button id="rd-power-btn" onclick="rdTogglePowerMenu()" style="background:rgba(201,162,39,.1);border:1px solid rgba(201,162,39,.3);border-radius:6px;color:#e0c060;cursor:pointer;font-size:10px;padding:5px 10px;letter-spacing:1px">⚡ PC ▾</button>
+      <div id="rd-power-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:#151030;border:1px solid rgba(139,92,246,.25);border-radius:10px;padding:6px;min-width:170px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:10">
+        <button onclick="rdTogglePowerMenu();rdShowUnlockPrompt('unlock')" style="display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;padding:8px 10px;border-radius:7px;border:none;background:transparent;color:#e0c060;cursor:pointer;font-size:11px;text-align:left" onmouseover="this.style.background='rgba(201,162,39,.1)'" onmouseout="this.style.background='transparent'">🔓 Déverrouiller</button>
+        <button onclick="rdTogglePowerMenu();rdShowUnlockPrompt('lock')" style="display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;padding:8px 10px;border-radius:7px;border:none;background:transparent;color:#c8aaff;cursor:pointer;font-size:11px;text-align:left" onmouseover="this.style.background='rgba(139,92,246,.1)'" onmouseout="this.style.background='transparent'">🔒 Verrouiller</button>
+        <button onclick="rdTogglePowerMenu();rdShowUnlockPrompt('sleep')" style="display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;padding:8px 10px;border-radius:7px;border:none;background:transparent;color:rgba(200,195,220,.8);cursor:pointer;font-size:11px;text-align:left" onmouseover="this.style.background='rgba(139,132,180,.1)'" onmouseout="this.style.background='transparent'">💤 Mettre en veille</button>
+      </div>
+    </div>
     <button id="rd-stream-btn" onclick="rdToggleStream()" style="background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.25);border-radius:6px;color:#c8aaff;cursor:pointer;font-size:10px;padding:5px 10px;letter-spacing:1px">⏸ PAUSE</button>
     <button onclick="rdScreenshot()" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:rgba(200,190,230,.6);cursor:pointer;font-size:10px;padding:5px 10px;letter-spacing:1px">📸</button>
     <button onclick="closeRemoteDesktop()" style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:6px;color:rgba(248,113,113,.7);cursor:pointer;font-size:13px;padding:4px 8px">✕</button>
