@@ -2161,6 +2161,9 @@ async function rdStartComputerUse(){
   const log = document.getElementById('rd-cu-log');
   if(!inp||!inp.value.trim()) return;
   const instruction = inp.value.trim();
+  // Garantir que le stream tourne pendant l'exécution — sans ça, la vision "temps réel"
+  // ne serait qu'une coïncidence si le stream était déjà actif par ailleurs.
+  if(!rdStreaming) rdStartStream();
   if(btn){ btn.disabled=true; btn.textContent='🔄 EN COURS...'; }
   if(log) log.innerHTML = '<div style="color:rgba(201,162,39,.7);margin-bottom:8px">🤖 Instruction: "'+instruction+'"</div>';
   try{
@@ -2174,11 +2177,42 @@ async function rdStartComputerUse(){
       });
     }
     rdScreenshot();
+    if(data.message) speakText(data.message);
   }catch(e){
     if(log) log.innerHTML+='<div style="color:#f87171">❌ '+(e.message||'Erreur')+'</div>';
+    speakText('Une erreur est survenue : '+(e.message||'erreur inconnue'));
   }finally{
     if(btn){ btn.disabled=false; btn.textContent='🤖 LANCER COMPUTER USE'; }
+    inp.value='';
   }
+}
+
+function rdStartVoiceInput(){
+  if(!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)){
+    const log = document.getElementById('rd-cu-log');
+    if(log) log.innerHTML += '<div style="color:#f87171">Micro non supporté sur ce navigateur.</div>';
+    return;
+  }
+  const btn = document.getElementById('rd-voice-btn');
+  const inp = document.getElementById('rd-cu-instruction');
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const rec = new SR();
+  rec.lang = 'fr-FR';
+  rec.continuous = false;
+  rec.interimResults = false;
+  if(btn){ btn.classList.add('active'); btn.textContent='🎙️ Écoute...'; }
+  rec.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    if(inp) inp.value = transcript;
+    rdStartComputerUse(); // scope strictement PC — ne passe jamais par le chat général
+  };
+  rec.onerror = () => {
+    if(btn){ btn.classList.remove('active'); btn.textContent='🎙️ PARLER'; }
+  };
+  rec.onend = () => {
+    if(btn){ btn.classList.remove('active'); btn.textContent='🎙️ PARLER'; }
+  };
+  rec.start();
 }
 
 function showAgentInstructions(){
@@ -2920,8 +2954,9 @@ async function apiCall(path,method='GET',body=null){
 
 function detectMediaCmd(msg){
   const m=msg.toLowerCase();
-  if(m.includes('youtube')||m.includes('video')||m.includes('vid'))return'youtube';
-  if(m.includes('spotify')||m.includes('musique')||m.includes('mets'))return'spotify';
+  // Spotify et YouTube ne sont plus interceptés ici — ils passent par le vrai système
+  // d'intentions du backend (recherche + lecture réelles), plus par ce raccourci qui se
+  // contentait d'ouvrir une page de recherche sans jamais rien lancer.
   if(m.includes('instagram'))return'instagram';
   if(m.includes('tiktok'))return'tiktok';
   if(m.includes(' x ')||m.includes('twitter'))return'x';
@@ -3100,8 +3135,8 @@ async function launchTeamMission(mission, teamSize=4){
 }
 
 function handleMediaCmd(app,msg){
-  const q=msg.replace(/youtube|spotify|instagram|tiktok|twitter|\bx\b|video|musique|mets|lance|ouvre|cherche|sur|une/gi,'').trim()||'tendances';
-  const urls={youtube:'https://www.youtube.com/results?search_query=',spotify:'https://open.spotify.com/search/',instagram:'https://www.instagram.com/explore/tags/',tiktok:'https://www.tiktok.com/search?q=',x:'https://x.com/search?q='};
+  const q=msg.replace(/instagram|tiktok|twitter|\bx\b|lance|ouvre|cherche|sur|une/gi,'').trim()||'tendances';
+  const urls={instagram:'https://www.instagram.com/explore/tags/',tiktok:'https://www.tiktok.com/search?q=',x:'https://x.com/search?q='};
   addMsg('ai',`J'ouvre ${app} sur "${q}"...`);speakText(`J'ouvre ${app} sur ${q}.`);setTimeout(()=>window.open(urls[app]+encodeURIComponent(q),'_blank'),600);
 }
 
@@ -3423,6 +3458,11 @@ async function sendMsg(){
       imgWrap.appendChild(img);
       cbImg.appendChild(imgWrap);
       cbImg.scrollTop=cbImg.scrollHeight;
+    }
+
+    // Vidéo YouTube trouvée — ouverture automatique, comme une vraie lecture
+    if(data.youtube_open_url){
+      setTimeout(()=>window.open(data.youtube_open_url,'_blank'),500);
     }
 
     document.getElementById('hmod').textContent=(data.model_used||'ORBIX').toUpperCase().replace('CLAUDE','ORBIX').replace('GPT-4O','ORBIX GPT');
@@ -4866,7 +4906,7 @@ async function checkGoogleStatus(){
     if(data.connected){
       const since=data.updated_at?new Date(data.updated_at).toLocaleDateString('fr'):'';
       const reconnectWarning=data.needs_reconnect?' · ⚠️ reconnecte pour Docs/Sheets':'';
-      calSt.innerHTML='✓ Connecté'+(since?' · '+since:'')+(reconnectWarning?'<br><span style="color:#e0c060;font-size:9px">⚠️ Docs/Sheets non autorisés — déconnecte puis reconnecte</span>':'');
+      calSt.innerHTML='✓ Connecté'+(since?' · '+since:'')+(reconnectWarning?'<br><span style="color:#e0c060;font-size:9px">⚠️ Docs/Sheets/Contacts non autorisés — déconnecte puis reconnecte</span>':'');
       calSt.className='conn-status ok';
       calBtn.textContent='DÉCONNECTER';
       calBtn.className='conn-btn connected';
@@ -5291,7 +5331,10 @@ if('serviceWorker' in navigator){
         <div id="rd-cu-log" style="flex:1;overflow-y:auto;padding:10px;font-size:11px;color:rgba(200,190,230,.7);line-height:1.6"></div>
         <div style="border-top:1px solid rgba(139,92,246,.12);padding:8px;display:flex;flex-direction:column;gap:6px">
           <textarea id="rd-cu-instruction" style="width:100%;background:rgba(255,255,255,.03);border:1px solid rgba(139,92,246,.2);border-radius:8px;padding:8px;color:rgba(200,190,230,.8);font-size:12px;font-family:'Courier New',monospace;outline:none;resize:none;box-sizing:border-box;min-height:55px" placeholder="Dis à Sutur ce qu'il doit faire...&#10;Ex: Cherche le prix du dollar aujourd'hui"></textarea>
-          <button id="rd-cu-btn" onclick="rdStartComputerUse()" style="padding:9px;border-radius:8px;border:1px solid rgba(139,92,246,.4);background:rgba(139,92,246,.12);color:#c8aaff;cursor:pointer;font-size:11px;letter-spacing:1.5px;font-family:'Courier New',monospace">🤖 LANCER COMPUTER USE</button>
+          <div style="display:flex;gap:6px">
+            <button id="rd-voice-btn" onclick="rdStartVoiceInput()" style="padding:9px 14px;border-radius:8px;border:1px solid rgba(201,162,39,.3);background:rgba(201,162,39,.08);color:#e0c060;cursor:pointer;font-size:11px;letter-spacing:1px;font-family:'Courier New',monospace">🎙️ PARLER</button>
+            <button id="rd-cu-btn" onclick="rdStartComputerUse()" style="flex:1;padding:9px;border-radius:8px;border:1px solid rgba(139,92,246,.4);background:rgba(139,92,246,.12);color:#c8aaff;cursor:pointer;font-size:11px;letter-spacing:1.5px;font-family:'Courier New',monospace">🤖 LANCER COMPUTER USE</button>
+          </div>
         </div>
       </div>
 
@@ -5326,6 +5369,8 @@ if('serviceWorker' in navigator){
 
 <style>
 .rdkey{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:5px;color:rgba(180,170,220,.6);cursor:pointer;font-size:9px;padding:4px 8px;font-family:'Courier New',monospace;letter-spacing:.5px;white-space:nowrap;flex-shrink:0}
+#rd-voice-btn.active{background:rgba(201,162,39,.25)!important;box-shadow:0 0 10px rgba(201,162,39,.4);animation:rdVoicePulse 1.2s ease-in-out infinite}
+@keyframes rdVoicePulse{0%,100%{opacity:1}50%{opacity:.6}}
 .rdkey:hover{background:rgba(139,92,246,.12);border-color:rgba(139,92,246,.25);color:#c8aaff}
 .rdtab{flex:1;padding:8px;background:transparent;border:none;color:rgba(160,151,196,.4);cursor:pointer;font-size:9px;letter-spacing:1.5px;font-family:'Courier New',monospace;border-bottom:2px solid transparent}
 .rdtab-active{color:rgba(200,190,230,.85);border-bottom-color:rgba(139,92,246,.6)!important}
