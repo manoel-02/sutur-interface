@@ -1,0 +1,40 @@
+/* ── AMBIANCES PAR ONGLET ── */
+/* CHAT — Pulsar / onde radio */
+#tab-chat::before{content:'';position:fixed;bottom:80px;right:20px;width:120px;height:120px;border-radius:50%;border:1px solid rgba(139,92,246,.08);animation:pulse-ring 3s ease-out infinite;pointer-events:none;z-index:0}
+#tab-chat::after{content:'';position:fixed;bottom:80px;right:20px;width:120px;height:120px;border-radius:50%;border:1px solid rgba(201,162,39,.05);animation:pulse-ring 3s ease-out infinite .8s;pointer-events:none;z-index:0}
+@keyframes pulse-ring{0%{transform:scale(.3);opacity:.8}100%{transform:scale(2.5);opacity:0}}
+
+/* BRIEF — Aurore boréale */
+#tab-brief{background:linear-gradient(180deg,rgba(0,200,100,.03) 0%,transparent 40%),linear-gradient(0deg,rgba(139,92,246,.03) 0%,transparent 40%)}
+#tab-brief::before{content:'';position:fixed;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,rgba(0,220,120,.3),rgba(139,92,246,.3),rgba(0,220,120,.15),transparent);animation:aurora 6s ease-in-out infinite;pointer-events:none;z-index:0}
+@keyframes aurora{0%,100%{opacity:.4;transform:scaleX(.8) translateX(-5%)}50%{opacity:1;transform:scaleX(1.1) translateX(5%)}}
+
+/* MEDIA — Wormhole / tunnel */
+#tab-media::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:200px;height:200px;border-radius:50%;border:1px solid rgba(139,92,246,.04);animation:wormhole 8s linear infinite;pointer-events:none;z-index:0}
+#tab-media::after{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:120px;height:120px;border-radius:50%;border:1px solid rgba(201,162,39,.03);animation:wormhole 6s linear infinite reverse;pointer-events:none;z-index:0}
+@keyframes wormhole{0%{transform:translate(-50%,-50%) scale(1) rotate(0deg)}100%{transform:translate(-50%,-50%) scale(1) rotate(360deg)}}
+
+/* OUTILS — Constellation de circuits */
+#tab-fn::before{content:'';position:fixed;top:0;right:0;width:180px;height:180px;background:radial-gradient(circle at 70% 30%,rgba(139,92,246,.06) 0%,transparent 70%);animation:circuit-glow 5s ease-in-out infinite alternate;pointer-events:none;z-index:0}
+@keyframes circuit-glow{0%{opacity:.3;transform:scale(.95)}100%{opacity:1;transform:scale(1.05)}}
+
+/* MÉMOIRE — Particules de données / ADN */
+#tab-mem::before{content:'';position:fixed;left:8px;top:60px;bottom:80px;width:2px;background:linear-gradient(180deg,transparent,rgba(139,92,246,.2),rgba(201,162,39,.15),rgba(139,92,246,.2),transparent);animation:data-stream 4s ease-in-out infinite;pointer-events:none;z-index:0}
+@keyframes data-stream{0%,100%{opacity:.3}50%{opacity:1}}
+
+/* AGENTS — Radar tournant */
+#tab-agents::before{content:'';position:fixed;top:50%;right:30px;transform:translateY(-50%);width:100px;height:100px;border-radius:50%;border:1px solid rgba(201,162,39,.06);animation:radar-spin 4s linear infinite;background:conic-gradient(from 0deg,rgba(201,162,39,.08) 0deg,transparent 60deg,transparent 360deg);pointer-events:none;z-index:0}
+@keyframes radar-spin{to{transform:translateY(-50%) rotate(360deg)}}
+
+/* MSGS — Signal / onde */
+#tab-msgs::before{content:'';position:fixed;bottom:100px;left:50%;transform:translateX(-50%);width:60px;height:60px;border-radius:50%;border:1px solid rgba(74,222,128,.08);animation:signal 2.5s ease-out infinite;pointer-events:none;z-index:0}
+@keyframes signal{0%{transform:translateX(-50%) scale(1);opacity:.8}100%{transform:translateX(-50%) scale(4);opacity:0}}
+
+/* PROFIL — Halo identitaire */
+#tab-profil::before{content:'';position:fixed;top:80px;right:20px;width:80px;height:80px;border-radius:50%;background:radial-gradient(circle,rgba(139,92,246,.08),transparent);animation:halo 3s ease-in-out infinite alternate;pointer-events:none;z-index:0}
+@keyframes halo{0%{transform:scale(1);opacity:.4}100%{transform:scale(1.4);opacity:.9}}
+
+/* CONFIG — Engrenage galactique */
+#tab-cfg::before{content:'';position:fixed;bottom:100px;right:20px;width:70px;height:70px;border-radius:50%;border:1px dashed rgba(201,162,39,.1);animation:gear-turn 10s linear infinite;pointer-events:none;z-index:0}
+#tab-cfg::after{content:'';position:fixed;bottom:115px;right:35px;width:40px;height:40px;border-radius:50%;border:1px dashed rgba(139,92,246,.08);animation:gear-turn 6s linear infinite reverse;pointer-events:none;z-index:0}
+@keyframes gear-turn{to{transform:rotate(360deg)}}

@@ -1,0 +1,98 @@
+/* ── PALETTE ORBIXLABS ── */
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;width:100%;background:#07051a;overflow:hidden;position:fixed;inset:0}
+
+/* ── PALETTE ORBIXLABS ──────────────────────────────────────────────────────
+   Fond : #07051a  — cosmos profond
+   Violet : #8b5cf6  — violet OrbixLabs
+   Or : #c9a227  — doré OrbixLabs
+   Blanc étoilé : #e8e4f8  — texte principal
+   Gris doux : #a097c4  — texte secondaire
+   Surface : rgba(255,255,255,.04)
+   Bordure : rgba(139,92,246,.18)
+──────────────────────────────────────────────────────────────────────────── */
+
+/* POLICES — plus grandes, plus lisibles */
+:root{
+  --font-main: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Courier New', monospace;
+  --text-primary: #e8e4f8;
+  --text-secondary: #a097c4;
+  --text-muted: rgba(160,151,196,.45);
+  --violet: #8b5cf6;
+  --violet-light: rgba(139,92,246,.18);
+  --violet-glow: rgba(139,92,246,.35);
+  --gold: #c9a227;
+  --gold-light: rgba(201,162,39,.15);
+  --surface: rgba(255,255,255,.04);
+  --border: rgba(139,92,246,.18);
+  --border-gold: rgba(201,162,39,.25);
+  --msg-ai-bg: rgba(139,92,246,.08);
+  --msg-ai-border: rgba(139,92,246,.18);
+  --msg-user-bg: rgba(139,92,246,.1);
+  --msg-user-border: rgba(139,92,246,.2);
+  --nav-active-bg: rgba(139,92,246,.15);
+  --nav-active-border: rgba(139,92,246,.3);
+  --lbl-color: rgba(139,92,246,.7);
+  --avatar-border: rgba(139,92,246,.4);
+  --app-bg: radial-gradient(ellipse at 20% 0%,rgba(139,92,246,.12) 0%,transparent 50%),radial-gradient(ellipse at 80% 100%,rgba(201,162,39,.08) 0%,transparent 50%),#07051a;
+}
+
+/* ── THÈME TERMINAL ── */
+body.theme-terminal{
+  --font-main: 'Courier New', monospace;
+  --text-primary: rgba(180,240,255,.9);
+  --text-secondary: rgba(150,220,200,.7);
+  --text-muted: rgba(0,200,255,.35);
+  --violet: #00c8ff;
+  --violet-light: rgba(0,200,255,.1);
+  --violet-glow: rgba(0,200,255,.3);
+  --gold: rgba(255,210,80,.8);
+  --surface: rgba(0,200,255,.04);
+  --border: rgba(0,200,255,.1);
+  --border-gold: rgba(255,210,80,.15);
+  --msg-ai-bg: rgba(0,200,255,.05);
+  --msg-ai-border: rgba(0,200,255,.1);
+  --msg-user-bg: rgba(255,210,80,.05);
+  --msg-user-border: rgba(255,210,80,.12);
+  --nav-active-bg: rgba(0,200,255,.06);
+  --nav-active-border: rgba(0,200,255,.2);
+  --lbl-color: rgba(0,200,255,.45);
+  --avatar-border: rgba(0,200,255,.35);
+  --app-bg: #030508;
+}
+body.theme-terminal #app::before{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(rgba(0,200,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(0,200,255,.018) 1px,transparent 1px);
+  background-size:36px 36px;
+}
+body.theme-terminal #app::after{
+  content:'';position:fixed;left:0;right:0;height:1px;z-index:1;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(0,200,255,.12),transparent);
+  animation:tscan 6s linear infinite;
+}
+@keyframes tscan{from{top:-1px}to{top:100vh}}
+body.theme-terminal .hud{background:rgba(3,5,8,.97);border-bottom:1px solid rgba(0,200,255,.12);position:relative;}
+body.theme-terminal .hud::before{content:'';position:absolute;top:6px;left:8px;width:14px;height:14px;border-top:1px solid rgba(0,200,255,.4);border-left:1px solid rgba(0,200,255,.4);}
+body.theme-terminal .hud::after{content:'';position:absolute;top:6px;right:8px;width:14px;height:14px;border-top:1px solid rgba(0,200,255,.4);border-right:1px solid rgba(0,200,255,.4);}
+body.theme-terminal .tabs{background:rgba(3,5,8,.95);border-bottom:1px solid rgba(0,200,255,.08);}
+body.theme-terminal .tab{color:rgba(0,200,255,.3);font-family:'Courier New',monospace;font-size:9px;letter-spacing:1.5px;}
+body.theme-terminal .tab.active{background:rgba(0,200,255,.06);border-color:rgba(0,200,255,.2);color:rgba(0,200,255,.85);}
+body.theme-terminal .cinp{font-family:'Courier New',monospace!important;background:transparent!important;border-color:rgba(0,200,255,.15)!important;color:rgba(180,240,255,.8)!important;}
+body.theme-terminal .cinp::placeholder{color:rgba(0,200,255,.25)!important;font-family:'Courier New',monospace!important;}
+body.theme-terminal .sbtn{background:rgba(0,200,255,.06)!important;border-color:rgba(0,200,255,.2)!important;color:rgba(0,200,255,.7)!important;}
+body.theme-terminal .micbtn{background:rgba(0,200,255,.05)!important;border-color:rgba(0,200,255,.15)!important;color:rgba(0,200,255,.5)!important;}
+body.theme-terminal .inp-bar{background:rgba(3,5,8,.97)!important;border-top:1px solid rgba(0,200,255,.1)!important;}
+body.theme-terminal .bottom-nav{background:rgba(3,5,8,.97)!important;border-top:1px solid rgba(0,200,255,.08)!important;}
+body.theme-terminal .nav-label{font-family:'Courier New',monospace!important;font-size:8px!important;letter-spacing:1px!important;}
+body.theme-terminal .nav-item.active{background:rgba(0,200,255,.06)!important;border:1px solid rgba(0,200,255,.18)!important;}
+body.theme-terminal .glass{background:rgba(0,200,255,.03)!important;border-color:rgba(0,200,255,.08)!important;}
+body.theme-terminal .section-title{color:rgba(0,200,255,.5)!important;letter-spacing:3px!important;font-family:'Courier New',monospace!important;}
+body.theme-terminal #lock{background:#030508!important;}
+body.theme-terminal .lock-title{color:rgba(0,200,255,.8)!important;letter-spacing:8px!important;font-family:'Courier New',monospace!important;}
+
+#app{position:fixed;inset:0;height:100%;width:100%;background:var(--app-bg);font-family:var(--font-main);overflow:hidden}
+canvas#bgc{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.6}
+.z1{position:relative;z-index:1}
+.glass{background:var(--surface);border:1px solid var(--border);border-radius:14px}

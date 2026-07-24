@@ -1,0 +1,49 @@
+/* ── CHAT ── */
+.chat-box{display:flex;flex-direction:column;gap:10px;padding:4px;margin-bottom:8px}
+.chat-box .mt{word-wrap:break-word;overflow-wrap:anywhere;white-space:pre-wrap;display:block}
+.chat-box .mt strong,.chat-box .mt b{color:var(--gold);font-weight:600}
+.chat-box .mt em,.chat-box .mt i{color:var(--text-secondary);font-style:italic}
+.chat-box .mt code{font-family:var(--font-mono);background:rgba(0,0,0,.3);padding:1px 5px;border-radius:4px;font-size:12px;color:#4ade80}
+.chat-box .mt a{color:var(--violet);text-decoration:underline;word-break:break-all}
+.msg-bubble .mt{word-wrap:break-word;overflow-wrap:anywhere;white-space:pre-wrap;display:block}
+.msg-bubble .mt strong,.msg-bubble .mt b{color:var(--gold);font-weight:600}
+.msg-bubble .mt code{font-family:var(--font-mono);background:rgba(0,0,0,.3);padding:1px 5px;border-radius:4px;font-size:12px;color:#4ade80}
+.cmsg{padding:12px 16px;border-radius:14px;font-size:15px;line-height:1.65;animation:fu .25s ease;font-family:var(--font-main)}
+@keyframes fu{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.cmsg.user{background:var(--msg-user-bg);border:1px solid var(--msg-user-border);color:var(--text-primary);align-self:flex-end;max-width:85%;text-align:right;margin-left:auto}
+.cmsg.ai{background:var(--msg-ai-bg);border:1px solid var(--msg-ai-border);color:var(--text-primary);align-self:flex-start;max-width:94%}
+.msg-row{display:flex;align-items:flex-start;gap:8px;align-self:flex-start;max-width:96%;animation:fu .25s ease}
+.msg-bubble{background:var(--msg-ai-bg);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--msg-ai-border);border-radius:14px;border-top-left-radius:4px;padding:10px 14px;color:var(--text-primary);font-size:15px;line-height:1.65;flex:1;box-shadow:0 4px 18px rgba(0,0,0,.18)}
+.cmsg .lbl{font-size:10px;color:var(--lbl-color);letter-spacing:1px;margin-bottom:5px;display:flex;align-items:center;gap:6px;font-family:var(--font-mono)}
+.speak-btn{background:none;border:none;cursor:pointer;font-size:12px;opacity:.4;padding:0;transition:opacity .2s}
+.speak-btn:hover{opacity:.8}
+.typing span{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--violet);margin:0 2px;animation:td 1.2s infinite}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+@keyframes td{0%,80%,100%{opacity:.2}40%{opacity:1}}
+
+/* BARRE DE SAISIE */
+.inp-bar{position:fixed;bottom:0;left:0;right:0;padding:10px 12px 16px;background:rgba(7,5,26,.95);border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;z-index:10;backdrop-filter:blur(8px)}
+.cinp{flex:1;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:24px;padding:11px 18px;color:var(--text-primary);font-size:15px;font-family:var(--font-main);outline:none;transition:border-color .2s}
+.cinp:focus{border-color:var(--violet)}
+.cinp::placeholder{color:var(--text-muted)}
+.sbtn{width:40px;height:40px;border-radius:50%;background:rgba(139,92,246,.2);border:1px solid var(--violet-glow);color:var(--text-primary);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+.sbtn:hover{background:rgba(139,92,246,.35);box-shadow:0 0 16px rgba(139,92,246,.3)}
+.micbtn{width:40px;height:40px;border-radius:50%;background:rgba(201,162,39,.08);border:1px solid var(--border-gold);color:var(--gold);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+.micbtn:hover{background:rgba(201,162,39,.18)}
+.micbtn.active{background:rgba(201,162,39,.25);animation:scan .6s infinite}
+
+/* ── BRIEF ── */
+.brief-card{padding:16px;border-radius:14px;background:var(--surface);border:1px solid var(--border);margin-bottom:12px;line-height:1.75;font-size:15px;color:var(--text-primary);white-space:pre-wrap}
+.brief-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.brief-date{font-size:11px;color:var(--text-muted)}
+
+/* ── SECTION TITLES ── */
+.section-title{font-size:11px;color:var(--gold);letter-spacing:2px;margin:14px 0 8px;font-weight:600;text-transform:uppercase}
+
+/* ── MESSAGERIE ── */
+.msg-item{padding:12px 14px;border-radius:12px;background:var(--surface);border:1px solid var(--border);margin-bottom:8px}
+.msg-from{font-size:10px;color:var(--gold);letter-spacing:1px;margin-bottom:4px;font-weight:600}
+.msg-body{font-size:14px;color:var(--text-primary);line-height:1.6}
+.msg-time{font-size:11px;color:var(--text-muted);margin-top:4px}
+.send-msg-area{display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:12px;background:var(--surface);border:1px solid var(--border);margin-bottom:12px}

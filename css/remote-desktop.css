@@ -1,0 +1,7 @@
+/* ── REMOTE DESKTOP — onglets et boutons du panneau de contrôle PC ── */
+.rdkey{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:5px;color:rgba(180,170,220,.6);cursor:pointer;font-size:9px;padding:4px 8px;font-family:'Courier New',monospace;letter-spacing:.5px;white-space:nowrap;flex-shrink:0}
+.rdkey:hover{background:rgba(139,92,246,.12);border-color:rgba(139,92,246,.25);color:#c8aaff}
+#rd-voice-btn.active{background:rgba(201,162,39,.25)!important;box-shadow:0 0 10px rgba(201,162,39,.4);animation:rdVoicePulse 1.2s ease-in-out infinite}
+@keyframes rdVoicePulse{0%,100%{opacity:1}50%{opacity:.6}}
+.rdtab{flex:1;padding:8px;background:transparent;border:none;color:rgba(160,151,196,.4);cursor:pointer;font-size:9px;letter-spacing:1.5px;font-family:'Courier New',monospace;border-bottom:2px solid transparent}
+.rdtab-active{color:rgba(200,190,230,.85);border-bottom-color:rgba(139,92,246,.6)!important}
