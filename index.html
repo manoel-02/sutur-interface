@@ -1443,11 +1443,14 @@ function lerp(a,b,t){return a+(b-a)*t;}
 
 function headRadiusAtY(y){
   // Rayon horizontal du contour de tête selon la hauteur y (-1=menton, 1=sommet du crâne).
-  // Forme allongée façon "visage IA stylisé" : large aux tempes, effilée vers un menton pointu.
-  if(y>0.75) return lerp(0.42,0.5,(1-y)/0.25);
-  if(y>0.3) return lerp(0.5,0.58,(0.75-y)/0.45);
-  if(y>-0.5) return lerp(0.58,0.36,(0.3-y)/0.8);
-  return Math.max(0,lerp(0.36,0.01,(-0.5-y)/0.5));
+  // Silhouette plus anguleuse et marquée : crâne large et net, tempes saillantes,
+  // resserrement franc vers une mâchoire nette, pointe de menton affirmée.
+  if(y>0.8) return lerp(0.36,0.46,(1-y)/0.2);
+  if(y>0.5) return lerp(0.46,0.6,(0.8-y)/0.3);
+  if(y>0.1) return lerp(0.6,0.57,(0.5-y)/0.4);
+  if(y>-0.3) return lerp(0.57,0.42,(0.1-y)/0.4);
+  if(y>-0.68) return lerp(0.42,0.15,(-0.3-y)/0.38);
+  return Math.max(0,lerp(0.15,0,(-0.68-y)/0.32));
 }
 
 function buildHeadOutlineLine(steps){
@@ -1467,40 +1470,64 @@ function buildHeadOutlineLine(steps){
 }
 
 function buildNoseLine(){
-  // Arête du nez — descend entre les yeux, s'évase légèrement, comme une ligne de
-  // structure sur le visage de référence plutôt qu'un vrai nez anatomique.
+  // Arête du nez — ligne nette du front jusqu'à une aile marquée, silhouette lisible
+  // même à petite taille plutôt qu'un losange abstrait.
   return [
-    0,0.12,0.1,
-    -0.02,-0.04,0.1,
-    -0.05,-0.21,0.09,
-    0.05,-0.21,0.09,
-    0.02,-0.04,0.1,
-    0,0.12,0.1,
+    0,0.22,0.12,
+    -0.01,0.0,0.115,
+    -0.025,-0.14,0.11,
+    -0.06,-0.25,0.1,
+    0,-0.21,0.105,
+    0.06,-0.25,0.1,
+    0.025,-0.14,0.11,
+    0.01,0.0,0.115,
+    0,0.22,0.12,
   ];
 }
 
 function buildBrowLine(side){
-  // Ligne d'arcade au-dessus de l'œil — angulaire, façon IA plutôt qu'anatomique.
+  // Arcade — longue et légèrement relevée vers l'extérieur, pour un regard plus
+  // intense/affirmé plutôt qu'un petit trait discret.
   return [
-    side*0.07,0.33,0.09,
-    side*0.2,0.31,0.08,
-    side*0.36,0.27,0.06,
+    side*0.05,0.36,0.1,
+    side*0.16,0.38,0.09,
+    side*0.29,0.36,0.075,
+    side*0.44,0.29,0.05,
+  ];
+}
+
+function buildCheekLine(side){
+  // Ligne de pommette — accompagne la courbe du crâne côté tempe/joue.
+  return [
+    side*0.52,0.32,0.045,
+    side*0.58,0.08,0.035,
+    side*0.5,-0.16,0.045,
   ];
 }
 
 function buildJawLine(side){
-  // Ligne de structure joue/mâchoire — évoque les circuits du visage de référence.
+  // Ligne de mâchoire — suit le resserrement net vers le menton.
   return [
-    side*0.52,0.18,0.03,
-    side*0.4,-0.28,0.05,
-    side*0.22,-0.62,0.04,
+    side*0.46,-0.24,0.05,
+    side*0.3,-0.5,0.045,
+    side*0.1,-0.68,0.04,
+  ];
+}
+
+function buildForeheadLine(){
+  // Ligne haute frontale — apporte de la richesse structurelle sur le haut du visage.
+  return [
+    -0.3,0.62,0.05,
+    -0.12,0.68,0.07,
+    0.12,0.68,0.07,
+    0.3,0.62,0.05,
   ];
 }
 
 function buildAmbientGlow(){
   // Quelques points larges juste derrière le visage — l'aide à se fondre dans le
   // décor plutôt que de flotter comme un calque détaché.
-  return [0,0.02,-0.35, -0.15,-0.1,-0.42, 0.15,0.15,-0.4];
+  return [0,0.02,-0.35, -0.15,-0.1,-0.42, 0.15,0.15,-0.4, 0,-0.35,-0.38];
 }
 
 function buildHeadVolume(n){
@@ -1602,6 +1629,7 @@ function buildMist(n,spread){
 
 let three_faceGroup=null,three_head=null,three_headVolume=null,three_eyeL=null,three_eyeR=null,three_mouth=null,three_stars=null;
 let three_nose=null,three_browL=null,three_browR=null,three_jawL=null,three_jawR=null,three_ambientGlow=null;
+let three_headGlow=null,three_cheekL=null,three_cheekR=null,three_forehead=null;
 let three_thinkMist=null;
 let three_burst=null,three_burstVelocities=null,burstActive=false,burstStartTime=0;
 let eyeBlinkPhase=0,nextBlinkAt=2+Math.random()*4;
@@ -1624,33 +1652,40 @@ async function initGlobe3D(){
     three_faceGroup=new THREE.Group();
 
     // Contour en trait continu (pas en points isolés) — bien plus "concret" et lisible,
-    // en particulier à petite taille sur mobile.
-    three_head=makeLine(buildHeadOutlineLine(90),0x8b5cf6,0.95,true);
+    // en particulier à petite taille sur mobile. Un halo de particules douces juste
+    // derrière lui donne l'effet de lueur/glow qu'une simple ligne WebGL ne peut pas
+    // produire seule (l'épaisseur de trait n'est pas fiable d'un navigateur à l'autre).
+    three_headGlow=makePoints(buildHeadOutlineLine(90),0x8b5cf6,0.09,0.28);
+    three_head=makeLine(buildHeadOutlineLine(90),0xffffff,1,true);
     three_headVolume=makePoints(buildHeadVolume(560),0x8b5cf6,0.015,0.4);
-    three_eyeL=makePoints(buildAlmondShape(16,0.13,0.055,-0.22,0.22),0xd4af37,0.03,0.95);
-    three_eyeR=makePoints(buildAlmondShape(16,0.13,0.055,0.22,0.22),0xd4af37,0.03,0.95);
+    three_eyeL=makePoints(buildAlmondShape(16,0.14,0.06,-0.22,0.22),0xd4af37,0.034,0.95);
+    three_eyeR=makePoints(buildAlmondShape(16,0.14,0.06,0.22,0.22),0xd4af37,0.034,0.95);
     three_mouth=makePoints(buildAlmondShape(16,0.16,0.04,0,-0.42),0xd4af37,0.026,0.85);
     three_stars=makePoints(buildStarfield(900,3.2),0xffffff,0.018,0.55);
     three_thinkMist=makePoints(buildMist(350,1.4),0xc9a227,0.02,0);
 
-    // Lignes structurelles — donnent au visage sa lisibilité (nez, arcades, mâchoire),
-    // dans le même esprit "circuit" que le visage de référence.
-    three_nose=makeLine(buildNoseLine(),0x8b5cf6,0.55,false);
-    three_browL=makeLine(buildBrowLine(-1),0x8b5cf6,0.5,false);
-    three_browR=makeLine(buildBrowLine(1),0x8b5cf6,0.5,false);
-    three_jawL=makeLine(buildJawLine(-1),0x8b5cf6,0.4,false);
-    three_jawR=makeLine(buildJawLine(1),0x8b5cf6,0.4,false);
+    // Lignes structurelles — donnent au visage sa lisibilité (nez, arcades, pommettes,
+    // mâchoire, front), dans le même esprit "circuit" que le visage de référence.
+    three_nose=makeLine(buildNoseLine(),0x8b5cf6,0.6,false);
+    three_browL=makeLine(buildBrowLine(-1),0x8b5cf6,0.55,false);
+    three_browR=makeLine(buildBrowLine(1),0x8b5cf6,0.55,false);
+    three_cheekL=makeLine(buildCheekLine(-1),0x8b5cf6,0.42,false);
+    three_cheekR=makeLine(buildCheekLine(1),0x8b5cf6,0.42,false);
+    three_jawL=makeLine(buildJawLine(-1),0x8b5cf6,0.45,false);
+    three_jawR=makeLine(buildJawLine(1),0x8b5cf6,0.45,false);
+    three_forehead=makeLine(buildForeheadLine(),0x8b5cf6,0.4,false);
 
     // Lueur ambiante juste derrière le visage — l'aide à se fondre dans le décor
     // plutôt que de flotter comme un calque détaché.
-    three_ambientGlow=makePoints(buildAmbientGlow(),0x8b5cf6,1.4,0.18);
+    three_ambientGlow=makePoints(buildAmbientGlow(),0x8b5cf6,1.6,0.16);
 
     const burstData=buildBurst(220);
     three_burstVelocities=burstData.velocities;
     three_burst=makePoints(burstData.positions,0xffffff,0.032,0);
 
-    three_faceGroup.add(three_head,three_headVolume,three_eyeL,three_eyeR,three_mouth,three_thinkMist,
-      three_nose,three_browL,three_browR,three_jawL,three_jawR,three_ambientGlow);
+    three_faceGroup.add(three_ambientGlow,three_headGlow,three_head,three_headVolume,
+      three_eyeL,three_eyeR,three_mouth,three_thinkMist,
+      three_nose,three_browL,three_browR,three_cheekL,three_cheekR,three_jawL,three_jawR,three_forehead);
     three_scene.add(three_faceGroup);
     three_scene.add(three_stars); // hors du groupe visage : tourne indépendamment
     three_scene.add(three_burst); // hors du groupe : l'explosion ne doit pas hériter de sa rotation
@@ -1687,15 +1722,21 @@ function renderGlobe3D(t){
   const m=GMODES[gMode];
   const tSec=t*0.016; // approx secondes, à raison de ~60 images/seconde
 
-  // Couleur réactive au mode en cours — même mapping que le rendu 2D existant
+  // Couleur réactive au mode en cours — même mapping que le rendu 2D existant.
+  // Le contour principal (three_head) reste blanc fixe — un noyau net et lumineux,
+  // toujours visible — pendant que la couleur du mode vit dans le halo et les
+  // lignes structurelles autour de lui, pour une meilleure hiérarchie visuelle.
   const col=new THREE.Color(m.col);
-  three_head.material.color.copy(col);
+  three_headGlow.material.color.copy(col);
   three_headVolume.material.color.copy(col);
   three_nose.material.color.copy(col);
   three_browL.material.color.copy(col);
   three_browR.material.color.copy(col);
+  three_cheekL.material.color.copy(col);
+  three_cheekR.material.color.copy(col);
   three_jawL.material.color.copy(col);
   three_jawR.material.color.copy(col);
+  three_forehead.material.color.copy(col);
   three_ambientGlow.material.color.copy(col);
 
   // ── Bouche : réagit VRAIMENT au volume du TTS en train de parler ──────────
