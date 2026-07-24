@@ -471,7 +471,7 @@ select.finp option,select.cinp option,select.sinp option{
     <div id="globe-area" style="flex-shrink:0;display:none;flex-direction:column;justify-content:center;align-items:center;padding:4px 0 0">
       <div id="globe-stack" style="position:relative;width:200px;height:200px">
         <canvas id="globe3d" style="position:absolute;top:0;left:0;width:100%;height:100%;touch-action:none;display:none"></canvas>
-        <canvas id="globe" width="200" height="200" style="position:absolute;top:0;left:0;width:100%;height:100%;touch-action:none"></canvas>
+        <canvas id="globe" width="200" height="200" style="position:absolute;top:0;left:0;width:100%;height:100%;touch-action:none;pointer-events:none"></canvas>
       </div>
       <div id="voice-caption" style="display:none;max-width:280px;text-align:center;font-size:12px;color:rgba(232,228,248,.75);margin-top:12px;line-height:1.5;padding:0 20px"></div>
     </div>
@@ -1521,25 +1521,18 @@ function makePoints(positionsArray,color,size,opacity){
   return new THREE.Points(geo,mat);
 }
 
-function buildScanRing(n,radius){
-  // Anneau plat qui balaie le visage de haut en bas — effet de scan holographique.
-  const pts=[];
+function buildBurst(n){
+  // Particules d'explosion au clic/tap — partent toutes du centre, chacune avec sa
+  // propre direction et vitesse aléatoires (répartition sphérique uniforme).
+  const positions=[],velocities=[];
   for(let i=0;i<n;i++){
-    const a=(i/n)*Math.PI*2;
-    pts.push(Math.cos(a)*radius,0,Math.sin(a)*radius);
+    const theta=Math.random()*Math.PI*2;
+    const phi=Math.acos(Math.random()*2-1);
+    const speed=0.4+Math.random()*0.9;
+    velocities.push(Math.sin(phi)*Math.cos(theta)*speed,Math.sin(phi)*Math.sin(theta)*speed,Math.cos(phi)*speed);
+    positions.push(0,0,0);
   }
-  return pts;
-}
-
-function buildBaseRing(n,radius){
-  // Anneau fixe sous le visage — évoque l'émetteur d'une projection holographique.
-  const pts=[];
-  for(let i=0;i<n;i++){
-    const a=(i/n)*Math.PI*2;
-    const r=radius*(0.95+Math.random()*0.1);
-    pts.push(Math.cos(a)*r,0,Math.sin(a)*r);
-  }
-  return pts;
+  return {positions,velocities};
 }
 
 function buildMist(n,spread){
@@ -1555,7 +1548,8 @@ function buildMist(n,spread){
 }
 
 let three_faceGroup=null,three_head=null,three_headVolume=null,three_eyeL=null,three_eyeR=null,three_mouth=null,three_stars=null;
-let three_scanRing=null,three_baseRing=null,three_thinkMist=null;
+let three_thinkMist=null;
+let three_burst=null,three_burstVelocities=null,burstActive=false,burstStartTime=0;
 let eyeBlinkPhase=0,nextBlinkAt=2+Math.random()*4;
 let greetPulse=0; // signal d'accueil bref à l'ouverture du mode vocal — décroît tout seul vers 0
 
@@ -1581,16 +1575,26 @@ async function initGlobe3D(){
     three_eyeR=makePoints(buildAlmondShape(16,0.13,0.055,0.22,0.22),0xd4af37,0.03,0.95);
     three_mouth=makePoints(buildAlmondShape(16,0.16,0.04,0,-0.42),0xd4af37,0.026,0.85);
     three_stars=makePoints(buildStarfield(900,3.2),0xffffff,0.018,0.55);
-    three_scanRing=makePoints(buildScanRing(60,0.62),0x00d4ff,0.022,0.5);
-    three_baseRing=makePoints(buildBaseRing(80,0.5),0xd4af37,0.024,0.7);
     three_thinkMist=makePoints(buildMist(350,1.4),0xc9a227,0.02,0);
 
-    three_baseRing.position.y=-1.35;
+    const burstData=buildBurst(220);
+    three_burstVelocities=burstData.velocities;
+    three_burst=makePoints(burstData.positions,0xffffff,0.032,0);
 
-    three_faceGroup.add(three_head,three_headVolume,three_eyeL,three_eyeR,three_mouth,three_scanRing,three_thinkMist);
+    three_faceGroup.add(three_head,three_headVolume,three_eyeL,three_eyeR,three_mouth,three_thinkMist);
     three_scene.add(three_faceGroup);
-    three_scene.add(three_stars);   // hors du groupe visage : tourne indépendamment
-    three_scene.add(three_baseRing); // hors du groupe : reste stable sous le visage, comme un émetteur
+    three_scene.add(three_stars); // hors du groupe visage : tourne indépendamment
+    three_scene.add(three_burst); // hors du groupe : l'explosion ne doit pas hériter de sa rotation
+
+    // ── Effet galactique au clic/tap sur le visage — 'click' couvre à la fois la
+    // souris (PC) et le tactile (mobile), les navigateurs émettent un click synthétique
+    // sur tap. touch-action:manipulation évite le zoom accidentel au double-tap.
+    canvas3d.style.cursor='pointer';
+    canvas3d.style.touchAction='manipulation';
+    canvas3d.addEventListener('click',()=>{
+      burstActive=true;
+      burstStartTime=performance.now();
+    });
 
     use3DGlobe=true;
     document.getElementById('globe3d').style.display='block';
@@ -1640,22 +1644,35 @@ function renderGlobe3D(t){
   three_eyeL.material.color.setStyle(eyeColor);
   three_eyeR.material.color.setStyle(eyeColor);
 
-  // ── Balayage holographique — anneau qui parcourt le visage de haut en bas ──
-  const scanY=Math.sin(tSec*.5)*1.05;
-  three_scanRing.position.y=scanY;
-  three_scanRing.material.color.setStyle(m.col);
-  three_scanRing.material.opacity=0.4+0.25*Math.sin(tSec*3);
-
-  // ── Anneau de projection à la base — pulse doucement, évoque l'émetteur ────
-  three_baseRing.material.color.setStyle(m.col);
-  const basePulse=1+0.06*Math.sin(tSec*1.2);
-  three_baseRing.scale.set(basePulse,1,basePulse);
-
   // ── Brume galactique — apparaît seulement en mode RÉFLEXION, transition douce ─
   const targetMistOpacity=gMode===1?0.4:0;
   three_thinkMist.material.opacity+=(targetMistOpacity-three_thinkMist.material.opacity)*0.05;
   three_thinkMist.rotation.y+=0.0012;
   three_thinkMist.material.color.setStyle(m.col);
+
+  // ── Explosion galactique au clic/tap — particules qui jaillissent du centre,
+  // couleur qui glisse du violet vers l'or puis le blanc, puis disparaît ──────
+  if(burstActive){
+    const elapsed=(performance.now()-burstStartTime)/1000;
+    const duration=1.1;
+    if(elapsed>duration){
+      burstActive=false;
+      three_burst.material.opacity=0;
+    }else{
+      const progress=elapsed/duration;
+      const posAttr=three_burst.geometry.attributes.position;
+      for(let i=0;i<posAttr.count;i++){
+        posAttr.setXYZ(i,
+          three_burstVelocities[i*3]*progress*2.4,
+          three_burstVelocities[i*3+1]*progress*2.4,
+          three_burstVelocities[i*3+2]*progress*2.4
+        );
+      }
+      posAttr.needsUpdate=true;
+      three_burst.material.opacity=(1-progress)*0.9;
+      three_burst.material.color.setHSL(0.75-progress*0.2,1,0.55+progress*0.3);
+    }
+  }
 
   // ── Signal d'accueil — bref éclat quand le mode vocal vient de s'ouvrir,
   // comme si Sutur venait de te remarquer. Décroît tout seul vers 0. ────────
@@ -1797,6 +1814,12 @@ function stopTtsAmplitudeLoop(){
 
 function drawGlobe(t){
   gctx.clearRect(0,0,GW,GH);
+  // Quand le visage 3D est actif, TOUT le rendu se fait dans renderGlobe3D() —
+  // ce canvas 2D ne sert plus que de repli si la 3D n'a pas pu se charger.
+  // Avant cette correction, les halos/anneaux/texte ci-dessous continuaient à se
+  // dessiner PAR-DESSUS le visage 3D à chaque image, le rendant difficile à voir.
+  if(use3DGlobe)return;
+
   const cx=GW/2,cy=GH/2;
   const m=GMODES[gMode];
   const sp=m.speed;
@@ -1852,31 +1875,29 @@ function drawGlobe(t){
   gctx.fillStyle=`rgba(${m.glow},.9)`;gctx.fill();
   gctx.restore();
 
-  // ── Globe central (sphère) — uniquement en repli si la 3D n'a pas pu se charger,
-  // sinon la vraie sphère de particules Three.js est déjà visible juste en dessous.
-  if(!use3DGlobe){
-    const sphereG=gctx.createRadialGradient(cx-R*.25,cy-R*.2,0,cx,cy,R*pulse);
-    sphereG.addColorStop(0,'rgba(80,40,140,.7)');
-    sphereG.addColorStop(.4,'rgba(30,10,70,.85)');
-    sphereG.addColorStop(.8,'rgba(10,4,30,.95)');
-    sphereG.addColorStop(1,'rgba(5,2,20,.98)');
-    gctx.beginPath();gctx.arc(cx,cy,R*pulse,0,Math.PI*2);
-    gctx.fillStyle=sphereG;gctx.fill();
+  // ── Globe central (sphère) — repli 2D pur, on n'atteint ce point que si la 3D
+  // n'a pas pu se charger (retour anticipé plus haut sinon).
+  const sphereG=gctx.createRadialGradient(cx-R*.25,cy-R*.2,0,cx,cy,R*pulse);
+  sphereG.addColorStop(0,'rgba(80,40,140,.7)');
+  sphereG.addColorStop(.4,'rgba(30,10,70,.85)');
+  sphereG.addColorStop(.8,'rgba(10,4,30,.95)');
+  sphereG.addColorStop(1,'rgba(5,2,20,.98)');
+  gctx.beginPath();gctx.arc(cx,cy,R*pulse,0,Math.PI*2);
+  gctx.fillStyle=sphereG;gctx.fill();
 
-    // Bordure lumineuse de la sphère
-    const borderG=gctx.createLinearGradient(cx-R,cy-R,cx+R,cy+R);
-    borderG.addColorStop(0,`rgba(${m.glow},.9)`);
-    borderG.addColorStop(.5,`rgba(${m.glow},.4)`);
-    borderG.addColorStop(1,`rgba(${m.glow},.1)`);
-    gctx.strokeStyle=borderG;gctx.lineWidth=1.5;gctx.stroke();
+  // Bordure lumineuse de la sphère
+  const borderG=gctx.createLinearGradient(cx-R,cy-R,cx+R,cy+R);
+  borderG.addColorStop(0,`rgba(${m.glow},.9)`);
+  borderG.addColorStop(.5,`rgba(${m.glow},.4)`);
+  borderG.addColorStop(1,`rgba(${m.glow},.1)`);
+  gctx.strokeStyle=borderG;gctx.lineWidth=1.5;gctx.stroke();
 
-    // Reflet/spéculaire sur la sphère
-    const spec=gctx.createRadialGradient(cx-R*.3,cy-R*.3,0,cx-R*.2,cy-R*.2,R*.5);
-    spec.addColorStop(0,'rgba(255,255,255,.12)');
-    spec.addColorStop(1,'transparent');
-    gctx.beginPath();gctx.arc(cx,cy,R*pulse,0,Math.PI*2);
-    gctx.fillStyle=spec;gctx.fill();
-  }
+  // Reflet/spéculaire sur la sphère
+  const spec=gctx.createRadialGradient(cx-R*.3,cy-R*.3,0,cx-R*.2,cy-R*.2,R*.5);
+  spec.addColorStop(0,'rgba(255,255,255,.12)');
+  spec.addColorStop(1,'transparent');
+  gctx.beginPath();gctx.arc(cx,cy,R*pulse,0,Math.PI*2);
+  gctx.fillStyle=spec;gctx.fill();
 
   // ── Couronne pulsante externe
   const crPulse=R*pulse+5+3*Math.sin(t*.04);
