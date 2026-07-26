@@ -57,132 +57,109 @@ function ensureThreeJS(){
 
 function lerp(a,b,t){return a+(b-a)*t;}
 
-function headRadiusAtY(y){
-  // Rayon horizontal du contour de tête selon la hauteur y (-1=menton, 1=sommet du crâne).
-  // Silhouette plus anguleuse et marquée : crâne large et net, tempes saillantes,
-  // resserrement franc vers une mâchoire nette, pointe de menton affirmée.
-  if(y>0.8) return lerp(0.36,0.46,(1-y)/0.2);
-  if(y>0.5) return lerp(0.46,0.6,(0.8-y)/0.3);
-  if(y>0.1) return lerp(0.6,0.57,(0.5-y)/0.4);
-  if(y>-0.3) return lerp(0.57,0.42,(0.1-y)/0.4);
-  if(y>-0.68) return lerp(0.42,0.15,(-0.3-y)/0.38);
-  return Math.max(0,lerp(0.15,0,(-0.68-y)/0.32));
-}
-
-function buildHeadOutlineLine(steps){
-  // Contour en UNE boucle continue (pas des points isolés) — trace le côté droit du
-  // sommet au menton, puis le côté gauche du menton au sommet, pour former une seule
-  // ligne fermée exploitable par THREE.LineLoop. Bien plus "concret" qu'un pointillé.
-  const pts=[];
-  for(let i=0;i<=steps;i++){
-    const y=lerp(1,-1,i/steps);
-    pts.push(headRadiusAtY(y),y,0);
+// ── Bruit simplex 3D — algorithme standard (Stefan Gustavson, domaine public),
+// utilisé pour donner à la masse organique son mouvement fluide et continu,
+// jamais répétitif, jamais figé. Validé séparément avant intégration : lisse
+// en tout point testé, plage de valeurs correcte. ──────────────────────────
+class SimplexNoise3D{
+  constructor(seed=42){
+    this.p=new Uint8Array(256);
+    let s=seed;
+    const rand=()=>{s=(s*16807)%2147483647;return (s-1)/2147483646;};
+    for(let i=0;i<256;i++)this.p[i]=i;
+    for(let i=255;i>0;i--){const j=Math.floor(rand()*(i+1));[this.p[i],this.p[j]]=[this.p[j],this.p[i]];}
+    this.perm=new Uint8Array(512);
+    for(let i=0;i<512;i++)this.perm[i]=this.p[i&255];
   }
-  for(let i=steps;i>=0;i--){
-    const y=lerp(1,-1,i/steps);
-    pts.push(-headRadiusAtY(y),y,0);
+  grad(hash,x,y,z){
+    const h=hash&15;
+    const u=h<8?x:y, v=h<4?y:(h===12||h===14?x:z);
+    return ((h&1)===0?u:-u)+((h&2)===0?v:-v);
   }
-  return pts;
-}
-
-function buildNoseLine(){
-  // Arête du nez — ligne nette du front jusqu'à une aile marquée, silhouette lisible
-  // même à petite taille plutôt qu'un losange abstrait.
-  return [
-    0,0.22,0.12,
-    -0.01,0.0,0.115,
-    -0.025,-0.14,0.11,
-    -0.06,-0.25,0.1,
-    0,-0.21,0.105,
-    0.06,-0.25,0.1,
-    0.025,-0.14,0.11,
-    0.01,0.0,0.115,
-    0,0.22,0.12,
-  ];
-}
-
-function buildBrowLine(side){
-  // Arcade — longue et légèrement relevée vers l'extérieur, pour un regard plus
-  // intense/affirmé plutôt qu'un petit trait discret.
-  return [
-    side*0.05,0.36,0.1,
-    side*0.16,0.38,0.09,
-    side*0.29,0.36,0.075,
-    side*0.44,0.29,0.05,
-  ];
-}
-
-function buildCheekLine(side){
-  // Ligne de pommette — accompagne la courbe du crâne côté tempe/joue.
-  return [
-    side*0.52,0.32,0.045,
-    side*0.58,0.08,0.035,
-    side*0.5,-0.16,0.045,
-  ];
-}
-
-function buildJawLine(side){
-  // Ligne de mâchoire — suit le resserrement net vers le menton.
-  return [
-    side*0.46,-0.24,0.05,
-    side*0.3,-0.5,0.045,
-    side*0.1,-0.68,0.04,
-  ];
-}
-
-function buildForeheadLine(){
-  // Ligne haute frontale — apporte de la richesse structurelle sur le haut du visage.
-  return [
-    -0.3,0.62,0.05,
-    -0.12,0.68,0.07,
-    0.12,0.68,0.07,
-    0.3,0.62,0.05,
-  ];
-}
-
-function buildAmbientGlow(){
-  // Quelques points larges juste derrière le visage — l'aide à se fondre dans le
-  // décor plutôt que de flotter comme un calque détaché.
-  return [0,0.02,-0.35, -0.15,-0.1,-0.42, 0.15,0.15,-0.4, 0,-0.35,-0.38];
-}
-
-function buildHeadVolume(n){
-  // Nuage de particules en coquille — biaisé vers 65-98% du rayon externe (plutôt
-  // qu'un remplissage uniforme) pour une vraie sensation de forme/volume, avec une
-  // répartition circulaire complète (pas juste x/z aléatoires) pour un galbe cohérent.
-  const pts=[];
-  let tries=0;
-  while(pts.length<n*3 && tries<n*20){
-    tries++;
-    const y=lerp(1,-1,Math.random());
-    const maxR=headRadiusAtY(y);
-    if(maxR<=0){tries--;continue;}
-    const shellBias=0.62+Math.random()*0.36;
-    const angle=Math.random()*Math.PI*2;
-    const x=Math.cos(angle)*maxR*shellBias;
-    const z=Math.sin(angle)*maxR*shellBias*0.38;
-    pts.push(x,y,z);
+  noise(x,y,z){
+    const F3=1/3, G3=1/6;
+    const s=(x+y+z)*F3;
+    const i=Math.floor(x+s), j=Math.floor(y+s), k=Math.floor(z+s);
+    const t=(i+j+k)*G3;
+    const X0=i-t, Y0=j-t, Z0=k-t;
+    const x0=x-X0, y0=y-Y0, z0=z-Z0;
+    let i1,j1,k1,i2,j2,k2;
+    if(x0>=y0){
+      if(y0>=z0){i1=1;j1=0;k1=0;i2=1;j2=1;k2=0;}
+      else if(x0>=z0){i1=1;j1=0;k1=0;i2=1;j2=0;k2=1;}
+      else{i1=0;j1=0;k1=1;i2=1;j2=0;k2=1;}
+    }else{
+      if(y0<z0){i1=0;j1=0;k1=1;i2=0;j2=1;k2=1;}
+      else if(x0<z0){i1=0;j1=1;k1=0;i2=0;j2=1;k2=1;}
+      else{i1=0;j1=1;k1=0;i2=1;j2=1;k2=0;}
+    }
+    const x1=x0-i1+G3, y1=y0-j1+G3, z1=z0-k1+G3;
+    const x2=x0-i2+2*G3, y2=y0-j2+2*G3, z2=z0-k2+2*G3;
+    const x3=x0-1+3*G3, y3=y0-1+3*G3, z3=z0-1+3*G3;
+    const ii=i&255, jj=j&255, kk=k&255;
+    let n0=0,n1=0,n2=0,n3=0;
+    let t0=0.6-x0*x0-y0*y0-z0*z0;
+    if(t0>=0){t0*=t0;n0=t0*t0*this.grad(this.perm[ii+this.perm[jj+this.perm[kk]]],x0,y0,z0);}
+    let t1=0.6-x1*x1-y1*y1-z1*z1;
+    if(t1>=0){t1*=t1;n1=t1*t1*this.grad(this.perm[ii+i1+this.perm[jj+j1+this.perm[kk+k1]]],x1,y1,z1);}
+    let t2=0.6-x2*x2-y2*y2-z2*z2;
+    if(t2>=0){t2*=t2;n2=t2*t2*this.grad(this.perm[ii+i2+this.perm[jj+j2+this.perm[kk+k2]]],x2,y2,z2);}
+    let t3=0.6-x3*x3-y3*y3-z3*z3;
+    if(t3>=0){t3*=t3;n3=t3*t3*this.grad(this.perm[ii+1+this.perm[jj+1+this.perm[kk+1]]],x3,y3,z3);}
+    return 32*(n0+n1+n2+n3);
   }
-  return pts;
+}
+const symbioteNoise=new SimplexNoise3D(7);
+
+function buildOrganicCore(n){
+  // Masse centrale — répartition sphérique en coquille, chaque particule garde
+  // sa position d'origine ET sa direction radiale : au rendu, on la déplace le
+  // long de cette direction selon le bruit, jamais aléatoirement dans l'espace
+  // (ce qui donnerait un nuage confus plutôt qu'une masse organique cohérente).
+  const positions=[],origins=[],dirs=[],colors=[];
+  for(let i=0;i<n;i++){
+    const theta=Math.random()*Math.PI*2;
+    const phi=Math.acos(Math.random()*2-1);
+    const shell=0.55+Math.random()*0.45; // densité du cœur vers la surface
+    const dx=Math.sin(phi)*Math.cos(theta), dy=Math.cos(phi), dz=Math.sin(phi)*Math.sin(theta);
+    const r=0.85*shell;
+    positions.push(dx*r,dy*r,dz*r);
+    origins.push(dx*r,dy*r,dz*r);
+    dirs.push(dx,dy,dz);
+    // Dégradé violet profond (cœur) -> magenta (surface), façon nébuleuse
+    const t=shell;
+    colors.push(lerp(0.35,0.75,t),lerp(0.15,0.25,t),lerp(0.55,0.85,t));
+  }
+  return {positions,origins,dirs,colors};
 }
 
-function buildAlmondShape(steps,w,h,cx,cy){
-  // Forme en amande (yeux) — deux arcs symétriques haut/bas se rejoignant aux coins.
-  const pts=[];
-  for(let i=0;i<=steps;i++){
-    const a=lerp(0,Math.PI,i/steps);
-    pts.push(cx+Math.cos(a)*w, cy+Math.sin(a)*h, 0.06);
+function buildTendrils(count,perTendril){
+  // Tentacules façon symbiote — partent de la surface du cœur et s'étendent
+  // vers l'extérieur, chacune ondulant selon le bruit perpendiculairement à
+  // son axe. La portée réagit à l'écoute (s'étend) et à la réflexion (s'agite).
+  const positions=[],baseDirs=[],tendrilIdx=[],alongIdx=[],colors=[];
+  const golden=Math.PI*(3-Math.sqrt(5));
+  for(let tI=0;tI<count;tI++){
+    const y=1-(tI/(count-1))*2;
+    const rad=Math.sqrt(1-y*y);
+    const theta=golden*tI;
+    const bx=Math.cos(theta)*rad, by=y, bz=Math.sin(theta)*rad;
+    for(let i=0;i<perTendril;i++){
+      const along=i/(perTendril-1);
+      positions.push(bx*(0.85+along*0.9),by*(0.85+along*0.9),bz*(0.85+along*0.9));
+      baseDirs.push(bx,by,bz);
+      tendrilIdx.push(tI);
+      alongIdx.push(along);
+      // Dégradé magenta (base) -> or (pointe)
+      colors.push(lerp(0.75,0.85,along),lerp(0.25,0.65,along),lerp(0.85,0.25,along));
+    }
   }
-  for(let i=0;i<=steps;i++){
-    const a=lerp(Math.PI,2*Math.PI,i/steps);
-    pts.push(cx+Math.cos(a)*w, cy+Math.sin(a)*h*0.5, 0.06);
-  }
-  return pts;
+  return {positions,baseDirs,tendrilIdx,alongIdx,colors};
 }
 
 function buildStarfield(n,spread){
-  // Champ d'étoiles ambiant autour du visage — l'aspect "galactique" demandé,
-  // séparé du visage lui-même pour tourner à une vitesse différente (parallaxe).
+  // Champ d'étoiles ambiant — l'aspect "fin fond de la galaxie" demandé,
+  // séparé de la masse elle-même pour tourner à une vitesse différente (parallaxe).
   const pts=[];
   for(let i=0;i<n;i++){
     const r=spread*(0.5+Math.random()*0.5);
@@ -191,30 +168,25 @@ function buildStarfield(n,spread){
     pts.push(
       r*Math.sin(phi)*Math.cos(theta),
       r*Math.sin(phi)*Math.sin(theta),
-      r*Math.cos(phi)*0.4-0.6 // aplati en profondeur, la majorité derrière le visage
+      r*Math.cos(phi)*0.4-0.6
     );
   }
   return pts;
 }
 
-function makePoints(positionsArray,color,size,opacity){
+function makePoints(positionsArray,color,size,opacity,vertexColorsArray){
   const geo=new THREE.BufferGeometry();
   geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(positionsArray),3));
-  const mat=new THREE.PointsMaterial({
+  const matOpts={
     color,size,transparent:true,opacity,
     sizeAttenuation:true,blending:THREE.AdditiveBlending,depthWrite:false
-  });
+  };
+  if(vertexColorsArray){
+    geo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(vertexColorsArray),3));
+    matOpts.vertexColors=true;
+  }
+  const mat=new THREE.PointsMaterial(matOpts);
   return new THREE.Points(geo,mat);
-}
-
-function makeLine(positionsArray,color,opacity,closed){
-  const geo=new THREE.BufferGeometry();
-  geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(positionsArray),3));
-  const mat=new THREE.LineBasicMaterial({
-    color,transparent:true,opacity,
-    blending:THREE.AdditiveBlending,depthWrite:false
-  });
-  return closed?new THREE.LineLoop(geo,mat):new THREE.Line(geo,mat);
 }
 
 function buildBurst(n){
@@ -231,18 +203,6 @@ function buildBurst(n){
   return {positions,velocities};
 }
 
-function buildMist(n,spread){
-  // Nuage large autour du visage — invisible par défaut, monte en opacité en réflexion.
-  const pts=[];
-  for(let i=0;i<n;i++){
-    const r=spread*(0.3+Math.random()*0.7);
-    const theta=Math.random()*Math.PI*2;
-    const phi=Math.acos(Math.random()*2-1);
-    pts.push(r*Math.sin(phi)*Math.cos(theta), r*Math.cos(phi)*0.7, r*Math.sin(phi)*Math.sin(theta));
-  }
-  return pts;
-}
-
 async function initGlobe3D(){
   try{
     if(!window.WebGLRenderingContext)throw new Error('WebGL non supporté');
@@ -252,55 +212,41 @@ async function initGlobe3D(){
 
     three_scene=new THREE.Scene();
     three_camera=new THREE.PerspectiveCamera(45,1,0.1,100);
-    three_camera.position.z=2.7;
+    three_camera.position.z=2.9;
 
     three_renderer=new THREE.WebGLRenderer({canvas:canvas3d,alpha:true,antialias:true});
     three_renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
 
-    three_faceGroup=new THREE.Group();
+    three_group=new THREE.Group();
 
-    // Contour en trait continu (pas en points isolés) — bien plus "concret" et lisible,
-    // en particulier à petite taille sur mobile. Un halo de particules douces juste
-    // derrière lui donne l'effet de lueur/glow qu'une simple ligne WebGL ne peut pas
-    // produire seule (l'épaisseur de trait n'est pas fiable d'un navigateur à l'autre).
-    three_headGlow=makePoints(buildHeadOutlineLine(90),0x8b5cf6,0.09,0.28);
-    three_head=makeLine(buildHeadOutlineLine(90),0xffffff,1,true);
-    three_headVolume=makePoints(buildHeadVolume(560),0x8b5cf6,0.015,0.4);
-    three_eyeL=makePoints(buildAlmondShape(16,0.14,0.06,-0.22,0.22),0xd4af37,0.034,0.95);
-    three_eyeR=makePoints(buildAlmondShape(16,0.14,0.06,0.22,0.22),0xd4af37,0.034,0.95);
-    three_mouth=makePoints(buildAlmondShape(16,0.16,0.04,0,-0.42),0xd4af37,0.026,0.85);
+    // Masse organique centrale — cœur en mouvement perpétuel, jamais figée,
+    // façon organisme vivant plutôt que forme géométrique rigide.
+    const core=buildOrganicCore(1300);
+    coreOrigins=core.origins;
+    coreDirs=core.dirs;
+    three_core=makePoints(core.positions,0x8b5cf6,0.026,0.85,core.colors);
+
+    // Tentacules — s'étendent depuis la surface, ondulent en continu, réagissent
+    // à l'écoute (s'étendent) et à la réflexion (s'agitent davantage).
+    const tendrils=buildTendrils(7,42);
+    tendrilBaseDirs=tendrils.baseDirs;
+    tendrilAlong=tendrils.alongIdx;
+    tendrilIdxArr=tendrils.tendrilIdx;
+    three_tendrils=makePoints(tendrils.positions,0xd4af37,0.02,0.7,tendrils.colors);
+
     three_stars=makePoints(buildStarfield(900,3.2),0xffffff,0.018,0.55);
-    three_thinkMist=makePoints(buildMist(350,1.4),0xc9a227,0.02,0);
-
-    // Lignes structurelles — donnent au visage sa lisibilité (nez, arcades, pommettes,
-    // mâchoire, front), dans le même esprit "circuit" que le visage de référence.
-    three_nose=makeLine(buildNoseLine(),0x8b5cf6,0.6,false);
-    three_browL=makeLine(buildBrowLine(-1),0x8b5cf6,0.55,false);
-    three_browR=makeLine(buildBrowLine(1),0x8b5cf6,0.55,false);
-    three_cheekL=makeLine(buildCheekLine(-1),0x8b5cf6,0.42,false);
-    three_cheekR=makeLine(buildCheekLine(1),0x8b5cf6,0.42,false);
-    three_jawL=makeLine(buildJawLine(-1),0x8b5cf6,0.45,false);
-    three_jawR=makeLine(buildJawLine(1),0x8b5cf6,0.45,false);
-    three_forehead=makeLine(buildForeheadLine(),0x8b5cf6,0.4,false);
-
-    // Lueur ambiante juste derrière le visage — l'aide à se fondre dans le décor
-    // plutôt que de flotter comme un calque détaché.
-    three_ambientGlow=makePoints(buildAmbientGlow(),0x8b5cf6,1.6,0.16);
 
     const burstData=buildBurst(220);
     three_burstVelocities=burstData.velocities;
     three_burst=makePoints(burstData.positions,0xffffff,0.032,0);
 
-    three_faceGroup.add(three_ambientGlow,three_headGlow,three_head,three_headVolume,
-      three_eyeL,three_eyeR,three_mouth,three_thinkMist,
-      three_nose,three_browL,three_browR,three_cheekL,three_cheekR,three_jawL,three_jawR,three_forehead);
-    three_scene.add(three_faceGroup);
-    three_scene.add(three_stars); // hors du groupe visage : tourne indépendamment
+    three_group.add(three_core,three_tendrils);
+    three_scene.add(three_group);
+    three_scene.add(three_stars); // hors du groupe : tourne indépendamment (parallaxe)
     three_scene.add(three_burst); // hors du groupe : l'explosion ne doit pas hériter de sa rotation
 
-    // ── Effet galactique au clic/tap sur le visage — 'click' couvre à la fois la
-    // souris (PC) et le tactile (mobile), les navigateurs émettent un click synthétique
-    // sur tap. touch-action:manipulation évite le zoom accidentel au double-tap.
+    // ── Effet galactique au clic/tap — 'click' couvre à la fois la souris (PC)
+    // et le tactile (mobile), les navigateurs émettent un click synthétique sur tap.
     canvas3d.style.cursor='pointer';
     canvas3d.style.touchAction='manipulation';
     canvas3d.addEventListener('click',()=>{
@@ -312,7 +258,7 @@ async function initGlobe3D(){
     document.getElementById('globe3d').style.display='block';
     resizeGlobe3D();
   }catch(e){
-    console.warn('Visage 3D indisponible, repli sur le rendu 2D existant:',e.message);
+    console.warn('Masse organique 3D indisponible, repli sur le rendu 2D existant:',e.message);
     use3DGlobe=false;
   }
 }
@@ -325,53 +271,54 @@ function resizeGlobe3D(){
 }
 
 function renderGlobe3D(t){
-  if(!use3DGlobe||!three_faceGroup)return;
+  if(!use3DGlobe||!three_core)return;
   const m=GMODES[gMode];
   const tSec=t*0.016; // approx secondes, à raison de ~60 images/seconde
-
-  // Couleur réactive au mode en cours — même mapping que le rendu 2D existant.
-  // Le contour principal (three_head) reste blanc fixe — un noyau net et lumineux,
-  // toujours visible — pendant que la couleur du mode vit dans le halo et les
-  // lignes structurelles autour de lui, pour une meilleure hiérarchie visuelle.
   const col=new THREE.Color(m.col);
-  three_headGlow.material.color.copy(col);
-  three_headVolume.material.color.copy(col);
-  three_nose.material.color.copy(col);
-  three_browL.material.color.copy(col);
-  three_browR.material.color.copy(col);
-  three_cheekL.material.color.copy(col);
-  three_cheekR.material.color.copy(col);
-  three_jawL.material.color.copy(col);
-  three_jawR.material.color.copy(col);
-  three_forehead.material.color.copy(col);
-  three_ambientGlow.material.color.copy(col);
 
-  // ── Bouche : réagit VRAIMENT au volume du TTS en train de parler ──────────
-  const mouthOpen=gMode===2?(0.15+ttsAmplitude*2.2):0.15;
-  three_mouth.scale.set(1,mouthOpen,1);
-  three_mouth.material.color.setStyle(gMode===2?'#4ade80':'#c9a227');
+  // ── Intensité du bruit selon le mode — le cœur "respire" toujours, mais
+  // plus ou moins vite/fort selon ce que Sutur fait réellement ─────────────
+  let noiseFreq=1.15, noiseAmp=0.15, noiseSpeed=0.15;
+  if(gMode===1){ noiseFreq=1.5; noiseAmp=0.24; noiseSpeed=0.4; }             // réflexion : turbulence accrue
+  if(gMode===2){ noiseAmp=0.14+ttsAmplitude*0.4; noiseSpeed=0.15+ttsAmplitude*0.5; } // parole : pulse avec la vraie voix
+  if(gMode===3){ noiseAmp=0.32; noiseSpeed=0.7; }                            // alerte : agitation
+  if(gMode===4){ noiseAmp=0.15+micAmplitude*0.25; }                          // écoute : frémit avec le micro
 
-  // ── Yeux : réagissent VRAIMENT au niveau du micro en écoute, + clignement idle ─
-  eyeBlinkPhase-=1/60;
-  if(eyeBlinkPhase<=0 && gMode!==4){
-    eyeBlinkPhase=0.14; // durée du clignement
-    nextBlinkAt=2.5+Math.random()*4;
+  // ── Déformation du cœur — chaque particule se déplace le long de SA propre
+  // direction radiale selon le bruit à sa position d'origine + le temps, ce qui
+  // donne une ondulation cohérente et organique plutôt qu'un scintillement confus.
+  const posAttr=three_core.geometry.attributes.position;
+  const n=coreOrigins.length/3;
+  for(let i=0;i<n;i++){
+    const ox=coreOrigins[i*3],oy=coreOrigins[i*3+1],oz=coreOrigins[i*3+2];
+    const dx=coreDirs[i*3],dy=coreDirs[i*3+1],dz=coreDirs[i*3+2];
+    const nv=symbioteNoise.noise(ox*noiseFreq+tSec*noiseSpeed,oy*noiseFreq+tSec*noiseSpeed*.6,oz*noiseFreq);
+    const disp=nv*noiseAmp;
+    posAttr.setXYZ(i,ox+dx*disp,oy+dy*disp,oz+dz*disp);
   }
-  nextBlinkAt-=1/60;
-  const blinking=eyeBlinkPhase>0;
-  const listenPulse=gMode===4?(1+micAmplitude*1.8):1;
-  const eyeYScale=blinking?0.08:listenPulse;
-  three_eyeL.scale.set(1,eyeYScale,1);
-  three_eyeR.scale.set(1,eyeYScale,1);
-  const eyeColor=gMode===4?'#00d4ff':gMode===3?'#f87171':'#d4af37';
-  three_eyeL.material.color.setStyle(eyeColor);
-  three_eyeR.material.color.setStyle(eyeColor);
+  posAttr.needsUpdate=true;
+  three_core.material.color.copy(col);
 
-  // ── Brume galactique — apparaît seulement en mode RÉFLEXION, transition douce ─
-  const targetMistOpacity=gMode===1?0.4:0;
-  three_thinkMist.material.opacity+=(targetMistOpacity-three_thinkMist.material.opacity)*0.05;
-  three_thinkMist.rotation.y+=0.0012;
-  three_thinkMist.material.color.setStyle(m.col);
+  // ── Tentacules — portée réactive (l'écoute les fait s'étendre, comme si Sutur
+  // "tendait l'oreille"), ondulation perpendiculaire à leur axe façon symbiote ──
+  let reach=1.0;
+  if(gMode===4)reach=1.0+micAmplitude*1.3;
+  if(gMode===1)reach=1.18;
+  if(gMode===2)reach=1.0+ttsAmplitude*0.3;
+
+  const posAttrT=three_tendrils.geometry.attributes.position;
+  const nT=tendrilBaseDirs.length/3;
+  for(let i=0;i<nT;i++){
+    const bx=tendrilBaseDirs[i*3],by=tendrilBaseDirs[i*3+1],bz=tendrilBaseDirs[i*3+2];
+    const along=tendrilAlong[i],tIdx=tendrilIdxArr[i];
+    const baseR=0.85+along*0.9*reach;
+    const w1=symbioteNoise.noise(tIdx*2.3+along*3+tSec*0.5,tIdx*1.1,0);
+    const w2=symbioteNoise.noise(0,tIdx*2.3+along*3+tSec*0.45,tIdx*1.7);
+    const wobble=0.1*along*(gMode===1?1.6:1);
+    posAttrT.setXYZ(i,bx*baseR+w1*wobble,by*baseR+w2*wobble,bz*baseR+w1*wobble*.7);
+  }
+  posAttrT.needsUpdate=true;
+  three_tendrils.material.color.copy(col);
 
   // ── Explosion galactique au clic/tap — particules qui jaillissent du centre,
   // couleur qui glisse du violet vers l'or puis le blanc, puis disparaît ──────
@@ -383,37 +330,33 @@ function renderGlobe3D(t){
       three_burst.material.opacity=0;
     }else{
       const progress=elapsed/duration;
-      const posAttr=three_burst.geometry.attributes.position;
-      for(let i=0;i<posAttr.count;i++){
-        posAttr.setXYZ(i,
+      const posAttrB=three_burst.geometry.attributes.position;
+      for(let i=0;i<posAttrB.count;i++){
+        posAttrB.setXYZ(i,
           three_burstVelocities[i*3]*progress*2.4,
           three_burstVelocities[i*3+1]*progress*2.4,
           three_burstVelocities[i*3+2]*progress*2.4
         );
       }
-      posAttr.needsUpdate=true;
+      posAttrB.needsUpdate=true;
       three_burst.material.opacity=(1-progress)*0.9;
       three_burst.material.color.setHSL(0.75-progress*0.2,1,0.55+progress*0.3);
     }
   }
 
-  // ── Signal d'accueil — bref éclat quand le mode vocal vient de s'ouvrir,
-  // comme si Sutur venait de te remarquer. Décroît tout seul vers 0. ────────
+  // ── Signal d'accueil — bref éclat quand le mode vocal vient de s'ouvrir ────
   greetPulse=Math.max(0,greetPulse-1/60*0.8);
   const greetBoost=1+greetPulse*0.25;
-  const greetGlow=greetPulse*0.4;
 
-  // ── Mouvement d'ensemble façon assistant attentif : léger flottement, tourne
-  // doucement comme s'il te regardait, jamais parfaitement figé ──────────────
-  three_faceGroup.rotation.y=Math.sin(tSec*.25)*.18;
-  three_faceGroup.rotation.x=Math.sin(tSec*.18)*.06-0.05;
-  three_faceGroup.position.y=Math.sin(tSec*.4)*.03;
-  const breathe=(1+Math.sin(tSec*.3)*.015+(gMode===2?ttsAmplitude*.05:0))*greetBoost;
-  three_faceGroup.scale.setScalar(breathe);
-  three_head.material.opacity=0.9+greetGlow;
-  three_headVolume.material.opacity=0.35+greetGlow*.5;
+  // ── Mouvement d'ensemble — flottement lent, jamais parfaitement figé,
+  // comme un organisme qui dérive doucement dans l'espace ────────────────────
+  three_group.rotation.y=Math.sin(tSec*.18)*.22+tSec*0.03;
+  three_group.rotation.x=Math.sin(tSec*.13)*.08;
+  three_group.position.y=Math.sin(tSec*.3)*.04;
+  const breathe=(1+Math.sin(tSec*.25)*.02+(gMode===2?ttsAmplitude*.06:0))*greetBoost;
+  three_group.scale.setScalar(breathe);
 
-  // ── Champ d'étoiles galactique — tourne lentement, indépendant du visage ──
+  // ── Champ d'étoiles galactique — tourne lentement, indépendant de la masse ──
   three_stars.rotation.y+=0.0006;
   three_stars.rotation.x+=0.0002;
 

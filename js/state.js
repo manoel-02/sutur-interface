@@ -14,12 +14,9 @@ const gctx=gc.getContext('2d');
 let GW=200,GH=200,gMode=0,gT=0,voiceModeActive=false;
 let threeLoaded=false,threeLoadingPromise=null,use3DGlobe=false;
 let three_scene=null,three_camera=null,three_renderer=null;
-let three_faceGroup=null,three_head=null,three_headVolume=null,three_eyeL=null,three_eyeR=null,three_mouth=null,three_stars=null;
-let three_nose=null,three_browL=null,three_browR=null,three_jawL=null,three_jawR=null,three_ambientGlow=null;
-let three_headGlow=null,three_cheekL=null,three_cheekR=null,three_forehead=null;
-let three_thinkMist=null;
+let three_group=null,three_core=null,three_tendrils=null,three_stars=null;
+let coreOrigins=null,coreDirs=null,tendrilBaseDirs=null,tendrilAlong=null,tendrilIdxArr=null;
 let three_burst=null,three_burstVelocities=null,burstActive=false,burstStartTime=0;
-let eyeBlinkPhase=0,nextBlinkAt=2+Math.random()*4;
 let greetPulse=0;
 const GMODES=[
   {name:'VEILLE',col:'#8b5cf6',glow:'139,92,246',gold:'201,162,39',speed:1},
