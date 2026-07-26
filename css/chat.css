@@ -23,7 +23,10 @@
 @keyframes td{0%,80%,100%{opacity:.2}40%{opacity:1}}
 
 /* BARRE DE SAISIE */
-.inp-bar{position:fixed;bottom:0;left:0;right:0;padding:10px 12px 16px;background:rgba(7,5,26,.95);border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;z-index:10;backdrop-filter:blur(8px)}
+/* .inp-bar est définie dans layout.css (section NAVIGATION 4 ZONES) — elle doit
+   se placer à 76px du bas pour ne pas recouvrir la barre de navigation. Cette
+   règle était dupliquée ici avec des valeurs différentes (bottom:0), ce qui
+   cassait la mise en page selon l'ordre de chargement des fichiers CSS. */
 .cinp{flex:1;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:24px;padding:11px 18px;color:var(--text-primary);font-size:15px;font-family:var(--font-main);outline:none;transition:border-color .2s}
 .cinp:focus{border-color:var(--violet)}
 .cinp::placeholder{color:var(--text-muted)}
