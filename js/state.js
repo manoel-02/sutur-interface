@@ -16,7 +16,9 @@ let threeLoaded=false,threeLoadingPromise=null,use3DGlobe=false;
 let three_scene=null,three_camera=null,three_renderer=null;
 let three_group=null,three_core=null,three_tendrils=null,three_stars=null;
 let coreOrigins=null,coreDirs=null,tendrilBaseDirs=null,tendrilAlong=null,tendrilIdxArr=null;
+let highlightOrigins=null,highlightDirs=null;
 let three_burst=null,three_burstVelocities=null,burstActive=false,burstStartTime=0;
+let three_highlights=null,touchReactPhase=0;
 let greetPulse=0;
 const GMODES=[
   {name:'VEILLE',col:'#8b5cf6',glow:'139,92,246',gold:'201,162,39',speed:1},

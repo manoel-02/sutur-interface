@@ -112,23 +112,40 @@ class SimplexNoise3D{
 const symbioteNoise=new SimplexNoise3D(7);
 
 function buildOrganicCore(n){
-  // Masse centrale — répartition sphérique en coquille, chaque particule garde
-  // sa position d'origine ET sa direction radiale : au rendu, on la déplace le
-  // long de cette direction selon le bruit, jamais aléatoirement dans l'espace
-  // (ce qui donnerait un nuage confus plutôt qu'une masse organique cohérente).
+  // Masse centrale — remplissage plus dense du volume (pas juste la coquille de
+  // surface) pour une vraie sensation de matière/substance plutôt qu'un nuage
+  // épars. Couleurs éclaircies pour plus de présence visuelle.
   const positions=[],origins=[],dirs=[],colors=[];
   for(let i=0;i<n;i++){
     const theta=Math.random()*Math.PI*2;
     const phi=Math.acos(Math.random()*2-1);
-    const shell=0.55+Math.random()*0.45; // densité du cœur vers la surface
+    const shell=0.4+Math.random()*0.6; // remplit davantage le volume, pas que la surface
     const dx=Math.sin(phi)*Math.cos(theta), dy=Math.cos(phi), dz=Math.sin(phi)*Math.sin(theta);
     const r=0.85*shell;
     positions.push(dx*r,dy*r,dz*r);
     origins.push(dx*r,dy*r,dz*r);
     dirs.push(dx,dy,dz);
-    // Dégradé violet profond (cœur) -> magenta (surface), façon nébuleuse
+    // Dégradé violet vif (cœur) -> magenta lumineux (surface), plus lumineux qu'avant
     const t=shell;
-    colors.push(lerp(0.35,0.75,t),lerp(0.15,0.25,t),lerp(0.55,0.85,t));
+    colors.push(lerp(0.5,0.85,t),lerp(0.22,0.35,t),lerp(0.75,1.0,t));
+  }
+  return {positions,origins,dirs,colors};
+}
+
+function buildHighlights(n){
+  // Points de lumière denses juste sous la surface — donne l'aspect "brillant,
+  // presque humide" façon matière organique vivante, pas un dégradé plat.
+  const positions=[],origins=[],dirs=[],colors=[];
+  for(let i=0;i<n;i++){
+    const theta=Math.random()*Math.PI*2;
+    const phi=Math.acos(Math.random()*2-1);
+    const shell=0.85+Math.random()*0.18; // concentré près de la surface externe
+    const dx=Math.sin(phi)*Math.cos(theta), dy=Math.cos(phi), dz=Math.sin(phi)*Math.sin(theta);
+    const r=0.85*shell;
+    positions.push(dx*r,dy*r,dz*r);
+    origins.push(dx*r,dy*r,dz*r);
+    dirs.push(dx,dy,dz);
+    colors.push(0.95,0.9,1.0); // quasi blanc — reflets lumineux
   }
   return {positions,origins,dirs,colors};
 }
@@ -150,8 +167,8 @@ function buildTendrils(count,perTendril){
       baseDirs.push(bx,by,bz);
       tendrilIdx.push(tI);
       alongIdx.push(along);
-      // Dégradé magenta (base) -> or (pointe)
-      colors.push(lerp(0.75,0.85,along),lerp(0.25,0.65,along),lerp(0.85,0.25,along));
+      // Dégradé magenta lumineux (base) -> or vif (pointe)
+      colors.push(lerp(0.85,0.95,along),lerp(0.3,0.75,along),lerp(0.95,0.3,along));
     }
   }
   return {positions,baseDirs,tendrilIdx,alongIdx,colors};
@@ -220,19 +237,26 @@ async function initGlobe3D(){
     three_group=new THREE.Group();
 
     // Masse organique centrale — cœur en mouvement perpétuel, jamais figée,
-    // façon organisme vivant plutôt que forme géométrique rigide.
-    const core=buildOrganicCore(1300);
+    // densifiée et éclaircie pour une vraie sensation de matière/substance.
+    const core=buildOrganicCore(1900);
     coreOrigins=core.origins;
     coreDirs=core.dirs;
-    three_core=makePoints(core.positions,0x8b5cf6,0.026,0.85,core.colors);
+    three_core=makePoints(core.positions,0x8b5cf6,0.038,0.92,core.colors);
+
+    // Reflets lumineux quasi-blancs près de la surface — aspect "brillant,
+    // presque humide" façon matière organique vivante plutôt qu'un dégradé plat.
+    const highlights=buildHighlights(260);
+    highlightOrigins=highlights.origins;
+    highlightDirs=highlights.dirs;
+    three_highlights=makePoints(highlights.positions,0xffffff,0.022,0.55,highlights.colors);
 
     // Tentacules — s'étendent depuis la surface, ondulent en continu, réagissent
-    // à l'écoute (s'étendent) et à la réflexion (s'agitent davantage).
+    // à l'écoute (s'étendent), à la réflexion (s'agitent) et au toucher (fouettent).
     const tendrils=buildTendrils(7,42);
     tendrilBaseDirs=tendrils.baseDirs;
     tendrilAlong=tendrils.alongIdx;
     tendrilIdxArr=tendrils.tendrilIdx;
-    three_tendrils=makePoints(tendrils.positions,0xd4af37,0.02,0.7,tendrils.colors);
+    three_tendrils=makePoints(tendrils.positions,0xd4af37,0.028,0.85,tendrils.colors);
 
     three_stars=makePoints(buildStarfield(900,3.2),0xffffff,0.018,0.55);
 
@@ -240,18 +264,19 @@ async function initGlobe3D(){
     three_burstVelocities=burstData.velocities;
     three_burst=makePoints(burstData.positions,0xffffff,0.032,0);
 
-    three_group.add(three_core,three_tendrils);
+    three_group.add(three_core,three_highlights,three_tendrils);
     three_scene.add(three_group);
     three_scene.add(three_stars); // hors du groupe : tourne indépendamment (parallaxe)
     three_scene.add(three_burst); // hors du groupe : l'explosion ne doit pas hériter de sa rotation
 
-    // ── Effet galactique au clic/tap — 'click' couvre à la fois la souris (PC)
-    // et le tactile (mobile), les navigateurs émettent un click synthétique sur tap.
+    // ── Effet galactique au clic/tap — déclenche aussi une réaction "fouet"
+    // sur les tentacules, comme si la masse réagissait vivement au contact ──
     canvas3d.style.cursor='pointer';
     canvas3d.style.touchAction='manipulation';
     canvas3d.addEventListener('click',()=>{
       burstActive=true;
       burstStartTime=performance.now();
+      touchReactPhase=1.0;
     });
 
     use3DGlobe=true;
@@ -283,6 +308,7 @@ function renderGlobe3D(t){
   if(gMode===2){ noiseAmp=0.14+ttsAmplitude*0.4; noiseSpeed=0.15+ttsAmplitude*0.5; } // parole : pulse avec la vraie voix
   if(gMode===3){ noiseAmp=0.32; noiseSpeed=0.7; }                            // alerte : agitation
   if(gMode===4){ noiseAmp=0.15+micAmplitude*0.25; }                          // écoute : frémit avec le micro
+  noiseAmp*=1+touchReactPhase*0.6; // léger sursaut du cœur lui-même au contact
 
   // ── Déformation du cœur — chaque particule se déplace le long de SA propre
   // direction radiale selon le bruit à sa position d'origine + le temps, ce qui
@@ -299,12 +325,33 @@ function renderGlobe3D(t){
   posAttr.needsUpdate=true;
   three_core.material.color.copy(col);
 
+  // ── Reflets lumineux — suivent le cœur avec un bruit plus rapide et léger,
+  // pour ce scintillement "humide" qui donne l'impression d'une vraie matière ─
+  const posAttrH=three_highlights.geometry.attributes.position;
+  const nH=highlightOrigins.length/3;
+  for(let i=0;i<nH;i++){
+    const ox=highlightOrigins[i*3],oy=highlightOrigins[i*3+1],oz=highlightOrigins[i*3+2];
+    const dx=highlightDirs[i*3],dy=highlightDirs[i*3+1],dz=highlightDirs[i*3+2];
+    const nv=symbioteNoise.noise(ox*noiseFreq*1.4+tSec*(noiseSpeed*1.6),oy*noiseFreq*1.4+tSec*(noiseSpeed*1.6)*.6,oz*noiseFreq*1.4);
+    const disp=nv*noiseAmp*1.1;
+    posAttrH.setXYZ(i,ox+dx*disp,oy+dy*disp,oz+dz*disp);
+  }
+  posAttrH.needsUpdate=true;
+
+  // ── Réaction au toucher — un clic/tap fait "fouetter" les tentacules,
+  // plus vite et plus fort, façon symbiote qui réagit au contact. Décroît
+  // ensuite tout seul vers la normale sur environ 1,4 seconde. ──────────────
+  touchReactPhase=Math.max(0,touchReactPhase-1/60/1.4);
+  const touchBoost=1+touchReactPhase*2.8;
+  const touchSpeedBoost=1+touchReactPhase*2.2;
+
   // ── Tentacules — portée réactive (l'écoute les fait s'étendre, comme si Sutur
   // "tendait l'oreille"), ondulation perpendiculaire à leur axe façon symbiote ──
   let reach=1.0;
   if(gMode===4)reach=1.0+micAmplitude*1.3;
   if(gMode===1)reach=1.18;
   if(gMode===2)reach=1.0+ttsAmplitude*0.3;
+  reach*=1+touchReactPhase*0.15; // s'étend aussi légèrement au contact
 
   const posAttrT=three_tendrils.geometry.attributes.position;
   const nT=tendrilBaseDirs.length/3;
@@ -312,9 +359,9 @@ function renderGlobe3D(t){
     const bx=tendrilBaseDirs[i*3],by=tendrilBaseDirs[i*3+1],bz=tendrilBaseDirs[i*3+2];
     const along=tendrilAlong[i],tIdx=tendrilIdxArr[i];
     const baseR=0.85+along*0.9*reach;
-    const w1=symbioteNoise.noise(tIdx*2.3+along*3+tSec*0.5,tIdx*1.1,0);
-    const w2=symbioteNoise.noise(0,tIdx*2.3+along*3+tSec*0.45,tIdx*1.7);
-    const wobble=0.1*along*(gMode===1?1.6:1);
+    const w1=symbioteNoise.noise(tIdx*2.3+along*3+tSec*0.5*touchSpeedBoost,tIdx*1.1,0);
+    const w2=symbioteNoise.noise(0,tIdx*2.3+along*3+tSec*0.45*touchSpeedBoost,tIdx*1.7);
+    const wobble=0.1*along*(gMode===1?1.6:1)*touchBoost;
     posAttrT.setXYZ(i,bx*baseR+w1*wobble,by*baseR+w2*wobble,bz*baseR+w1*wobble*.7);
   }
   posAttrT.needsUpdate=true;
