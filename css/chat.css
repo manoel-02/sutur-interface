@@ -27,7 +27,7 @@
    se placer à 76px du bas pour ne pas recouvrir la barre de navigation. Cette
    règle était dupliquée ici avec des valeurs différentes (bottom:0), ce qui
    cassait la mise en page selon l'ordre de chargement des fichiers CSS. */
-.cinp{flex:1;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:24px;padding:11px 18px;color:var(--text-primary);font-size:15px;font-family:var(--font-main);outline:none;transition:border-color .2s}
+.cinp{flex:1;min-width:0;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:24px;padding:11px 18px;color:var(--text-primary);font-size:15px;font-family:var(--font-main);outline:none;transition:border-color .2s}
 .cinp:focus{border-color:var(--violet)}
 .cinp::placeholder{color:var(--text-muted)}
 .sbtn{width:40px;height:40px;border-radius:50%;background:rgba(139,92,246,.2);border:1px solid var(--violet-glow);color:var(--text-primary);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}

@@ -1,4 +1,22 @@
 /* ── REMOTE DESKTOP — onglets et boutons du panneau de contrôle PC ── */
+
+/* Corps principal : écran + panneau latéral côte à côte sur grand écran */
+.rd-body{display:flex;flex:1;overflow:hidden;min-height:0}
+.rd-screen-col{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;background:#000;min-width:0}
+.rd-side-panel{width:260px;border-left:1px solid rgba(139,92,246,.15);background:#0d0b1e;display:flex;flex-direction:column;flex-shrink:0}
+
+/* Sur téléphone : empilés verticalement plutôt que serrés côte à côte — sans ça,
+   la vue de l'écran distant tombait à ~130px de large sur un iPhone standard,
+   quasiment inutilisable. L'écran garde la priorité (plus de hauteur), le panneau
+   d'outils passe en dessous avec une hauteur fixe raisonnable et son propre défilement. */
+@media (max-width:700px){
+  .rd-body{flex-direction:column}
+  .rd-screen-col{flex:1 1 auto;min-height:38vh}
+  .rd-side-panel{width:100%;height:46vh;border-left:none;border-top:1px solid rgba(139,92,246,.15);flex-shrink:0}
+  .rdkey{padding:7px 11px;font-size:10px}
+  .rdtab{padding:11px 8px;font-size:10px}
+}
+
 .rdkey{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:5px;color:rgba(180,170,220,.6);cursor:pointer;font-size:9px;padding:4px 8px;font-family:'Courier New',monospace;letter-spacing:.5px;white-space:nowrap;flex-shrink:0}
 .rdkey:hover{background:rgba(139,92,246,.12);border-color:rgba(139,92,246,.25);color:#c8aaff}
 #rd-voice-btn.active{background:rgba(201,162,39,.25)!important;box-shadow:0 0 10px rgba(201,162,39,.4);animation:rdVoicePulse 1.2s ease-in-out infinite}
