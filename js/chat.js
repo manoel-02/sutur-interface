@@ -357,7 +357,8 @@ async function sendMsg(){
       history:history.slice(-8),
       location:userLocation,
       image_data: currentPhotoB64 ? (currentPhotoB64.includes(',') ? currentPhotoB64.split(',')[1] : currentPhotoB64) : null,
-      image_type: currentPhotoType || 'image/jpeg'
+      image_type: currentPhotoType || 'image/jpeg',
+      voice_mode: !!voiceModeActive
     });
     rmTyping();const reply=data.reply||data.detail||'Erreur';
     history.push({role:'assistant',content:reply});
