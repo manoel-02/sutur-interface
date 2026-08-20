@@ -82,8 +82,10 @@ async function loadMessages(){
     const data=await apiCall('/messages');
     const msgs=data.messages||[];
     const tabBtn=document.getElementById('tab-msgs-btn');
-    if(msgs.length>0)tabBtn.innerHTML='MSGS<span class="notif-dot"></span>';
-    else tabBtn.innerHTML='MSGS';
+    if(tabBtn){
+      if(msgs.length>0)tabBtn.innerHTML='MSGS<span class="notif-dot"></span>';
+      else tabBtn.innerHTML='MSGS';
+    }
     const el=document.getElementById('msgs-list');
     el.innerHTML=msgs.length?msgs.map(m=>`
       <div class="msg-item">

@@ -606,6 +606,51 @@
         <button class="go-btn" onclick="loadMemories()">&#8635; Actualiser</button>
       </div>
       <div id="mem-list" style="color:rgba(120,80,255,.35);font-size:12px;text-align:center;padding:20px">Chargement...</div>
+
+      <!-- ── Coffre sécurisé — documents et identifiants chiffrés ── -->
+      <div style="margin-top:24px;padding-top:16px;border-top:1px solid rgba(139,92,246,.15)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0">
+          <div class="section-title" style="margin:0">🔒 COFFRE SÉCURISÉ</div>
+          <button class="go-btn" id="vault-lock-btn" onclick="vaultLock()" style="display:none">🔒 Verrouiller</button>
+        </div>
+
+        <!-- État verrouillé -->
+        <div id="vault-locked-view">
+          <div style="font-size:11px;color:rgba(200,190,230,.5);margin-bottom:10px;line-height:1.5">
+            Documents (carte d'identité, passeport, permis...) et identifiants de comptes — chiffrés, illisibles sans ton mot de passe.
+          </div>
+          <input type="password" id="vault-password-input" placeholder="Mot de passe du coffre" class="cinp" style="width:100%;box-sizing:border-box;margin-bottom:8px" onkeydown="if(event.key==='Enter')vaultUnlock()">
+          <button class="access-btn" style="width:100%" onclick="vaultUnlock()">🔓 Déverrouiller le coffre</button>
+          <div id="vault-unlock-error" style="color:#f87171;font-size:11px;text-align:center;margin-top:8px;display:none"></div>
+        </div>
+
+        <!-- État déverrouillé -->
+        <div id="vault-unlocked-view" style="display:none">
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <button class="access-btn" style="flex:1;font-size:11px" onclick="vaultShowAddDocument()">📄 Ajouter un document</button>
+            <button class="access-btn" style="flex:1;font-size:11px" onclick="vaultShowAddCredential()">🔑 Ajouter un identifiant</button>
+          </div>
+
+          <!-- Formulaire ajout document -->
+          <div id="vault-add-document" style="display:none;background:rgba(139,92,246,.05);border:1px solid rgba(139,92,246,.15);border-radius:10px;padding:12px;margin-bottom:12px">
+            <input type="text" id="vault-doc-label" placeholder="Libellé (ex: Carte d'identité)" class="cinp" style="width:100%;box-sizing:border-box;margin-bottom:6px">
+            <input type="file" id="vault-doc-file" accept="image/*,.pdf" style="width:100%;margin-bottom:6px;font-size:11px;color:rgba(200,190,230,.6)">
+            <textarea id="vault-doc-notes" placeholder="Notes (optionnel)" class="cinp" style="width:100%;box-sizing:border-box;margin-bottom:6px;min-height:50px;resize:vertical"></textarea>
+            <button class="access-btn" style="width:100%" onclick="vaultAddDocument()">Enregistrer, chiffré</button>
+          </div>
+
+          <!-- Formulaire ajout identifiant -->
+          <div id="vault-add-credential" style="display:none;background:rgba(139,92,246,.05);border:1px solid rgba(139,92,246,.15);border-radius:10px;padding:12px;margin-bottom:12px">
+            <input type="text" id="vault-cred-label" placeholder="Libellé (ex: Spotify)" class="cinp" style="width:100%;box-sizing:border-box;margin-bottom:6px">
+            <input type="text" id="vault-cred-username" placeholder="Identifiant / email" class="cinp" style="width:100%;box-sizing:border-box;margin-bottom:6px">
+            <input type="password" id="vault-cred-password" placeholder="Mot de passe du compte" class="cinp" style="width:100%;box-sizing:border-box;margin-bottom:6px">
+            <input type="text" id="vault-cred-url" placeholder="Site (optionnel)" class="cinp" style="width:100%;box-sizing:border-box;margin-bottom:6px">
+            <button class="access-btn" style="width:100%" onclick="vaultAddCredential()">Enregistrer, chiffré</button>
+          </div>
+
+          <div id="vault-list"></div>
+        </div>
+      </div>
     </div>
 
     <!-- AGENTS -->
@@ -1232,6 +1277,7 @@
   <script src="js/finance.js"></script>
   <script src="js/email.js"></script>
   <script src="js/brief-memories-maps.js"></script>
+  <script src="js/vault.js"></script>
   <script src="js/push-admin.js"></script>
   <script src="js/profile-integrations.js"></script>
   <script src="js/app.js"></script>
