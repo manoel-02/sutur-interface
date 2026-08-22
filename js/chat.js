@@ -358,8 +358,10 @@ async function sendMsg(){
       location:userLocation,
       image_data: currentPhotoB64 ? (currentPhotoB64.includes(',') ? currentPhotoB64.split(',')[1] : currentPhotoB64) : null,
       image_type: currentPhotoType || 'image/jpeg',
-      voice_mode: !!voiceModeActive
+      voice_mode: !!voiceModeActive,
+      thread_id: currentThreadId
     });
+    if(data.thread_id && !currentThreadId) currentThreadId=data.thread_id;
     rmTyping();const reply=data.reply||data.detail||'Erreur';
     history.push({role:'assistant',content:reply});
     // Nettoyer la photo après envoi

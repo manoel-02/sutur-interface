@@ -42,6 +42,7 @@ const AVATAR_CONTEXTS={
   coach:{label:'Coach',keywords:['motivation','objectif','sport','exercice','performance','succès','défi','améliorer','progresser','discipline']}
 };
 let TOKEN='',API_URL='',EL_KEY='',PASS='',history=[],busy=false,micActive=false,selApp='youtube',currentBrief='',userIsOwner=false,userLocation=null,currentUserName='',onboarding=false,onboardingStep='';
+let currentThreadId=null;
 let voiceLoopActive=false,voiceRecognition=null,voiceLoopErrorCount=0,voiceNetworkBackoff=false;
 let rdStreaming = false;
 let rdStreamInterval = null;
