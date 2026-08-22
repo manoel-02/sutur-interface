@@ -359,6 +359,7 @@ async function sendMsg(){
       image_data: currentPhotoB64 ? (currentPhotoB64.includes(',') ? currentPhotoB64.split(',')[1] : currentPhotoB64) : null,
       image_type: currentPhotoType || 'image/jpeg',
       voice_mode: !!voiceModeActive,
+      device_type: window.innerWidth<600 ? 'mobile' : 'desktop',
       thread_id: currentThreadId
     });
     if(data.thread_id && !currentThreadId) currentThreadId=data.thread_id;
