@@ -786,6 +786,14 @@
         <button onclick="openRemoteDesktop()" class="access-btn" style="flex:1;padding:9px;font-size:11px;border-color:rgba(74,222,128,.4);background:rgba(74,222,128,.08);color:#4ade80">🖥️ Ouvrir</button>
       </div>
       <button onclick="showAgentInstructions()" class="access-btn" style="width:100%;padding:9px;font-size:11px;letter-spacing:1px;margin-bottom:4px">📋 INSTALLER L'AGENT PC</button>
+
+      <!-- WORLD -->
+      <div class="section-title" style="margin-top:12px">🌍 WORLD</div>
+      <div style="font-size:11px;color:rgba(200,190,230,.5);margin-bottom:8px;line-height:1.5">
+        Globe 3D à explorer — pays, bâtiments, itinéraires, en temps réel.
+      </div>
+      <button onclick="openWorldPanel()" class="access-btn" style="width:100%;padding:9px;font-size:11px;border-color:rgba(0,212,255,.4);background:rgba(0,212,255,.08);color:#00d4ff">🌍 Ouvrir le globe</button>
+
       <div class="section-title">SÉCURITÉ AVANCÉE</div>
       <div class="cfg-row">
         <div><div class="cfg-lbl">Face ID / Touch ID</div><div class="cfg-sub2">Connexion biométrique réelle (WebAuthn)</div></div>
@@ -1036,6 +1044,42 @@
 </div>
 
 <!-- MODAL PHOTO PREVIEW -->
+<div id="world-modal" style="display:none;position:fixed;inset:0;z-index:220;background:#050308;flex-direction:column">
+  <div style="padding:14px 18px;border-bottom:1px solid rgba(139,92,246,.15);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+    <div style="font-size:13px;font-weight:600;color:#e8e4f8;letter-spacing:1px">🌍 WORLD</div>
+    <button onclick="closeWorldPanel()" style="background:none;border:none;color:rgba(160,151,196,.5);cursor:pointer;font-size:18px;line-height:1">✕</button>
+  </div>
+  <div style="flex:1;position:relative;overflow:hidden">
+    <canvas id="world-canvas" style="width:100%;height:100%;display:block;touch-action:none;cursor:grab"></canvas>
+    <div id="world-loading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:rgba(139,92,246,.5);background:#050308">
+      <div style="font-size:28px">🌌</div>
+      <div style="font-size:11px;letter-spacing:1px">Chargement des frontières du monde...</div>
+    </div>
+    <div id="world-hint" style="position:absolute;top:12px;left:12px;font-size:10px;color:rgba(160,151,196,.4);letter-spacing:.5px;pointer-events:none">Glisse pour tourner · Touche un pays</div>
+    <div id="world-info-panel" style="display:none;position:absolute;bottom:0;left:0;right:0;max-height:55%;overflow-y:auto;background:rgba(10,8,24,.95);backdrop-filter:blur(20px);border-top:1px solid rgba(139,92,246,.25);padding:16px;box-sizing:border-box">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div id="world-info-title" style="font-size:16px;font-weight:700;color:#e8e4f8"></div>
+        <button onclick="document.getElementById('world-info-panel').style.display='none'" style="background:none;border:none;color:rgba(160,151,196,.5);cursor:pointer;font-size:16px">✕</button>
+      </div>
+      <div id="world-info-body" style="font-size:12.5px;color:rgba(220,215,240,.85);line-height:1.7"></div>
+    </div>
+  </div>
+</div>
+
+<div id="holomap-modal" style="display:none;position:fixed;inset:0;z-index:210;background:rgba(0,0,0,.92);flex-direction:column">
+  <div style="padding:14px 18px;border-bottom:1px solid rgba(139,92,246,.15);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+    <div style="font-size:13px;font-weight:600;color:#e8e4f8;letter-spacing:1px" id="holomap-title">📍 REPRÉSENTATION HOLOGRAPHIQUE</div>
+    <button onclick="closeHolomap()" style="background:none;border:none;color:rgba(160,151,196,.5);cursor:pointer;font-size:18px;line-height:1">✕</button>
+  </div>
+  <div style="flex:1;position:relative">
+    <canvas id="holomap-canvas" style="width:100%;height:100%;display:block"></canvas>
+    <div id="holomap-empty" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:rgba(139,92,246,.4);text-align:center;padding:20px">
+      <div style="font-size:32px">🛰️</div>
+      <div style="font-size:12px;letter-spacing:1px">Aucune donnée de bâtiment/route à cette échelle pour ce lieu</div>
+    </div>
+  </div>
+</div>
+
 <div id="threads-modal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.88);align-items:center;justify-content:center;padding:16px;flex-direction:column">
   <div style="background:#0d0a24;border:1px solid rgba(139,92,246,.35);border-radius:20px;max-width:420px;width:100%;max-height:85vh;overflow:hidden;display:flex;flex-direction:column">
     <div style="padding:14px 18px;border-bottom:1px solid rgba(139,92,246,.15);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
@@ -1293,6 +1337,8 @@
   <script src="js/brief-memories-maps.js"></script>
   <script src="js/vault.js"></script>
   <script src="js/threads.js"></script>
+  <script src="js/holomap.js"></script>
+  <script src="js/world.js"></script>
   <script src="js/push-admin.js"></script>
   <script src="js/profile-integrations.js"></script>
   <script src="js/app.js"></script>

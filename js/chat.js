@@ -395,6 +395,7 @@ async function sendMsg(){
     // Carte persistante — reste ouverte, se met juste à jour à chaque nouvelle demande de lieu
     if(data.map && data.map.lat!=null && data.map.lng!=null){
       showPersistentMap(data.map.lat,data.map.lng,data.map.location_name);
+      showHolographicLocation(data.map);
     }
 
     // Image générée par IA — une nouvelle image par demande, insérée dans le fil
