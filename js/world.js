@@ -198,6 +198,8 @@ function handleWorldClick(clientX,clientY){
   }
 }
 
+let world_currentCountryData=null;
+
 async function showWorldCountryInfo(countryName){
   const panel=document.getElementById('world-info-panel');
   const title=document.getElementById('world-info-title');
@@ -205,9 +207,11 @@ async function showWorldCountryInfo(countryName){
   panel.style.display='block';
   title.textContent=countryName;
   body.innerHTML='<div style="color:rgba(139,92,246,.4)">Chargement...</div>';
+  world_currentCountryData=null;
 
   try{
     const data=await apiCall('/country/'+encodeURIComponent(countryName));
+    world_currentCountryData=data;
     let html='';
     if(data.population) html+=`<div>👥 <b>${data.population.toLocaleString('fr')}</b> habitants</div>`;
     if(data.capital) html+=`<div>🏛️ Capitale : <b>${data.capital}</b></div>`;
@@ -215,6 +219,9 @@ async function showWorldCountryInfo(countryName){
     if(data.languages && data.languages.length) html+=`<div>🗣️ ${data.languages.join(', ')}</div>`;
     if(data.current_weather) html+=`<div style="margin-top:8px">🌤️ ${data.current_weather}</div>`;
     if(data.recent_activity) html+=`<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(139,92,246,.15)">${data.recent_activity}</div>`;
+    if(data.capital_lat!=null && data.capital_lng!=null){
+      html+=`<button onclick="showCapitalBuildings()" class="access-btn" style="width:100%;margin-top:10px;font-size:11px">🏙️ Voir les bâtiments de la capitale</button>`;
+    }
     body.innerHTML=html || '<div style="color:rgba(139,92,246,.4)">Aucune information disponible.</div>';
   }catch(e){
     body.innerHTML='<div style="color:#f87171">Informations indisponibles pour ce pays.</div>';
@@ -228,6 +235,25 @@ function worldLoop(){
   if(world_globeGroup){ world_globeGroup.rotation.y=world_rotationY; world_globeGroup.rotation.x=world_rotationX; }
   if(world_renderer && world_scene && world_camera) world_renderer.render(world_scene,world_camera);
   requestAnimationFrame(worldLoop);
+}
+
+async function showCapitalBuildings(){
+  const data=world_currentCountryData;
+  if(!data || data.capital_lat==null || data.capital_lng==null)return;
+  const btn=document.querySelector('#world-info-body button');
+  if(btn){ btn.disabled=true; btn.textContent='Chargement des bâtiments...'; }
+  try{
+    const geo=await apiCall(`/places/buildings-nearby?lat=${data.capital_lat}&lng=${data.capital_lng}&radius=200&coord_format=local`);
+    showHolographicLocation({
+      location_name:data.capital||data.official_name||'Capitale',
+      lat:data.capital_lat, lng:data.capital_lng,
+      buildings:geo.buildings||[], roads:geo.roads||[],
+    });
+  }catch(e){
+    // Échec silencieux — le panneau pays reste utilisable même sans les bâtiments
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='🏙️ Voir les bâtiments de la capitale'; }
+  }
 }
 
 function closeWorldPanel(){
