@@ -68,6 +68,7 @@ async function showPersistentMap(lat,lng,label){
     persistentMapInstance=L.map('persistent-map',{zoomControl:true,attributionControl:true}).setView([20,0],2);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:18,subdomains:'abcd',attribution:'© OpenStreetMap, © CARTO'}).addTo(persistentMapInstance);
     persistentMapMarker=L.circleMarker([lat,lng],{radius:8,color:'#8b5cf6',fillColor:'#c9a227',fillOpacity:.9,weight:2}).addTo(persistentMapInstance);
+    setupMapBuildingZoom();
     setTimeout(()=>{
       if(!persistentMapInstance)return;
       persistentMapInstance.invalidateSize();
@@ -81,6 +82,57 @@ async function showPersistentMap(lat,lng,label){
   }
   // Visibilité finale : uniquement si on est bien sur l'onglet chat
   wrap.style.display=onChatTab?'block':'none';
+}
+
+let mapBuildingLayers=[], mapBuildingsZoomBound=false, mapBuildingsFetchTimer=null;
+const MAP_BUILDINGS_MIN_ZOOM=17;
+
+function setupMapBuildingZoom(){
+  if(mapBuildingsZoomBound || !persistentMapInstance)return;
+  mapBuildingsZoomBound=true;
+  persistentMapInstance.on('zoomend moveend',()=>{
+    clearTimeout(mapBuildingsFetchTimer);
+    mapBuildingsFetchTimer=setTimeout(refreshMapBuildings,350); // anti-rebond, évite une requête à chaque pixel de déplacement
+  });
+}
+
+function clearMapBuildings(){
+  mapBuildingLayers.forEach(l=>persistentMapInstance.removeLayer(l));
+  mapBuildingLayers=[];
+}
+
+async function refreshMapBuildings(){
+  if(!persistentMapInstance)return;
+  const zoom=persistentMapInstance.getZoom();
+  if(zoom<MAP_BUILDINGS_MIN_ZOOM){ clearMapBuildings(); return; }
+  const center=persistentMapInstance.getCenter();
+  try{
+    const data=await apiCall(`/places/buildings-nearby?lat=${center.lat}&lng=${center.lng}&radius=250`);
+    clearMapBuildings();
+    (data.buildings||[]).forEach(b=>{
+      if(!b.points || b.points.length<3)return;
+      // Effet "3D léger" sur une carte plate : remplissage + contour lumineux qui
+      // distingue nettement chaque bâtiment de la rue, façon relief simulé — un vrai
+      // rendu 3D en perspective nécessiterait de quitter Leaflet, hors de portée ici.
+      const poly=L.polygon(b.points,{
+        color: b.height_is_real ? '#d4af37' : '#8b5cf6',
+        weight:1.5, opacity:.8,
+        fillColor: b.height_is_real ? '#d4af37' : '#8b5cf6', fillOpacity:.22,
+      }).addTo(persistentMapInstance);
+      if(b.name) poly.bindTooltip(b.name,{sticky:true});
+      poly.on('click',async()=>{
+        const centerPt=b.points.reduce((acc,p)=>[acc[0]+p[0]/b.points.length,acc[1]+p[1]/b.points.length],[0,0]);
+        try{
+          const localGeo=await apiCall(`/places/buildings-nearby?lat=${centerPt[0]}&lng=${centerPt[1]}&radius=80&coord_format=local`);
+          showHolographicLocation({ location_name:b.name||'Bâtiment', lat:centerPt[0], lng:centerPt[1], buildings:localGeo.buildings||[], roads:localGeo.roads||[] });
+        }catch(e){}
+      });
+      mapBuildingLayers.push(poly);
+    });
+  }catch(e){
+    // Échec silencieux — la carte reste utilisable sans les contours de bâtiments,
+    // ce n'est qu'un enrichissement visuel, pas une fonction critique.
+  }
 }
 
 function hidePersistentMap(){
@@ -109,6 +161,7 @@ async function showRouteOnMap(route){
   if(!persistentMapInstance){
     persistentMapInstance=L.map('persistent-map',{zoomControl:true,attributionControl:true}).setView([20,0],2);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:18,subdomains:'abcd',attribution:'© OpenStreetMap, © CARTO'}).addTo(persistentMapInstance);
+    setupMapBuildingZoom();
   }
 
   // Retirer un éventuel tracé précédent avant d'en dessiner un nouveau
