@@ -89,6 +89,51 @@ function hidePersistentMap(){
   if(wrap)wrap.style.display='none';
 }
 
+let persistentRouteLine=null, persistentRouteMarkers=[];
+
+async function showRouteOnMap(route){
+  const wrap=document.getElementById('persistent-map-wrap');
+  if(!wrap || !route || !route.path || !route.path.length)return;
+  mapIsActive=true;
+  const onChatTab=document.getElementById('tab-chat')?.classList.contains('active');
+  wrap.style.display='block';
+  try{
+    await ensureLeaflet();
+  }catch(e){
+    wrap.style.display='none';
+    return;
+  }
+  const labelEl=document.getElementById('persistent-map-label');
+  if(labelEl)labelEl.textContent=`${route.origin_name} → ${route.dest_name} · ${route.distance_km} km · ${route.duration_minutes} min`;
+
+  if(!persistentMapInstance){
+    persistentMapInstance=L.map('persistent-map',{zoomControl:true,attributionControl:true}).setView([20,0],2);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:18,subdomains:'abcd',attribution:'© OpenStreetMap, © CARTO'}).addTo(persistentMapInstance);
+  }
+
+  // Retirer un éventuel tracé précédent avant d'en dessiner un nouveau
+  if(persistentRouteLine){ persistentMapInstance.removeLayer(persistentRouteLine); persistentRouteLine=null; }
+  persistentRouteMarkers.forEach(m=>persistentMapInstance.removeLayer(m));
+  persistentRouteMarkers=[];
+  if(persistentMapMarker){ persistentMapInstance.removeLayer(persistentMapMarker); persistentMapMarker=null; }
+
+  persistentRouteLine=L.polyline(route.path,{color:'#00d4ff',weight:3,opacity:.85}).addTo(persistentMapInstance);
+
+  const startMarker=L.circleMarker([route.origin_lat,route.origin_lng],{radius:7,color:'#8b5cf6',fillColor:'#8b5cf6',fillOpacity:.9,weight:2}).addTo(persistentMapInstance);
+  startMarker.bindTooltip(route.origin_name,{permanent:false});
+  const endMarker=L.circleMarker([route.dest_lat,route.dest_lng],{radius:8,color:'#c9a227',fillColor:'#c9a227',fillOpacity:.9,weight:2}).addTo(persistentMapInstance);
+  endMarker.bindTooltip(route.dest_name,{permanent:false});
+  persistentRouteMarkers=[startMarker,endMarker];
+
+  setTimeout(()=>{
+    if(!persistentMapInstance)return;
+    persistentMapInstance.invalidateSize();
+    persistentMapInstance.fitBounds(persistentRouteLine.getBounds(),{padding:[30,30]});
+  },80);
+
+  wrap.style.display=onChatTab?'block':'none';
+}
+
 async function loadAgentsMap(){
   const mapEl=document.getElementById('agents-map');
   if(!mapEl)return;
