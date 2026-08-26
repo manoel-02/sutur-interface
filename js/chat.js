@@ -400,6 +400,19 @@ async function sendMsg(){
       showHolographicLocation(data.map);
     }
 
+    // Fermeture d'une fonctionnalité demandée par commande (texte ou vocal) — chaque
+    // fonction est vérifiée avant appel, pour ne jamais planter si l'une d'elles
+    // n'existe pas encore dans une version future du frontend.
+    if(data.close_action){
+      const closeDispatch={
+        map:()=>hidePersistentMap(), world:()=>closeWorldPanel(), holomap:()=>closeHolomap(),
+        remote:()=>closeRemoteDesktop(), vault:()=>vaultLock(), threads:()=>closeThreadsPanel(),
+        camera:()=>closePhotoModal(),
+      };
+      const fn=closeDispatch[data.close_action];
+      if(fn){ try{ fn(); }catch(e){} }
+    }
+
     // Image générée par IA — une nouvelle image par demande, insérée dans le fil
     if(data.image && data.image.url){
       const cbImg=document.getElementById('chatbox');
