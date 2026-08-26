@@ -15,6 +15,19 @@
 .finp{width:100%;padding:12px 16px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;color:var(--text-primary);font-size:15px;font-family:var(--font-main);outline:none;transition:border-color .2s}
 .finp:focus{border-color:var(--violet)}
 .finp::placeholder{color:var(--text-muted)}
+/* Chrome/Safari forcent un fond blanc sur les champs autocomplétés par le navigateur
+   (mot de passe enregistré), qui écrase le thème sombre malgré le CSS ci-dessus — le
+   correctif standard consiste à imposer une ombre intérieure de la couleur du thème,
+   avec un délai de transition très long pour empêcher le flash blanc initial. */
+.finp:-webkit-autofill,
+.finp:-webkit-autofill:hover,
+.finp:-webkit-autofill:focus,
+.finp:-webkit-autofill:active{
+  -webkit-box-shadow:0 0 0 1000px #0d0a24 inset!important;
+  -webkit-text-fill-color:var(--text-primary)!important;
+  caret-color:var(--text-primary);
+  transition:background-color 5000s ease-in-out 0s;
+}
 .bio-row{display:flex;gap:10px;width:100%}
 .bio-btn{flex:1;padding:14px 8px;border-radius:12px;border:1px solid rgba(201,162,39,.25);background:rgba(201,162,39,.05);color:var(--gold);font-size:11px;letter-spacing:1px;cursor:pointer;font-family:var(--font-main);display:flex;flex-direction:column;align-items:center;gap:6px;transition:all .2s}
 .bio-btn:hover{background:rgba(201,162,39,.12);border-color:rgba(201,162,39,.45)}
