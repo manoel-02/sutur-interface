@@ -1047,7 +1047,7 @@
 <div id="world-modal" style="display:none;position:fixed;inset:0;z-index:220;background:#050308;flex-direction:column">
   <div style="padding:14px 18px;border-bottom:1px solid rgba(139,92,246,.15);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
     <div style="font-size:13px;font-weight:600;color:#e8e4f8;letter-spacing:1px">🌍 WORLD</div>
-    <button onclick="closeWorldPanel()" style="background:none;border:none;color:rgba(160,151,196,.5);cursor:pointer;font-size:18px;line-height:1">✕</button>
+    <button onclick="closeWorldPanel()" style="background:none;border:none;color:rgba(160,151,196,.5);cursor:pointer;font-size:18px;line-height:1;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center">✕</button>
   </div>
   <div style="flex:1;position:relative;overflow:hidden">
     <canvas id="world-canvas" style="width:100%;height:100%;display:block;touch-action:none;cursor:grab"></canvas>
@@ -1059,7 +1059,7 @@
     <div id="world-info-panel" style="display:none;position:absolute;bottom:0;left:0;right:0;max-height:55%;overflow-y:auto;background:rgba(10,8,24,.95);backdrop-filter:blur(20px);border-top:1px solid rgba(139,92,246,.25);padding:16px;box-sizing:border-box">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
         <div id="world-info-title" style="font-size:16px;font-weight:700;color:#e8e4f8"></div>
-        <button onclick="document.getElementById('world-info-panel').style.display='none'" style="background:none;border:none;color:rgba(160,151,196,.5);cursor:pointer;font-size:16px">✕</button>
+        <button onclick="document.getElementById('world-info-panel').style.display='none'" style="background:none;border:none;color:rgba(160,151,196,.5);cursor:pointer;font-size:16px;min-width:40px;min-height:40px;display:flex;align-items:center;justify-content:center">✕</button>
       </div>
       <div id="world-info-body" style="font-size:12.5px;color:rgba(220,215,240,.85);line-height:1.7"></div>
     </div>
