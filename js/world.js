@@ -5,6 +5,8 @@
 // photographique, une vraie géométrie stylisée cohérente avec l'identité visuelle.
 const WORLD_GEOJSON_URL='https://raw.githubusercontent.com/datasets/geo-countries/main/data/countries.geojson';
 let world_scene=null, world_camera=null, world_renderer=null, world_globeGroup=null;
+let world_earthTexture=null; // chargée une seule fois, réutilisée à chaque réouverture
+const WORLD_EARTH_TEXTURE_URL='https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg';
 let world_countriesData=null, world_animating=false;
 let world_rotationY=0.4, world_rotationX=0.3;
 let world_dragging=false, world_lastX=0, world_lastY=0;
@@ -80,7 +82,7 @@ async function openWorldPanel(){
     }
   }
 
-  initWorldGlobe();
+  await initWorldGlobe();
   buildCountryBorders();
   document.getElementById('world-loading').style.display='none';
 
@@ -91,7 +93,7 @@ async function openWorldPanel(){
   setupWorldControls();
 }
 
-function initWorldGlobe(){
+async function initWorldGlobe(){
   const canvas=document.getElementById('world-canvas');
   const w=canvas.clientWidth||400, h=canvas.clientHeight||400;
 
@@ -116,11 +118,25 @@ function initWorldGlobe(){
   starGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(starPos),3));
   world_scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xffffff,size:0.06,transparent:true,opacity:0.5})));
 
-  // Sphère de base — grille de points façon holographique, cohérent avec le reste de Sutur
+  // Vraie texture Terre — chargée une seule fois puis mise en cache. Repli sur le
+  // style filaire précédent si le chargement échoue (réseau coupé, etc.), pour ne
+  // jamais laisser le globe complètement vide en cas de souci.
   const sphereGeo=new THREE.SphereGeometry(2.5,48,32);
-  const wireMat=new THREE.MeshBasicMaterial({color:0x8b5cf6,wireframe:true,transparent:true,opacity:0.08});
-  world_globeGroup.add(new THREE.Mesh(sphereGeo,wireMat));
-  // Sphère invisible dédiée au raycasting (plus fiable que viser le wireframe fin)
+  let earthMat;
+  try{
+    if(!world_earthTexture){
+      world_earthTexture=await new Promise((resolve,reject)=>{
+        new THREE.TextureLoader().load(WORLD_EARTH_TEXTURE_URL,resolve,undefined,reject);
+      });
+    }
+    earthMat=new THREE.MeshBasicMaterial({map:world_earthTexture});
+  }catch(e){
+    console.warn('[world] texture Terre indisponible, repli sur le rendu filaire',e);
+    earthMat=new THREE.MeshBasicMaterial({color:0x8b5cf6,wireframe:true,transparent:true,opacity:0.15});
+  }
+  world_globeGroup.add(new THREE.Mesh(sphereGeo,earthMat));
+
+  // Sphère invisible dédiée au raycasting (plus fiable que viser la texture directement)
   const hitSphere=new THREE.Mesh(sphereGeo,new THREE.MeshBasicMaterial({visible:false}));
   hitSphere.name='world-hit-sphere';
   world_globeGroup.add(hitSphere);
@@ -132,61 +148,21 @@ function initWorldGlobe(){
   world_scene.add(world_globeGroup);
 }
 
-// Palette cohérente avec le thème holographique déjà établi ailleurs dans Sutur —
-// couleur assignée par hachage du nom, donc stable d'une session à l'autre (le même
-// pays a toujours la même couleur, jamais aléatoire à chaque ouverture).
-const WORLD_COUNTRY_PALETTE=[0xd4af37,0x8b5cf6,0x00d4ff,0xf87171,0x4ade80,0xfb923c,0xc084fc,0x60a5fa];
-function hashCountryColor(name){
-  let hash=0;
-  for(let i=0;i<(name||'').length;i++){ hash=(hash*31+name.charCodeAt(i))|0; }
-  return WORLD_COUNTRY_PALETTE[Math.abs(hash)%WORLD_COUNTRY_PALETTE.length];
-}
-
-function fillCountryWithParticles(ring,color,radius){
-  // Remplissage par nuage de particules plutôt qu'un maillage plein classique — cohérent
-  // avec l'esthétique holographique du reste de Sutur, et bien plus simple à calculer
-  // qu'une vraie triangulation sphérique. Densité proportionnelle à la taille du pays,
-  // plafonnée pour ne jamais surcharger les tout petits comme les immenses territoires.
-  let minLat=90,maxLat=-90,minLng=180,maxLng=-180;
-  for(const [lng,lat] of ring){
-    if(lat<minLat)minLat=lat; if(lat>maxLat)maxLat=lat;
-    if(lng<minLng)minLng=lng; if(lng>maxLng)maxLng=lng;
-  }
-  const area=(maxLat-minLat)*(maxLng-minLng);
-  const targetPoints=Math.max(3,Math.min(35,Math.round(area*1.2)));
-  const points=[];
-  let attempts=0;
-  while(points.length<targetPoints && attempts<targetPoints*15){
-    attempts++;
-    const lat=minLat+Math.random()*(maxLat-minLat);
-    const lng=minLng+Math.random()*(maxLng-minLng);
-    if(pointInRing(lng,lat,ring)) points.push(latLngToVector3(lat,lng,radius+0.002));
-  }
-  if(points.length===0) return null;
-  const geo=new THREE.BufferGeometry().setFromPoints(points);
-  return new THREE.Points(geo,new THREE.PointsMaterial({color,size:0.028,transparent:true,opacity:0.55}));
-}
-
 function buildCountryBorders(){
   const RADIUS=2.5;
   for(const feature of world_countriesData.features){
     const geom=feature.geometry;
     if(!geom) continue;
-    const countryName=feature.properties?.ADMIN||feature.properties?.name||'';
-    const color=hashCountryColor(countryName);
     const polys = geom.type==='Polygon' ? [geom.coordinates] : (geom.type==='MultiPolygon' ? geom.coordinates : []);
     for(const poly of polys){
       const ring=poly[0]; // anneau extérieur uniquement — suffisant pour un tracé de frontière lisible
       if(!ring || ring.length<2) continue;
-      const pts=ring.map(([lng,lat])=>latLngToVector3(lat,lng,RADIUS+0.005));
+      const pts=ring.map(([lng,lat])=>latLngToVector3(lat,lng,RADIUS+0.01));
       const geo=new THREE.BufferGeometry().setFromPoints(pts);
-      // Contour plus marqué qu'avant (opacité relevée) pour rester net même avec le
-      // remplissage de particules en dessous.
-      const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color,transparent:true,opacity:0.8}));
+      // Contour doré, net et bien visible par-dessus la texture réelle — cohérent avec
+      // le reste de l'identité visuelle de Sutur sans dénaturer les vraies couleurs du globe.
+      const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xffd966,transparent:true,opacity:0.85}));
       world_globeGroup.add(line);
-
-      const fill=fillCountryWithParticles(ring,color,RADIUS);
-      if(fill) world_globeGroup.add(fill);
     }
   }
 }
@@ -288,7 +264,9 @@ function handleWorldClick(clientX,clientY){
 
   const props=findCountryAt(lat,lng);
   if(props){
-    showWorldCountryInfo(props.ADMIN || props.name || props.NAME, props.ISO_A3 || props.ISO_A2 || null);
+    const isoCode = props['ISO3166-1-Alpha-3'] || props['ISO3166-1-Alpha-2'] || props.ISO_A3 || props.ISO_A2 || null;
+    const countryLabel = props.name || props.ADMIN || props.NAME || 'Pays';
+    showWorldCountryInfo(countryLabel, (isoCode && isoCode !== '-99') ? isoCode : null);
   }
 }
 
