@@ -294,6 +294,15 @@ async function initGlobe3D(){
   }catch(e){
     console.warn('Masse organique 3D indisponible, repli sur le rendu 2D existant:',e.message);
     use3DGlobe=false;
+    // Une seule nouvelle tentative après un court délai — couvre le cas fréquent sur
+    // mobile où le tout premier chargement de page tente de charger le CDN avant que
+    // le réseau soit pleinement prêt. Pas de boucle infinie : si ça échoue encore,
+    // le repli 2D (maintenant un vrai nuage de particules, pas l'ancien anneau) reste
+    // parfaitement présentable pour le reste de la session.
+    if(!window._globe3dRetried){
+      window._globe3dRetried=true;
+      setTimeout(()=>{ if(!use3DGlobe) initGlobe3D(); },4000);
+    }
   }
 }
 

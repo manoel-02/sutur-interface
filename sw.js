@@ -1,51 +1,24 @@
-// sw.js — Service Worker Sutur
-// Rôle : recevoir les notifications push envoyées par le serveur et les afficher
-// avec l'avatar Sutur (comme une notification Instagram), pas une notif générique.
+// Service worker Sutur — délibérément minimal. Ne met JAMAIS en cache le code
+// applicatif (HTML/JS/CSS) : chaque requête passe directement par le réseau, pour
+// qu'une correction déployée soit immédiatement visible, sans jamais rester bloqué
+// sur une ancienne version à cause d'un cache silencieux. S'il existait auparavant
+// une version de ce fichier qui mettait en cache plus agressivement, celle-ci la
+// remplace et purge tout cache existant au premier chargement.
 
-self.addEventListener('install', () => {
-  self.skipWaiting();
+const CACHE_VERSION = 'sutur-v3-no-cache';
+
+self.addEventListener('install', (event) => {
+  self.skipWaiting(); // active la nouvelle version immédiatement, sans attendre la fermeture de tous les onglets
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
-});
-
-self.addEventListener('push', (event) => {
-  let data = {};
-  try {
-    data = event.data ? event.data.json() : {};
-  } catch (e) {
-    data = { title: 'Sutur', body: event.data ? event.data.text() : 'Nouvelle notification' };
-  }
-
-  const title = data.title || 'Sutur';
-  const options = {
-    body: data.body || '',
-    icon: data.icon || '/icon-192.png',    // l'avatar affiché à côté de la notification
-    badge: '/icon-96.png',                  // petite icône monochrome (barre de statut Android)
-    tag: data.tag || 'sutur-' + Date.now(), // évite d'empiler des notifs identiques
-    renotify: false,
-    vibrate: [100, 50, 100],
-    data: { url: data.url || '/' }
-  };
-
-  event.waitUntil(self.registration.showNotification(title, options));
-});
-
-// Clic sur la notification → ramène sur l'app déjà ouverte, ou en ouvre une nouvelle
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || '/';
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
-          return client.focus();
-        }
-      }
-      if (self.clients.openWindow) {
-        return self.clients.openWindow(url);
-      }
-    })
+    caches.keys().then((names) =>
+      Promise.all(names.map((name) => caches.delete(name)))
+    ).then(() => self.clients.claim())
   );
 });
+
+// Aucune interception de fetch — chaque requête va directement au réseau, exactement
+// comme si aucun service worker n'était présent. Le seul rôle de ce fichier est de
+// purger un éventuel cache existant d'une version antérieure.
