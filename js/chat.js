@@ -438,7 +438,7 @@ async function sendMsg(){
       setTimeout(()=>window.open(data.youtube_open_url,'_blank'),500);
     }
 
-    document.getElementById('hmod').textContent=(data.model_used||'ORBIX').toUpperCase().replace('CLAUDE','ORBIX').replace('GPT-4O','ORBIX GPT');
+    document.getElementById('hmod').textContent=(data.model_used||'SUTUR').toUpperCase().replace('CLAUDE','SUTUR').replace('GPT-4O','SUTUR GPT');
     // Indicateur émotionnel
     const emotIcons={stress:'😤',joie:'😊',fatigue:'😴',motivation:'🔥',tristesse:'😔',colere:'😠',anxiete:'😰',neutre:''};
     const emot=data.emotion||'neutre';

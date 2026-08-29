@@ -579,5 +579,5 @@ function loop(t){
 
 function setGlobeMode(n){
   gMode=n;
-  document.getElementById('hmod').textContent=['ORBIX','RÉFLEXION','PAROLE','ALERTE','ÉCOUTE'][n];
+  document.getElementById('hmod').textContent=['SUTUR','RÉFLEXION','PAROLE','ALERTE','ÉCOUTE'][n];
 }
