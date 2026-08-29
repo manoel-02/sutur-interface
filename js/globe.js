@@ -45,13 +45,22 @@ function drawBg(t){
 function ensureThreeJS(){
   if(threeLoaded && window.THREE)return Promise.resolve();
   if(threeLoadingPromise)return threeLoadingPromise;
-  threeLoadingPromise=new Promise((resolve,reject)=>{
+  const sources=[
+    'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+    'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js', // secours si le premier CDN est bloqué/indisponible
+  ];
+  const tryLoad=(i)=>new Promise((resolve,reject)=>{
+    if(i>=sources.length){reject(new Error('Three.js indisponible (tous les CDN ont échoué)'));return;}
     const script=document.createElement('script');
-    script.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+    script.src=sources[i];
     script.onload=()=>{threeLoaded=true;resolve();};
-    script.onerror=()=>{threeLoadingPromise=null;reject(new Error('Three.js indisponible'));};
+    script.onerror=()=>{
+      console.warn(`[globe] échec du CDN Three.js (${sources[i]}), tentative suivante...`);
+      tryLoad(i+1).then(resolve,reject);
+    };
     document.head.appendChild(script);
   });
+  threeLoadingPromise=tryLoad(0).catch(e=>{threeLoadingPromise=null;throw e;});
   return threeLoadingPromise;
 }
 
@@ -423,148 +432,67 @@ function resizeGlobe(){
   resizeGlobe3D();
 }
 
+let _cloud2DParticles=null;
+function buildCloud2DParticles(n){
+  // Distribution sphérique projetée en 2D, densifiée vers le centre — même esprit
+  // que la masse organique 3D (buildOrganicCore), en beaucoup plus simple puisque
+  // ce repli 2D n'a pas besoin d'un vrai volume, juste de donner l'impression d'un
+  // nuage de matière vivante vu de face.
+  const pts=[];
+  for(let i=0;i<n;i++){
+    const u=Math.random(),v=Math.random();
+    const r=Math.pow(Math.random(),0.65); // plus dense vers le centre qu'une distribution uniforme
+    const theta=u*Math.PI*2;
+    const depth=Math.random(); // simule la profondeur -> taille/opacité variables
+    pts.push({
+      baseAngle:theta, baseR:r,
+      phase:Math.random()*Math.PI*2,
+      speed:0.4+Math.random()*0.8,
+      depth, size:0.6+depth*1.8,
+    });
+  }
+  return pts;
+}
+
 function drawGlobe(t){
   gctx.clearRect(0,0,GW,GH);
   // Quand le visage 3D est actif, TOUT le rendu se fait dans renderGlobe3D() —
   // ce canvas 2D ne sert plus que de repli si la 3D n'a pas pu se charger.
-  // Avant cette correction, les halos/anneaux/texte ci-dessous continuaient à se
-  // dessiner PAR-DESSUS le visage 3D à chaque image, le rendant difficile à voir.
   if(use3DGlobe)return;
+  if(!_cloud2DParticles)_cloud2DParticles=buildCloud2DParticles(260);
 
   const cx=GW/2,cy=GH/2;
   const m=GMODES[gMode];
-  const sp=m.speed;
-  const R=GW*.38; // rayon globe
+  const R=GW*.36;
   const liveAmp=gMode===4?micAmplitude:(gMode===2?ttsAmplitude:0);
-  const pulse=1+.04*Math.sin(t*.04)+liveAmp*.4;
+  const agitation=gMode===3?1.8:gMode===1?1.4:1; // alerte/réflexion : nuage plus agité
+  const pulse=1+.05*Math.sin(t*.03)+liveAmp*.35;
 
-  // ── Halos lumineux multicouches (comme sur la photo)
-  [[R*3,.04],[R*2.2,.08],[R*1.5,.14],[R*1.1,.2]].forEach(([r,a])=>{
-    const g=gctx.createRadialGradient(cx,cy,0,cx,cy,r*pulse);
-    g.addColorStop(0,`rgba(${m.glow},${a})`);
-    g.addColorStop(.6,`rgba(${m.glow},${a*.3})`);
-    g.addColorStop(1,'transparent');
-    gctx.fillStyle=g;gctx.beginPath();gctx.arc(cx,cy,r*pulse,0,Math.PI*2);gctx.fill();
-  });
+  // Halo doux derrière le nuage, pour donner du volume sans revenir à un anneau net
+  const halo=gctx.createRadialGradient(cx,cy,0,cx,cy,R*1.6*pulse);
+  halo.addColorStop(0,`rgba(${m.glow},.16)`);
+  halo.addColorStop(1,'transparent');
+  gctx.fillStyle=halo;gctx.beginPath();gctx.arc(cx,cy,R*1.6*pulse,0,Math.PI*2);gctx.fill();
 
-  // ── Anneau orbital doré principal (incliné comme sur la photo)
-  gctx.save();gctx.translate(cx,cy);gctx.rotate(-.3);
-  // Anneau doré brillant
-  const ringR=R*1.15;const ringY=R*.38;
-  gctx.beginPath();gctx.ellipse(0,0,ringR,ringY,0,0,Math.PI*2);
-  const ringG=gctx.createLinearGradient(-ringR,0,ringR,0);
-  ringG.addColorStop(0,'rgba(201,162,39,.1)');
-  ringG.addColorStop(.3,'rgba(201,162,39,.8)');
-  ringG.addColorStop(.5,'rgba(255,210,80,.95)');
-  ringG.addColorStop(.7,'rgba(201,162,39,.8)');
-  ringG.addColorStop(1,'rgba(201,162,39,.1)');
-  gctx.strokeStyle=ringG;gctx.lineWidth=2;gctx.stroke();
-  // Satellite doré sur l'anneau
-  const sa=t*.013*sp;
-  const sx=Math.cos(sa)*ringR,sy=Math.sin(sa)*ringY;
-  // Halo satellite
-  const shg=gctx.createRadialGradient(sx,sy,0,sx,sy,8);
-  shg.addColorStop(0,'rgba(255,210,80,.5)');shg.addColorStop(1,'transparent');
-  gctx.fillStyle=shg;gctx.fillRect(sx-8,sy-8,16,16);
-  gctx.beginPath();gctx.arc(sx,sy,3.5,0,Math.PI*2);
-  gctx.fillStyle='rgba(255,220,100,.95)';gctx.fill();
-  gctx.restore();
-
-  // ── Anneau violet secondaire (autre inclinaison)
-  gctx.save();gctx.translate(cx,cy);gctx.rotate(.2);
-  gctx.beginPath();gctx.ellipse(0,0,R*1.05,R*.32,0,0,Math.PI*2);
-  const ring2G=gctx.createLinearGradient(-R,0,R,0);
-  ring2G.addColorStop(0,`rgba(${m.glow},.05)`);
-  ring2G.addColorStop(.4,`rgba(${m.glow},.6)`);
-  ring2G.addColorStop(.6,`rgba(${m.glow},.6)`);
-  ring2G.addColorStop(1,`rgba(${m.glow},.05)`);
-  gctx.strokeStyle=ring2G;gctx.lineWidth=1.2;gctx.stroke();
-  // Satellite violet
-  const sb=-t*.017*sp;
-  const sx2=Math.cos(sb)*R*1.05,sy2=Math.sin(sb)*R*.32;
-  gctx.beginPath();gctx.arc(sx2,sy2,2.5,0,Math.PI*2);
-  gctx.fillStyle=`rgba(${m.glow},.9)`;gctx.fill();
-  gctx.restore();
-
-  // ── Globe central (sphère) — repli 2D pur, on n'atteint ce point que si la 3D
-  // n'a pas pu se charger (retour anticipé plus haut sinon).
-  const sphereG=gctx.createRadialGradient(cx-R*.25,cy-R*.2,0,cx,cy,R*pulse);
-  sphereG.addColorStop(0,'rgba(80,40,140,.7)');
-  sphereG.addColorStop(.4,'rgba(30,10,70,.85)');
-  sphereG.addColorStop(.8,'rgba(10,4,30,.95)');
-  sphereG.addColorStop(1,'rgba(5,2,20,.98)');
-  gctx.beginPath();gctx.arc(cx,cy,R*pulse,0,Math.PI*2);
-  gctx.fillStyle=sphereG;gctx.fill();
-
-  // Bordure lumineuse de la sphère
-  const borderG=gctx.createLinearGradient(cx-R,cy-R,cx+R,cy+R);
-  borderG.addColorStop(0,`rgba(${m.glow},.9)`);
-  borderG.addColorStop(.5,`rgba(${m.glow},.4)`);
-  borderG.addColorStop(1,`rgba(${m.glow},.1)`);
-  gctx.strokeStyle=borderG;gctx.lineWidth=1.5;gctx.stroke();
-
-  // Reflet/spéculaire sur la sphère
-  const spec=gctx.createRadialGradient(cx-R*.3,cy-R*.3,0,cx-R*.2,cy-R*.2,R*.5);
-  spec.addColorStop(0,'rgba(255,255,255,.12)');
-  spec.addColorStop(1,'transparent');
-  gctx.beginPath();gctx.arc(cx,cy,R*pulse,0,Math.PI*2);
-  gctx.fillStyle=spec;gctx.fill();
-
-  // ── Couronne pulsante externe
-  const crPulse=R*pulse+5+3*Math.sin(t*.04);
-  gctx.beginPath();gctx.arc(cx,cy,crPulse,0,Math.PI*2);
-  gctx.strokeStyle=`rgba(${m.glow},${.12+.06*Math.sin(t*.035)})`;gctx.lineWidth=1;gctx.stroke();
-
-  // ── Animations selon le mode
-  if(gMode===1){ // RÉFLEXION — particules orbitantes
-    for(let i=0;i<12;i++){
-      const a=t*.07+i*(Math.PI/6);const pr=R+15+Math.sin(t*.05+i)*4;
-      const px=cx+Math.cos(a)*pr*pulse,py=cy+Math.sin(a)*pr*.38*pulse;
-      gctx.beginPath();gctx.arc(px,py,1.8,0,Math.PI*2);
-      gctx.fillStyle=`rgba(201,162,39,${.3+.5*Math.sin(t*.09+i)})`;gctx.fill();
-    }
-  }
-  if(gMode===2){ // PAROLE — ondes sonores réactives au volume réel du TTS
-    for(let i=1;i<=5;i++){
-      const wr=(R+i*10+(5+22*ttsAmplitude)*Math.sin(t*.06+i*.7))*pulse;
-      const wa=(.2-i*.035)*(0.45+ttsAmplitude*1.3);
-      gctx.beginPath();gctx.arc(cx,cy,wr,0,Math.PI*2);
-      gctx.strokeStyle=`rgba(74,222,128,${Math.max(0,wa*Math.abs(Math.sin(t*.05+i)))})`;
-      gctx.lineWidth=1+ttsAmplitude*2;gctx.stroke();
-    }
-  }
-  if(gMode===4){ // ÉCOUTE — points qui pulsent au rythme du micro
-    for(let i=0;i<8;i++){
-      const a=(i/8)*Math.PI*2+t*.01;
-      const dr=(R+16)*pulse;
-      const px=cx+Math.cos(a)*dr,py=cy+Math.sin(a)*dr*.38;
-      const dotR=2+micAmplitude*7;
-      gctx.beginPath();gctx.arc(px,py,dotR,0,Math.PI*2);
-      gctx.fillStyle=`rgba(0,212,255,${.3+micAmplitude*.6})`;gctx.fill();
-    }
-  }
-  if(gMode===3){ // ALERTE — flash rouge pulsant
-    const flashA=.08+.06*Math.abs(Math.sin(t*.12));
-    for(let i=1;i<=3;i++){
-      gctx.beginPath();gctx.arc(cx,cy,(R+i*14)*pulse,0,Math.PI*2);
-      gctx.strokeStyle=`rgba(248,113,113,${flashA/i})`;gctx.lineWidth=1.5;gctx.stroke();
-    }
+  // ── Nuage de particules — vivant, jamais figé, jamais un simple anneau statique
+  for(const p of _cloud2DParticles){
+    const wobble=Math.sin(t*.02*p.speed*agitation+p.phase)*0.12;
+    const r=(p.baseR+wobble)*R*pulse;
+    const angle=p.baseAngle+Math.sin(t*.01*p.speed+p.phase)*0.15;
+    const px=cx+Math.cos(angle)*r;
+    const py=cy+Math.sin(angle)*r*.82; // légèrement aplati, cohérent avec la vue 3D de face
+    const alpha=(0.25+p.depth*0.55)*(gMode===4?0.7+micAmplitude*0.6:1);
+    gctx.beginPath();
+    gctx.arc(px,py,p.size*(gMode===2?1+ttsAmplitude*0.6:1),0,Math.PI*2);
+    gctx.fillStyle=p.depth>0.75?`rgba(255,255,255,${alpha*.8})`:`rgba(${m.glow},${alpha})`;
+    gctx.fill();
   }
 
-  // ── Texte central
+  // ── Label mode, discret, sous le nuage — pas de "SUTUR"/"by OrbixLabs" ici,
+  // déjà affichés dans l'en-tête, jamais dupliqués dans l'avatar lui-même.
   gctx.textAlign='center';
-  const fontSize=Math.round(R*.52);
-  gctx.font=`700 ${fontSize}px system-ui,-apple-system,sans-serif`;
-  gctx.fillStyle='rgba(232,228,248,.96)';
-  gctx.fillText('SUTUR',cx,cy+R*.08);
-  const subSize=Math.round(R*.22);
-  gctx.font=`${subSize}px system-ui`;
-  gctx.fillStyle='rgba(201,162,39,.8)';
-  gctx.fillText('by OrbixLabs',cx,cy+R*.36);
-
-  // ── Label mode en dessous du globe
-  gctx.font=`500 ${Math.round(R*.2)}px system-ui`;
-  gctx.fillStyle=`rgba(${m.glow},.6)`;
+  gctx.font=`500 ${Math.round(R*.16)}px system-ui`;
+  gctx.fillStyle=`rgba(${m.glow},.55)`;
   gctx.fillText(m.name,cx,GH-8);
 }
 
