@@ -12,9 +12,27 @@ function selectGender(g){
 
 function getLocation(){
   if(navigator.geolocation&&document.getElementById('t-geo').classList.contains('on')){
-    navigator.geolocation.getCurrentPosition(pos=>{userLocation={lat:pos.coords.latitude,lng:pos.coords.longitude}},()=>{})
+    navigator.geolocation.getCurrentPosition(pos=>{
+      userLocation={lat:pos.coords.latitude,lng:pos.coords.longitude};
+      // Envoyée tout de suite, sans attendre le prochain message de chat — sinon,
+      // en voyage, un simple coup d'oeil à l'app sans écrire de message ne mettrait
+      // jamais à jour la position, et le brief du matin refléterait encore l'ancien lieu.
+      apiCall('/location/update','POST',{lat:userLocation.lat,lng:userLocation.lng}).catch(()=>{});
+    },()=>{});
   }
 }
+
+// Rafraîchit la position à chaque fois que l'app revient au premier plan (l'utilisateur
+// rouvre l'app après l'avoir mise en arrière-plan) — c'est le moment naturel où on
+// détecterait un changement de lieu après un trajet, pas seulement à la connexion initiale.
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible') getLocation();
+});
+// Filet de sécurité supplémentaire si l'app reste ouverte longtemps sans jamais
+// passer en arrière-plan (ex: laissée ouverte sur un bureau) — un rafraîchissement
+// toutes les 30 minutes reste largement suffisant pour ce cas, sans solliciter le
+// GPS de façon excessive.
+setInterval(getLocation, 30*60*1000);
 
 async function silentHealthCheck(){
   if(!TOKEN||!API_URL) return;
