@@ -358,6 +358,8 @@ async function sendMsg(){
       location:userLocation,
       image_data: currentPhotoB64 ? (currentPhotoB64.includes(',') ? currentPhotoB64.split(',')[1] : currentPhotoB64) : null,
       image_type: currentPhotoType || 'image/jpeg',
+      document_data: currentDocumentB64 ? (currentDocumentB64.includes(',') ? currentDocumentB64.split(',')[1] : currentDocumentB64) : null,
+      document_type: currentDocumentType || 'application/pdf',
       voice_mode: !!voiceModeActive,
       device_type: window.innerWidth<600 ? 'mobile' : 'desktop',
       thread_id: currentThreadId
@@ -365,8 +367,9 @@ async function sendMsg(){
     if(data.thread_id && !currentThreadId) currentThreadId=data.thread_id;
     rmTyping();const reply=data.reply||data.detail||'Erreur';
     history.push({role:'assistant',content:reply});
-    // Nettoyer la photo après envoi
+    // Nettoyer la photo et le document après envoi
     clearPhoto();
+    clearPdf();
     // Vérifier si des actions spéciales sont disponibles
     checkSpecialActions(msg, reply);
 

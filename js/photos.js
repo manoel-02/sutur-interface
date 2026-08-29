@@ -151,3 +151,38 @@ function closePermModal(){
   document.getElementById('perm-modal').style.display='none';
   localStorage.setItem('s_perms_done','1');
 }
+
+// ── DOCUMENT PDF — instructions et/ou code à suivre, généré dans credical ──
+function handlePdfSelect(input){
+  const file = input.files[0];
+  if(!file) return;
+  if(file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')){
+    alert('Seuls les fichiers PDF sont acceptés.');
+    input.value='';
+    return;
+  }
+  currentDocumentType = file.type || 'application/pdf';
+  currentDocumentName = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    currentDocumentB64 = e.target.result; // data URL complet, nettoyé au moment de l'envoi
+    const bar = document.getElementById('pdf-preview-bar');
+    const nameEl = document.getElementById('pdf-filename');
+    if(nameEl) nameEl.textContent = file.name;
+    if(bar) bar.style.display='flex';
+  };
+  reader.onerror = () => {
+    alert('Impossible de lire ce fichier — réessaie.');
+    clearPdf();
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearPdf(){
+  currentDocumentB64 = null;
+  currentDocumentName = '';
+  const bar = document.getElementById('pdf-preview-bar');
+  if(bar) bar.style.display='none';
+  const input = document.getElementById('pdf-input');
+  if(input) input.value='';
+}
