@@ -360,6 +360,7 @@ async function sendMsg(){
       image_type: currentPhotoType || 'image/jpeg',
       document_data: currentDocumentB64 ? (currentDocumentB64.includes(',') ? currentDocumentB64.split(',')[1] : currentDocumentB64) : null,
       document_type: currentDocumentType || 'application/pdf',
+      document_name: currentDocumentName || null,
       voice_mode: !!voiceModeActive,
       device_type: window.innerWidth<600 ? 'mobile' : 'desktop',
       thread_id: currentThreadId

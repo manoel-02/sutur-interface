@@ -885,8 +885,8 @@
     <button class="micbtn" id="micbtn" onclick="toggleMic()">&#127908;</button>
     <button class="micbtn" id="photobtn" onclick="openPhotoModal()" title="Analyser une photo" style="font-size:16px">📷</button>
     <input type="file" id="photo-input" accept="image/*" style="display:none" onchange="handlePhotoSelect(this)"/>
-    <button class="micbtn" id="pdfbtn" onclick="document.getElementById('pdf-input').click()" title="Envoyer un PDF (instructions/code)" style="font-size:15px">📄</button>
-    <input type="file" id="pdf-input" accept="application/pdf" style="display:none" onchange="handlePdfSelect(this)"/>
+    <button class="micbtn" id="pdfbtn" onclick="document.getElementById('pdf-input').click()" title="Envoyer un PDF, CSV ou Excel (instructions/code/données)" style="font-size:15px">📄</button>
+    <input type="file" id="pdf-input" accept="application/pdf,.csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none" onchange="handlePdfSelect(this)"/>
     <div id="pdf-preview-bar" style="display:none;align-items:center;gap:6px;flex-shrink:0;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.25);border-radius:8px;padding:4px 8px">
       <span style="font-size:14px">📄</span>
       <span id="pdf-filename" style="font-size:10px;color:rgba(220,215,240,.8);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>

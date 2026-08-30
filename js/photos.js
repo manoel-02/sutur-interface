@@ -156,8 +156,13 @@ function closePermModal(){
 function handlePdfSelect(input){
   const file = input.files[0];
   if(!file) return;
-  if(file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')){
-    alert('Seuls les fichiers PDF sont acceptés.');
+  const name = file.name.toLowerCase();
+  const isPdf = file.type === 'application/pdf' || name.endsWith('.pdf');
+  const isData = name.endsWith('.csv') || name.endsWith('.xlsx') || name.endsWith('.xls')
+    || file.type === 'text/csv' || file.type === 'application/vnd.ms-excel'
+    || file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  if(!isPdf && !isData){
+    alert('Seuls les fichiers PDF, CSV et Excel sont acceptés.');
     input.value='';
     return;
   }
