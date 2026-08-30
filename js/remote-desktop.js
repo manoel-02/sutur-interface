@@ -230,8 +230,18 @@ async function rdExec(){
   rdOutLog('$ '+cmd);
   try{
     const data = await apiCall('/remote/exec','POST',{command:cmd,timeout:30});
+    if(data.needs_confirmation){
+      rdOutLog('⚠️ '+data.reason);
+      const confirme = confirm("Confirmer l'exécution de :\n\n"+cmd+"\n\n"+data.reason);
+      if(!confirme){ rdOutLog('[annulé]\\n'); return; }
+      const data2 = await apiCall('/remote/exec','POST',{command:cmd,timeout:30,confirmed:true});
+      rdOutLog(data2.result||'(pas de sortie)');
+      rdOutLog('[exit '+data2.exit_code+']\\n');
+      setTimeout(rdScreenshot, 800);
+      return;
+    }
     rdOutLog(data.result||'(pas de sortie)');
-    rdOutLog('[exit '+data.exit_code+']\n');
+    rdOutLog('[exit '+data.exit_code+']\\n');
     setTimeout(rdScreenshot, 800);
   }catch(e){ rdOutLog('❌ '+(e.message||'PC non connecté')); }
 }
