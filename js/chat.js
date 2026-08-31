@@ -249,12 +249,26 @@ function handleMediaCmd(app,msg){
   addMsg('ai',`J'ouvre ${app} sur "${q}"...`);speakText(`J'ouvre ${app} sur ${q}.`);setTimeout(()=>window.open(urls[app]+encodeURIComponent(q),'_blank'),600);
 }
 
+function autoResizeChatInput(el){
+  el.style.height='auto'; // réinitialise avant de mesurer, sinon la hauteur ne peut jamais réduire
+  const maxHeight=160; // évite qu'un texte très long ne prenne tout l'écran, défile au-delà
+  el.style.height=Math.min(el.scrollHeight,maxHeight)+'px';
+}
+
+function handleChatInputKeydown(event){
+  if(event.key==='Enter' && !event.shiftKey){
+    event.preventDefault(); // empêche l'insertion du retour à la ligne par défaut du navigateur
+    sendMsg();
+  }
+  // Maj+Entrée : comportement par défaut du navigateur (insère un vrai retour à la ligne)
+}
+
 async function sendMsg(){
   const inp=document.getElementById('cinp'),model=document.getElementById('model-sel').value,msg=inp.value.trim();
   // Permettre envoi si photo sélectionnée même sans texte
   if((!msg && !currentPhotoB64)||busy)return;
   if(!TOKEN){addMsg('ai','Configure ton acces dans CONFIG.');return}
-  inp.value='';busy=true;gActive=true;
+  inp.value='';inp.style.height='auto';busy=true;gActive=true;
   // Afficher le message utilisateur avec la photo si présente
   if(currentPhotoB64){
     const thumbHtml=`<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
