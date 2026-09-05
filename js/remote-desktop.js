@@ -35,7 +35,10 @@ async function checkRemoteStatus(){
 function openRemoteDesktop(){
   const modal = document.getElementById('remote-modal');
   if(modal) modal.style.display='flex';
-  checkRemoteStatus().then(()=>{ if(rdConnected) rdStartStream(); });
+  // Le flux d'images ne démarre plus automatiquement à l'ouverture — seulement la
+  // vérification de connexion. L'utilisateur doit cliquer explicitement sur le
+  // bouton de flux pour qu'une seule image commence à être transmise.
+  checkRemoteStatus();
 }
 
 function closeRemoteDesktop(){

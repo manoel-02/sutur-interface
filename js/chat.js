@@ -418,6 +418,17 @@ async function sendMsg(){
       showHolographicLocation(data.map);
     }
 
+    // Ouverture d'une fonctionnalité demandée par commande (texte ou vocal) — symétrique
+    // du dispatch de fermeture ci-dessous, volontairement limité aux fonctionnalités
+    // qui s'ouvrent sans paramètre ni ré-authentification (voir intent_service.py).
+    if(data.open_action){
+      const openDispatch={
+        remote:()=>openRemoteDesktop(), threads:()=>openThreadsPanel(), camera:()=>openPhotoModal(),
+      };
+      const fn=openDispatch[data.open_action];
+      if(fn){ try{ fn(); }catch(e){} }
+    }
+
     // Fermeture d'une fonctionnalité demandée par commande (texte ou vocal) — chaque
     // fonction est vérifiée avant appel, pour ne jamais planter si l'une d'elles
     // n'existe pas encore dans une version future du frontend.
