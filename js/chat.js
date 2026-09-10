@@ -365,7 +365,7 @@ async function sendMsg(){
   const mc=detectMediaCmd(msg);
   if(mc){rmTyping();handleMediaCmd(mc,msg);busy=false;setStatus('EN LIGNE','idle');return}
   try{
-    const data=await apiCall('/chat','POST',{
+    const submitResp=await apiCall('/chat','POST',{
       message:msg,
       model,
       history:history.slice(-8),
@@ -379,14 +379,39 @@ async function sendMsg(){
       device_type: window.innerWidth<600 ? 'mobile' : 'desktop',
       thread_id: currentThreadId
     });
-    if(data.thread_id && !currentThreadId) currentThreadId=data.thread_id;
-    rmTyping();const reply=data.reply||data.detail||'Erreur';
-    history.push({role:'assistant',content:reply});
-    // Nettoyer la photo et le document après envoi
+    // Nettoyer la photo et le document dès que la tâche est prise en charge par
+    // le serveur — pas besoin d'attendre le résultat complet pour ça, la zone de
+    // composition doit être prête pour un nouveau message tout de suite.
     clearPhoto();
     clearPdf();
+
+    if(!submitResp || !submitResp.job_id){
+      rmTyping();addMsg('ai','Erreur de connexion.');setStatus('EN LIGNE','idle');busy=false;
+      return;
+    }
+
+    // Mémorise la tâche en attente — si l'onglet est mis en veille prolongée puis
+    // entièrement déchargé (cas extrême sur mobile), ce qui suit permet de
+    // reprendre le suivi au rechargement plutôt que de perdre la réponse.
+    pendingChatJobId=submitResp.job_id;
+    pendingChatOriginalMsg=msg;
+    localStorage.setItem('sutur_pending_job', JSON.stringify({job_id:submitResp.job_id, thread_id:currentThreadId, original_msg:msg}));
+    await pollChatResult(submitResp.job_id, msg);
+  }catch(e){
+    rmTyping();addMsg('ai','Erreur de connexion.');
+    setStatus('EN LIGNE','idle');busy=false;
+  }
+}
+
+// ── Traitement du résultat une fois la tâche terminée — extrait de l'ancien
+// sendMsg() pour être appelable aussi bien juste après l'envoi que beaucoup
+// plus tard, si l'interrogation reprend après une mise en arrière-plan. ──────
+function handleChatResult(data, originalMsg){
+    if(data.thread_id && !currentThreadId) currentThreadId=data.thread_id;
+    const reply=data.reply||data.detail||'Erreur';
+    history.push({role:'assistant',content:reply});
     // Vérifier si des actions spéciales sont disponibles
-    checkSpecialActions(msg, reply);
+    checkSpecialActions(originalMsg, reply);
 
     // Brouillon d'email — afficher interface de confirmation
     if(data.draft_email && data.draft_email.draft_email){
@@ -470,6 +495,70 @@ async function sendMsg(){
     const emot=data.emotion||'neutre';
     const hemot=document.getElementById('hemot');
     if(hemot)hemot.textContent=emotIcons[emot]||'';
-  }catch(e){rmTyping();addMsg('ai','Erreur de connexion.')}
-  setStatus('EN LIGNE','idle');busy=false;
+}
+
+
+let pendingChatJobId=null;
+let pendingChatOriginalMsg='';
+let pollTimeoutHandle=null;
+
+async function pollChatResult(jobId, originalMsg){
+  // Interroge le résultat toutes les 2s — le traitement réel continue côté
+  // serveur même si l'onglet est mis en arrière-plan entre deux interrogations,
+  // c'est justement tout l'intérêt de ce mécanisme : la tâche ne dépend plus
+  // d'une connexion ouverte en continu pour aboutir.
+  try{
+    const data=await apiCall(`/chat/result/${jobId}`,'GET');
+    if(!data || data.status==='processing'){
+      pollTimeoutHandle=setTimeout(()=>pollChatResult(jobId, originalMsg),2000);
+      return;
+    }
+    pendingChatJobId=null;
+    localStorage.removeItem('sutur_pending_job');
+    rmTyping();
+    handleChatResult(data, originalMsg);
+    setStatus('EN LIGNE','idle');busy=false;
+  }catch(e){
+    // Une erreur réseau PENDANT l'interrogation (ex: onglet qui revient tout
+    // juste d'arrière-plan, connexion pas encore rétablie) n'est jamais un échec
+    // définitif — on réessaie, la tâche continue d'exister côté serveur quoi
+    // qu'il arrive, ce n'est qu'une histoire d'aller la consulter à nouveau.
+    pollTimeoutHandle=setTimeout(()=>pollChatResult(jobId, originalMsg),3000);
+  }
+}
+
+// Dès que l'onglet redevient visible, vérifie immédiatement une tâche en
+// attente plutôt que d'attendre le prochain cycle — les minuteurs JS sont
+// ralentis ou suspendus en arrière-plan sur mobile, cette vérification
+// immédiate évite un délai perceptible au retour de l'utilisateur.
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible' && pendingChatJobId){
+    if(pollTimeoutHandle) clearTimeout(pollTimeoutHandle);
+    pollChatResult(pendingChatJobId, pendingChatOriginalMsg);
+  }
+});
+
+// Au chargement de la page — si l'onglet a été entièrement déchargé pendant
+// qu'une tâche tournait encore (mise en veille prolongée sur iOS notamment),
+// reprend le suivi de cette tâche plutôt que de perdre silencieusement la
+// réponse déjà prête côté serveur.
+function resumePendingChatJobIfAny(){
+  try{
+    const saved=localStorage.getItem('sutur_pending_job');
+    if(!saved) return;
+    const parsed=JSON.parse(saved);
+    if(!parsed.job_id) return;
+    pendingChatJobId=parsed.job_id;
+    pendingChatOriginalMsg=parsed.original_msg||'';
+    if(parsed.thread_id) currentThreadId=parsed.thread_id;
+    busy=true;addTyping();setStatus('TRAITEMENT...','think');
+    pollChatResult(parsed.job_id, pendingChatOriginalMsg);
+  }catch(e){
+    localStorage.removeItem('sutur_pending_job');
+  }
+}
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded', resumePendingChatJobIfAny);
+}else{
+  resumePendingChatJobIfAny();
 }
