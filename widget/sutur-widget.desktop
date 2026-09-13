@@ -3,8 +3,8 @@ Version=1.0
 Type=Application
 Name=Sutur
 Comment=Bulles flottantes Sutur — chat, Spotify, et bientôt plus, sans ouvrir l'application complète
-Exec=google-chrome --app=https://sutur-interface.vercel.app/widget/widget.html --window-size=420,700 --window-position=1200,50
-Icon=sutur
+Exec=google-chrome --app=https://sutur-interface.vercel.app/widget/widget.html --window-size=420,700 --window-position=1200,50 --enable-transparent-visuals
+Icon=/home/elegbede/sutur-interface/widget/sutur-icon.png
 Terminal=false
 Categories=Utility;
 StartupNotify=true

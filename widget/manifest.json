@@ -1,0 +1,14 @@
+{
+  "name": "Sutur",
+  "short_name": "Sutur",
+  "description": "Bulles flottantes Sutur — chat, Spotify et plus, sans ouvrir l'application complète",
+  "start_url": "/widget/widget.html",
+  "scope": "/widget/",
+  "display": "standalone",
+  "background_color": "#07051a",
+  "theme_color": "#0c0920",
+  "icons": [
+    { "src": "/widget/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/widget/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

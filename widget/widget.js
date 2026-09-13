@@ -189,3 +189,11 @@ function escapeHtml(s) {
   d.textContent = s || '';
   return d.innerHTML;
 }
+
+// ── Installabilité PWA — sans ça, Chrome ne propose jamais "Installer" ─────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('widget-sw.js').catch(() => {
+    // Non bloquant : sans service worker, le widget fonctionne quand même
+    // normalement en tant que page web classique, juste pas installable.
+  });
+}

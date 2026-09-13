@@ -1,0 +1,8 @@
+/* ── Ambiances décoratives par onglet — retirées volontairement ──────────────
+   Ce fichier contenait des animations infinies non déclenchées par l'utilisateur
+   (anneaux qui pulsent, halos, engrenages) sur chaque onglet, sans fonction —
+   exactement le type de mouvement gratuit qu'un design sobre et intentionnel
+   évite. Fichier gardé vide plutôt que supprimé pour ne pas casser la référence
+   existante dans index.html, sans risque : ces règles n'avaient aucun rôle
+   fonctionnel (pointer-events:none partout).
+──────────────────────────────────────────────────────────────────────────── */
