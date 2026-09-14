@@ -92,3 +92,12 @@ let mapIsActive=false;
 const VAPID_PUBLIC_KEY='BB205SQgaEeCyXLCW7K3l1szOowMkXs61Fxkc0oJCKA9L1tNAVjk4VhDzkZ6rWLmwUxFsYlDUoqmO1wsOjMAjvw';
 let currentTrendCategory='general';
 let csvRows=[], csvHeaders=[];
+
+// Échappement HTML générique — à utiliser chaque fois qu'une valeur potentiellement
+// saisie par un utilisateur (nom, message d'erreur...) est injectée via innerHTML,
+// pour ne jamais laisser passer du HTML/JavaScript non voulu.
+function escapeHtml(s){
+  const d=document.createElement('div');
+  d.textContent=s??'';
+  return d.innerHTML;
+}

@@ -522,6 +522,6 @@ async function runDiagnostic(){
       addMsg('ai', `⚠️ **Alerte système** — Des composants critiques sont en erreur : ${data.errors.join(', ')}. Vérifie les logs Railway.`, false);
     }
   }catch(e){
-    overall.innerHTML = `<span style="color:#f87171">❌ Impossible de contacter le backend : ${e.message||'erreur réseau'}</span>`;
+    overall.innerHTML = `<span style="color:#f87171">❌ Impossible de contacter le backend : ${escapeHtml(e.message||'erreur réseau')}</span>`;
   }
 }

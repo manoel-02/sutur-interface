@@ -142,7 +142,7 @@ async function inviteUser(){
   try{
     const data=await apiCall('/admin/invite','POST',{name,custom_token:customToken||null,password:password||null,profession:'',interests:[]});
     result.style.color='#4ade80';
-    result.innerHTML=`✅ <strong>${data.name}</strong> créé<br>🔑 Token: <span style="font-family:'Courier New',monospace;color:#c9a227">${data.token}</span><br>🔒 Pass: <span style="font-family:'Courier New',monospace;color:#c9a227">${data.password}</span>`;
+    result.innerHTML=`✅ <strong>${escapeHtml(data.name)}</strong> créé<br>🔑 Token: <span style="font-family:'Courier New',monospace;color:#c9a227">${escapeHtml(data.token)}</span><br>🔒 Pass: <span style="font-family:'Courier New',monospace;color:#c9a227">${escapeHtml(data.password)}</span>`;
     document.getElementById('invite-name').value='';
     document.getElementById('invite-token').value='';
     document.getElementById('invite-pass').value='';
