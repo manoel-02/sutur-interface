@@ -10,22 +10,6 @@ function detectAvatarContext(msg){
   return 'default';
 }
 
-function renderMarkdown(text){
-  if(!text) return '';
-  return text
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')  // échapper HTML
-    .replace(/\*\*\*(.*?)\*\*\*/g,'<strong><em>$1</em></strong>')
-    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g,'<em>$1</em>')
-    .replace(/`([^`]+)`/g,'<code>$1</code>')
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-    .replace(/^#{3}\s(.+)$/gm,'<strong style="font-size:13px;color:var(--gold)">$1</strong>')
-    .replace(/^#{2}\s(.+)$/gm,'<strong style="font-size:14px;color:var(--gold)">$1</strong>')
-    .replace(/^#{1}\s(.+)$/gm,'<strong style="font-size:15px;color:var(--gold)">$1</strong>')
-    .replace(/^[-•]\s(.+)$/gm,'&nbsp;&nbsp;· $1')
-    .replace(/\n/g,'<br>');
-}
-
 function cleanForSpeech(text){
   return text
     .replace(/\*\*?(.*?)\*\*?/g,'$1')
@@ -44,9 +28,12 @@ function cleanForSpeech(text){
 
 function isTerminal(){return document.body.classList.contains('theme-terminal');}
 
-function addMsg(role,text,speak=false){
-  const cb=document.getElementById('chatbox');
+// Construit l'élément d'un message, sans l'ajouter au DOM : permet de construire d'un
+// coup (fragment) l'historique de plusieurs centaines de messages.
+function buildMsgElement(role,text){
   const d=document.createElement('div');
+  d.dataset.role=role;
+  d._src=text;
   if(isTerminal()){
     // ── MODE TERMINAL : structure ligne de commande ──
     if(role==='ai'){
@@ -64,30 +51,41 @@ function addMsg(role,text,speak=false){
       d.style.cssText='display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;animation:fu .2s ease';
       d.innerHTML=`
         <span style="font-size:10px;color:rgba(255,210,80,.5);letter-spacing:1px;font-weight:600;white-space:nowrap;padding-top:2px;min-width:52px;font-family:'Courier New',monospace">${currentUserName||'USER'}›</span>
-        <span style="font-size:13px;color:rgba(255,230,150,.75);line-height:1.65;font-family:'Courier New',monospace">${text}</span>`;
+        <span style="font-size:13px;color:rgba(255,230,150,.75);line-height:1.65;font-family:'Courier New',monospace">${escapeHtml(text)}</span>`;
     }
   }else{
-    // ── Bulles de message, sans glassmorphism systématique ni label répété ──
     if(role==='ai'){
       currentAvatarCtx=detectAvatarContext(text);
       const ctxLabel=AVATAR_CONTEXTS[currentAvatarCtx]?.label||'';
       d.className='msg-row';
-      d.innerHTML=`<div class="msg-bubble">${ctxLabel?`<div class="lbl">${ctxLabel}</div>`:''}<span class="mt">${renderMarkdown(text)}</span><button class="speak-btn" onclick="speakText(this.previousElementSibling.innerText)" aria-label="Écouter">&#128266;</button></div>`;
+      d.innerHTML=`<div class="msg-bubble">${ctxLabel?`<div class="lbl">${escapeHtml(ctxLabel)}</div>`:''}<div class="mt md">${renderMarkdown(text)}</div>${aiActionsHtml()}</div>`;
     }else{
       d.className='cmsg user';
       d.textContent=text;
     }
   }
-  cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
+  return d;
+}
+
+function addMsg(role,text,speak=false){
+  const cb=document.getElementById('chatbox');
+  const d=buildMsgElement(role,text);
+  cb.appendChild(d);
+  // Un message de l'utilisateur ramène toujours en bas ; une réponse suit le bas seulement
+  // si l'utilisateur y est déjà (il peut relire plus haut sans être « tiré » vers le bas).
+  scrollChatToBottom(role==='user');
+  refreshMessageActions();
   if(voiceModeActive){
     const cap=document.getElementById('voice-caption');
     if(cap)cap.textContent=text.slice(0,240);
   }
   if(speak&&role==='ai'&&document.getElementById('t-autospeak').classList.contains('on'))setTimeout(()=>speakText(text),200);
+  return d;
 }
 
 function addTyping(){
   const cb=document.getElementById('chatbox');
+  rmTyping();
   const d=document.createElement('div');
   d.id='tymsg';
   if(isTerminal()){
@@ -100,9 +98,18 @@ function addTyping(){
     d._interval=el;
   }else{
     d.className='msg-row';
-    d.innerHTML=`<div class="msg-bubble"><div class="lbl">SUTUR</div><div class="typing"><span></span><span></span><span></span></div></div>`;
+    d.innerHTML='<div class="msg-bubble typing-bubble"><div class="typing" aria-hidden="true"><span></span><span></span><span></span></div><span class="typing-label">Sutur réfléchit…</span></div>';
+    // Précisions au fil de l'attente : l'utilisateur sait que ça travaille toujours
+    const t0=Date.now();
+    d._interval=setInterval(()=>{
+      const lab=d.querySelector('.typing-label');
+      if(!lab){clearInterval(d._interval);return;}
+      const s=(Date.now()-t0)/1000;
+      lab.textContent=s>25?'Cela prend plus de temps que d\'habitude… Sutur continue.':s>8?'Toujours en train de réfléchir…':'Sutur réfléchit…';
+    },1000);
   }
-  cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
+  cb.appendChild(d);
+  scrollChatToBottom(true);
 }
 
 function rmTyping(){const t=document.getElementById('tymsg');if(t){if(t._interval)clearInterval(t._interval);t.remove();}}
@@ -132,7 +139,7 @@ function checkSpecialActions(message, reply){
       const d=document.createElement('div');
       d.style.cssText='display:flex;gap:8px;margin:4px 0 8px 44px';
       d.innerHTML=`<button onclick="launchWebTask(${JSON.stringify(message)})" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(74,222,128,.35);background:rgba(74,222,128,.08);color:#4ade80;cursor:pointer;font-size:11px;font-family:var(--font-main)">🌐 Lancer WebTask automatiquement</button>`;
-      cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
+      cb.appendChild(d);scrollChatToBottom(true);
     },500);
   }
 
@@ -146,7 +153,7 @@ function checkSpecialActions(message, reply){
       d.innerHTML=`
         <button onclick="launchTeamMission(${JSON.stringify(message)},4)" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(139,92,246,.35);background:rgba(139,92,246,.08);color:#c8aaff;cursor:pointer;font-size:11px;font-family:var(--font-main)">🤖 OrbixTeam (4 agents)</button>
         <button onclick="launchTeamMission(${JSON.stringify(message)},6)" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(201,162,39,.35);background:rgba(201,162,39,.06);color:rgba(201,162,39,.8);cursor:pointer;font-size:11px;font-family:var(--font-main)">⚡ OrbixTeam Complet (6 agents)</button>`;
-      cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
+      cb.appendChild(d);scrollChatToBottom(true);
     },500);
   }
 
@@ -160,7 +167,7 @@ function checkSpecialActions(message, reply){
       const d=document.createElement('div');
       d.style.cssText='display:flex;gap:8px;margin:4px 0 8px 44px;flex-wrap:wrap';
       d.innerHTML=`<button onclick="generateCode(${JSON.stringify(message)},${JSON.stringify(lang)})" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(74,222,128,.35);background:rgba(74,222,128,.08);color:#4ade80;cursor:pointer;font-size:11px;font-family:var(--font-main)">💻 Générer le code ${lang}</button>`;
-      cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
+      cb.appendChild(d);scrollChatToBottom(true);
     },500);
   }
 
@@ -175,7 +182,7 @@ function checkSpecialActions(message, reply){
         <button onclick="analyzeNotebook(${JSON.stringify(message)},'summarize')" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.07);color:#c8aaff;cursor:pointer;font-size:10px">📋 Résumé</button>
         <button onclick="analyzeNotebook(${JSON.stringify(message)},'extract_key_points')" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.07);color:#c8aaff;cursor:pointer;font-size:10px">🎯 Points clés</button>
         <button onclick="analyzeNotebook(${JSON.stringify(message)},'create_outline')" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.07);color:#c8aaff;cursor:pointer;font-size:10px">📑 Plan</button>`;
-      cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
+      cb.appendChild(d);scrollChatToBottom(true);
     },500);
   }
 }
@@ -256,9 +263,13 @@ function autoResizeChatInput(el){
 }
 
 function handleChatInputKeydown(event){
+  if(event.isComposing||event.keyCode===229)return; // saisie assistée (clavier mobile, IME) en cours : ne pas envoyer
   if(event.key==='Enter' && !event.shiftKey){
     event.preventDefault(); // empêche l'insertion du retour à la ligne par défaut du navigateur
     sendMsg();
+  }else if(event.key==='Escape' && chatFlow.state==='streaming'){
+    event.preventDefault();
+    cancelGeneration();
   }
   // Maj+Entrée : comportement par défaut du navigateur (insère un vrai retour à la ligne)
 }
@@ -266,19 +277,21 @@ function handleChatInputKeydown(event){
 async function sendMsg(){
   const inp=document.getElementById('cinp'),model=document.getElementById('model-sel').value,msg=inp.value.trim();
   // Permettre envoi si photo sélectionnée même sans texte
-  if((!msg && !currentPhotoB64)||busy)return;
+  if(!msg && !currentPhotoB64)return;
+  if(busy){hintBusy();return;} // jamais d'envoi simultané — mais jamais de « bouton mort » non plus
   if(!TOKEN){addMsg('ai','Configure ton acces dans CONFIG.');return}
   inp.value='';inp.style.height='auto';busy=true;gActive=true;
   // Afficher le message utilisateur avec la photo si présente
   if(currentPhotoB64){
     const thumbHtml=`<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
       <img src="${currentPhotoB64}" style="max-width:200px;max-height:150px;border-radius:10px;border:1px solid var(--violet-glow);object-fit:cover"/>
-      ${msg?`<span style="text-align:right">${msg}</span>`:''}
+      ${msg?`<span style="text-align:right">${escapeHtml(msg)}</span>`:''}
     </div>`;
     const cb=document.getElementById('chatbox');
     const d=document.createElement('div');
     d.className='cmsg user';d.innerHTML=thumbHtml;
-    cb.appendChild(d);cb.scrollTop=cb.scrollHeight;
+    d.dataset.role='user';d.dataset.editable='0';
+    cb.appendChild(d);scrollChatToBottom(true);
   }else{
     addMsg('user',msg);
   }
@@ -301,7 +314,7 @@ async function sendMsg(){
           gb.innerHTML=`
             <button onclick="selectGender('m')" style="flex:1;padding:10px;border-radius:10px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.1);color:#c8aaff;font-size:14px;cursor:pointer;font-family:system-ui">👨 Homme</button>
             <button onclick="selectGender('f')" style="flex:1;padding:10px;border-radius:10px;border:1px solid rgba(201,162,39,.3);background:rgba(201,162,39,.08);color:#c9a227;font-size:14px;cursor:pointer;font-family:system-ui">👩 Femme</button>`;
-          cb.appendChild(gb);cb.scrollTop=cb.scrollHeight;
+          cb.appendChild(gb);scrollChatToBottom(true);
         },300);
         return;
       }
@@ -360,79 +373,43 @@ async function sendMsg(){
   }
   // ── FIN ONBOARDING ───────────────────────────────────────────────────────
 
-  addTyping();setStatus('Traitement...','think');
   history.push({role:'user',content:msg});
   const mc=detectMediaCmd(msg);
-  if(mc){rmTyping();handleMediaCmd(mc,msg);busy=false;setStatus('En ligne','idle');return}
-  try{
-    const submitResp=await apiCall('/chat','POST',{
-      message:msg,
-      model,
-      history:history.slice(-8),
-      location:userLocation,
-      image_data: currentPhotoB64 ? (currentPhotoB64.includes(',') ? currentPhotoB64.split(',')[1] : currentPhotoB64) : null,
-      image_type: currentPhotoType || 'image/jpeg',
-      document_data: currentDocumentB64 ? (currentDocumentB64.includes(',') ? currentDocumentB64.split(',')[1] : currentDocumentB64) : null,
-      document_type: currentDocumentType || 'application/pdf',
-      document_name: currentDocumentName || null,
-      voice_mode: !!voiceModeActive,
-      device_type: window.innerWidth<600 ? 'mobile' : 'desktop',
-      thread_id: currentThreadId
-    });
-    // Nettoyer la photo et le document dès que la tâche est prise en charge par
-    // le serveur — pas besoin d'attendre le résultat complet pour ça, la zone de
-    // composition doit être prête pour un nouveau message tout de suite.
-    clearPhoto();
-    clearPdf();
-
-    if(!submitResp || !submitResp.job_id){
-      rmTyping();addMsg('ai','Erreur de connexion.');setStatus('En ligne','idle');busy=false;
-      return;
-    }
-
-    // Mémorise la tâche en attente — si l'onglet est mis en veille prolongée puis
-    // entièrement déchargé (cas extrême sur mobile), ce qui suit permet de
-    // reprendre le suivi au rechargement plutôt que de perdre la réponse.
-    pendingChatJobId=submitResp.job_id;
-    pendingChatOriginalMsg=msg;
-    localStorage.setItem('sutur_pending_job', JSON.stringify({job_id:submitResp.job_id, thread_id:currentThreadId, original_msg:msg}));
-    await pollChatResult(submitResp.job_id, msg);
-  }catch(e){
-    rmTyping();addMsg('ai','Erreur de connexion.');
-    setStatus('En ligne','idle');busy=false;
-  }
+  if(mc){handleMediaCmd(mc,msg);busy=false;setStatus('En ligne','idle');syncSendButton();return}
+  await submitChat({
+    msg,model,
+    location:userLocation,
+    image_data:currentPhotoB64?(currentPhotoB64.includes(',')?currentPhotoB64.split(',')[1]:currentPhotoB64):null,
+    image_type:currentPhotoType||'image/jpeg',
+    document_data:currentDocumentB64?(currentDocumentB64.includes(',')?currentDocumentB64.split(',')[1]:currentDocumentB64):null,
+    document_type:currentDocumentType||'application/pdf',
+    document_name:currentDocumentName||null,
+    voice_mode:!!voiceModeActive,
+    device_type:window.innerWidth<600?'mobile':'desktop',
+  },{userPushed:true});
 }
 
 // ── Traitement du résultat une fois la tâche terminée — extrait de l'ancien
 // sendMsg() pour être appelable aussi bien juste après l'envoi que beaucoup
 // plus tard, si l'interrogation reprend après une mise en arrière-plan. ──────
 function handleChatResult(data, originalMsg){
-    if(data.thread_id && !currentThreadId) currentThreadId=data.thread_id;
+    const isNewThread=!!(data.thread_id && !currentThreadId);
+    if(isNewThread) currentThreadId=data.thread_id;
+    // Nouvelle conversation : le titre intelligent est généré en arrière-plan juste
+    // après la première réponse — la liste se met à jour toute seule.
+    if(isNewThread && typeof refreshThreadsSoon==='function') refreshThreadsSoon();
     const reply=data.reply||data.detail||'Erreur';
     history.push({role:'assistant',content:reply});
     // Vérifier si des actions spéciales sont disponibles
     checkSpecialActions(originalMsg, reply);
 
-    // Brouillon d'email — afficher interface de confirmation
+    // Brouillon d'email — carte construite en DOM (jamais d'HTML venant du contenu)
     if(data.draft_email && data.draft_email.draft_email){
-      const d=data.draft_email;
-      const emailHtml=`
-        <div style="background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.2);border-radius:12px;padding:14px;margin-top:8px">
-          <div style="font-size:9px;color:rgba(0,212,255,.5);letter-spacing:2px;margin-bottom:10px">✉ BROUILLON D'EMAIL</div>
-          <div style="font-size:11px;color:rgba(150,120,255,.6);margin-bottom:4px">À :</div>
-          <div style="font-size:12px;color:#c8aaff;margin-bottom:8px" id="draft-to">${d.to||'<non spécifié>'}</div>
-          <div style="font-size:11px;color:rgba(150,120,255,.6);margin-bottom:4px">Objet :</div>
-          <div style="font-size:12px;color:#c8aaff;margin-bottom:8px">${d.subject||''}</div>
-          <div style="font-size:11px;color:rgba(150,120,255,.6);margin-bottom:4px">Message :</div>
-          <div style="font-size:12px;color:#e0d0ff;white-space:pre-wrap;margin-bottom:12px;line-height:1.6">${d.body||''}</div>
-          <div style="display:flex;gap:8px">
-            <button onclick="sendDraftEmail(${JSON.stringify(d).replace(/"/g,'&quot;')})" style="flex:1;padding:8px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);border-radius:8px;color:#00d4ff;font-size:10px;letter-spacing:1px;cursor:pointer;font-family:'Courier New',monospace">✓ ENVOYER</button>
-            <button onclick="this.closest('div[style]').remove()" style="flex:1;padding:8px;background:rgba(255,60,60,.07);border:1px solid rgba(255,60,60,.2);border-radius:8px;color:#ff6060;font-size:10px;letter-spacing:1px;cursor:pointer;font-family:'Courier New',monospace">✗ ANNULER</button>
-          </div>
-        </div>`;
-      addMsg('ai','Voici le mail que j\'ai rédigé pour toi :'+emailHtml,false);
+      discardLiveMessage();
+      addMsg('ai','Voici le mail que j\'ai rédigé pour toi :',false);
+      appendDraftEmailCard(data.draft_email);
     }else{
-      addMsg('ai',reply,true);
+      commitAiMessage(reply,true,data);
     }
 
     // Carte persistante — reste ouverte, se met juste à jour à chaque nouvelle demande de lieu
@@ -481,7 +458,7 @@ function handleChatResult(data, originalMsg){
       img.onclick=()=>window.open(data.image.url,'_blank');
       imgWrap.appendChild(img);
       cbImg.appendChild(imgWrap);
-      cbImg.scrollTop=cbImg.scrollHeight;
+      scrollChatToBottom(false);
     }
 
     // Vidéo YouTube trouvée — ouverture automatique, comme une vraie lecture
@@ -495,70 +472,4 @@ function handleChatResult(data, originalMsg){
     const emot=data.emotion||'neutre';
     const hemot=document.getElementById('hemot');
     if(hemot)hemot.textContent=emotIcons[emot]||'';
-}
-
-
-let pendingChatJobId=null;
-let pendingChatOriginalMsg='';
-let pollTimeoutHandle=null;
-
-async function pollChatResult(jobId, originalMsg){
-  // Interroge le résultat toutes les 2s — le traitement réel continue côté
-  // serveur même si l'onglet est mis en arrière-plan entre deux interrogations,
-  // c'est justement tout l'intérêt de ce mécanisme : la tâche ne dépend plus
-  // d'une connexion ouverte en continu pour aboutir.
-  try{
-    const data=await apiCall(`/chat/result/${jobId}`,'GET');
-    if(!data || data.status==='processing'){
-      pollTimeoutHandle=setTimeout(()=>pollChatResult(jobId, originalMsg),2000);
-      return;
-    }
-    pendingChatJobId=null;
-    localStorage.removeItem('sutur_pending_job');
-    rmTyping();
-    handleChatResult(data, originalMsg);
-    setStatus('En ligne','idle');busy=false;
-  }catch(e){
-    // Une erreur réseau PENDANT l'interrogation (ex: onglet qui revient tout
-    // juste d'arrière-plan, connexion pas encore rétablie) n'est jamais un échec
-    // définitif — on réessaie, la tâche continue d'exister côté serveur quoi
-    // qu'il arrive, ce n'est qu'une histoire d'aller la consulter à nouveau.
-    pollTimeoutHandle=setTimeout(()=>pollChatResult(jobId, originalMsg),3000);
-  }
-}
-
-// Dès que l'onglet redevient visible, vérifie immédiatement une tâche en
-// attente plutôt que d'attendre le prochain cycle — les minuteurs JS sont
-// ralentis ou suspendus en arrière-plan sur mobile, cette vérification
-// immédiate évite un délai perceptible au retour de l'utilisateur.
-document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible' && pendingChatJobId){
-    if(pollTimeoutHandle) clearTimeout(pollTimeoutHandle);
-    pollChatResult(pendingChatJobId, pendingChatOriginalMsg);
-  }
-});
-
-// Au chargement de la page — si l'onglet a été entièrement déchargé pendant
-// qu'une tâche tournait encore (mise en veille prolongée sur iOS notamment),
-// reprend le suivi de cette tâche plutôt que de perdre silencieusement la
-// réponse déjà prête côté serveur.
-function resumePendingChatJobIfAny(){
-  try{
-    const saved=localStorage.getItem('sutur_pending_job');
-    if(!saved) return;
-    const parsed=JSON.parse(saved);
-    if(!parsed.job_id) return;
-    pendingChatJobId=parsed.job_id;
-    pendingChatOriginalMsg=parsed.original_msg||'';
-    if(parsed.thread_id) currentThreadId=parsed.thread_id;
-    busy=true;addTyping();setStatus('Traitement...','think');
-    pollChatResult(parsed.job_id, pendingChatOriginalMsg);
-  }catch(e){
-    localStorage.removeItem('sutur_pending_job');
-  }
-}
-if(document.readyState==='loading'){
-  document.addEventListener('DOMContentLoaded', resumePendingChatJobIfAny);
-}else{
-  resumePendingChatJobIfAny();
 }

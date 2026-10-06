@@ -33,6 +33,7 @@ function handlePhotoSelect(input){
     const dataUrl = e.target.result;
     // Stocker le data URL complet pour l'affichage
     currentPhotoB64 = dataUrl;
+    if(typeof syncSendButton==='function')syncSendButton();
     // Afficher dans le modal
     const img = document.getElementById('photo-modal-img');
     const btn = document.getElementById('photo-validate-btn');
@@ -71,6 +72,7 @@ function sendPhotoNow(){
 
 function clearPhoto(){
   currentPhotoB64 = null;
+  if(typeof syncSendButton==='function')syncSendButton();
   currentPhotoType = 'image/jpeg';
   const preview = document.getElementById('photo-preview-bar');
   const thumb = document.getElementById('photo-thumb');
