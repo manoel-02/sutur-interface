@@ -5,6 +5,20 @@
 let holomap_scene=null, holomap_camera=null, holomap_renderer=null, holomap_group=null;
 let holomap_animating=false;
 
+// Retirer le groupe de la scène ne libère rien côté GPU : sans dispose(), chaque
+// lieu affiché laissait derrière lui ses bâtiments, ses routes et sa grille en
+// mémoire vidéo, et le panneau s'ouvre une fois par lieu consulté.
+function disposeHolomapGroup(){
+  if(!holomap_group) return;
+  holomap_group.traverse(o=>{
+    if(o.geometry) o.geometry.dispose();
+    const m=o.material;
+    if(m) (Array.isArray(m)?m:[m]).forEach(x=>x&&x.dispose());
+  });
+  if(holomap_group.parent) holomap_group.parent.remove(holomap_group);
+  holomap_group=null;
+}
+
 async function showHolographicLocation(mapData){
   const hasGeometry = mapData && ((mapData.buildings && mapData.buildings.length) || (mapData.roads && mapData.roads.length));
   if(!hasGeometry) return; // Rien à montrer -> la carte 2D classique suffit, pas la peine d'ouvrir le modal
@@ -33,7 +47,7 @@ async function showHolographicLocation(mapData){
   holomap_camera.aspect=w/h;
   holomap_camera.updateProjectionMatrix();
 
-  if(holomap_group) holomap_scene.remove(holomap_group);
+  disposeHolomapGroup();
   holomap_group=new THREE.Group();
 
   // Étoiles de fond — cohérent avec le thème galactique déjà établi
@@ -53,6 +67,10 @@ async function showHolographicLocation(mapData){
   // Bâtiments — extrusion du VRAI contour (données OSM), hauteur réelle si connue.
   // Doré = hauteur confirmée par une vraie donnée, violet = hauteur estimée par défaut
   // (on ne prétend jamais connaître une hauteur qu'on n'a pas vraiment).
+  // Deux tampons seulement (hauteur réelle / hauteur estimée) au lieu de deux
+  // maillages par bâtiment : sur une capitale dense ça faisait des centaines
+  // d'objets et autant d'appels de rendu par image, pour un rendu identique.
+  const merged={0xd4af37:[], 0x8b5cf6:[]};
   (mapData.buildings||[]).forEach(b=>{
     if(!b.points || b.points.length<3) return;
     const shape=new THREE.Shape();
@@ -64,10 +82,20 @@ async function showHolographicLocation(mapData){
     try{ geo=new THREE.ExtrudeGeometry(shape,{depth:height,bevelEnabled:false}); }
     catch(e){ return; } // contour dégénéré (points colinéaires...) -> on l'ignore plutôt que planter
     geo.rotateX(-Math.PI/2);
-    const color=b.height_is_real?0xd4af37:0x8b5cf6;
-    holomap_group.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color,wireframe:true,transparent:true,opacity:0.85})));
-    holomap_group.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.05,side:THREE.DoubleSide})));
+    const arr=geo.getAttribute('position').array;
+    const bucket=merged[b.height_is_real?0xd4af37:0x8b5cf6];
+    for(let i=0;i<arr.length;i++) bucket.push(arr[i]);
+    geo.dispose();
   });
+  for(const key of Object.keys(merged)){
+    const pos=merged[key];
+    if(!pos.length) continue;
+    const color=Number(key);
+    const geo=new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos),3));
+    holomap_group.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.05,side:THREE.DoubleSide})));
+    holomap_group.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color,wireframe:true,transparent:true,opacity:0.85})));
+  }
 
   // Routes — tracé réel, ligne lumineuse au ras du sol
   (mapData.roads||[]).forEach(r=>{
@@ -100,4 +128,6 @@ function holomapLoop(){
 
 function closeHolomap(){
   document.getElementById('holomap-modal').style.display='none';
+  disposeHolomapGroup();
+  if(holomap_renderer) holomap_renderer.renderLists.dispose();
 }

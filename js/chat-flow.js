@@ -12,7 +12,7 @@ const CHAT_MAX_WAIT_MS=4*60*1000;
 const SEND_LABELS={
   idle:'Envoyer',
   ready:'Envoyer le message',
-  sending:'Envoi en cours…',
+  sending:'Envoi en cours — appuie pour annuler',
   streaming:'Arrêter la génération',
   completed:'Réponse terminée',
   error:'Échec — réessayer',
@@ -111,27 +111,26 @@ function setSendState(state){
   b.setAttribute('aria-label',SEND_LABELS[state]||'Envoyer');
   b.title=SEND_LABELS[state]||'Envoyer';
   b.setAttribute('aria-busy',state==='sending'||state==='streaming'?'true':'false');
-  b.setAttribute('aria-disabled',state==='idle'||state==='sending'?'true':'false');
+  b.setAttribute('aria-disabled',state==='idle'?'true':'false'); // « sending » est annulable : jamais annoncé comme inactif
 }
 
 function syncSendButton(){
   if(['sending','streaming','completed','error'].includes(chatFlow.state))return;
   const inp=document.getElementById('cinp');
-  const has=!!((inp&&inp.value.trim())||(typeof currentPhotoB64!=='undefined'&&currentPhotoB64));
+  const has=!!((inp&&inp.value.trim())||(typeof currentPhotoB64!=='undefined'&&currentPhotoB64)||(typeof currentDocumentB64!=='undefined'&&currentDocumentB64));
   setSendState(has?'ready':'idle');
 }
 
 function onSendClick(){
-  if(chatFlow.state==='streaming'){
+  if(chatFlow.state==='streaming'||chatFlow.state==='sending'){
     // Un double-clic sur « Envoyer » ne doit jamais annuler sa propre génération : le bouton
     // devient « Arrêter » dès que le serveur accepte la demande (quelques dizaines de ms),
     // donc le 2e clic d'un double-clic tomberait dessus. Courte période de protection.
     if(chatFlow.ctx&&Date.now()-chatFlow.ctx.startedAt<800)return;
     cancelGeneration();return;
   }
-  if(chatFlow.state==='sending')return;
   const inp=document.getElementById('cinp');
-  if(!inp.value.trim()&&!(typeof currentPhotoB64!=='undefined'&&currentPhotoB64)){inp.focus();return;}
+  if(!inp.value.trim()&&!(typeof currentPhotoB64!=='undefined'&&currentPhotoB64)&&!(typeof currentDocumentB64!=='undefined'&&currentDocumentB64)){inp.focus();return;}
   sendMsg();
 }
 
@@ -166,11 +165,15 @@ function _clearPendingJob(){
 // Le serveur publie le texte partiel au fil de la génération ; il arrive par
 // paquets à chaque interrogation. Le rendu lisse ces paquets (apparition fluide,
 // sans à-coups) et reste correct à chaque instant (Markdown incomplet toléré).
-const liveStream={row:null,mt:null,target:'',shown:0,raf:0};
+const liveStream={row:null,mt:null,target:'',shown:0,raf:0,lastRender:0};
+// Le Markdown est rendu sur TOUT le texte déjà reçu : le refaire à chaque image donnait
+// un coût qui grandit avec la réponse (le téléphone gelait sur les réponses longues). On
+// s'en tient à une dizaine de rendus par seconde, ce qui suffit à l'effet de frappe.
+const LIVE_RENDER_MS=90;
 
 function _resetLive(){
   if(liveStream.raf)cancelAnimationFrame(liveStream.raf);
-  liveStream.row=null;liveStream.mt=null;liveStream.target='';liveStream.shown=0;liveStream.raf=0;
+  liveStream.row=null;liveStream.mt=null;liveStream.target='';liveStream.shown=0;liveStream.raf=0;liveStream.lastRender=0;
 }
 
 function startLiveMessage(){
@@ -198,12 +201,19 @@ function _liveTick(){
   L.raf=0;
   if(!L.row)return;
   if(L.shown<L.target.length){
+    const now=performance.now();
+    if(now-L.lastRender<LIVE_RENDER_MS){L.raf=requestAnimationFrame(_liveTick);return;}
+    L.lastRender=now;
     const gap=L.target.length-L.shown;
-    L.shown=Math.min(L.target.length,L.shown+Math.max(2,Math.ceil(gap/10)));
+    // Pas plus large qu'avant : il y a moins de rendus, donc chacun doit rattraper plus.
+    L.shown=Math.min(L.target.length,L.shown+Math.max(4,Math.ceil(gap/4)));
     const c=L.target.charCodeAt(L.shown-1);
     if(c>=0xD800&&c<=0xDBFF&&L.shown<L.target.length)L.shown++; // ne jamais couper un emoji en deux
     L.mt.innerHTML=renderMarkdown(L.target.slice(0,L.shown))+'<span class="stream-caret" aria-hidden="true"></span>';
-    scrollChatToBottom(false);
+    // Défilement direct : scrollChatToBottom relit scrollHeight dans une 2e passe, utile
+    // à l'arrivée d'un message mais pas à cette cadence (deux reflows par rendu).
+    if(chatPinned){const sc=_chatScroller();if(sc)sc.scrollTop=sc.scrollHeight;}
+    else updateScrollButton(true); // relecture plus haut : on ne tire pas, on signale le nouveau
   }
   if(L.shown<L.target.length)L.raf=requestAnimationFrame(_liveTick);
 }
@@ -295,7 +305,7 @@ async function waitForChatResult(ctx){
 //            document_name,voice_mode,device_type}
 // opts    : {userPushed:true si le message est déjà dans history, regenerate:true}
 async function submitChat(payload,opts={}){
-  const ctx={jobId:null,startedAt:Date.now(),stopped:false,payload,opts};
+  const ctx={jobId:null,startedAt:Date.now(),stopped:false,payload,opts,abort:new AbortController()};
   chatFlow.ctx=ctx;
   setSendState('sending');
   setStatus('Envoi...','think');
@@ -305,10 +315,14 @@ async function submitChat(payload,opts={}){
     return;
   }
   try{
+    // Le backend ajoute lui-même payload.msg à la fin de l'historique reçu (chat.py) :
+    // l'y laisser le ferait parvenir deux fois au modèle.
+    const hist=history.slice();
+    if(hist.length&&hist[hist.length-1].role==='user'&&hist[hist.length-1].content===payload.msg)hist.pop();
     const body={
       message:payload.msg,
       model:payload.model,
-      history:history.slice(-8),
+      history:hist.slice(-8),
       location:payload.location,
       image_data:payload.image_data||null,
       image_type:payload.image_type||'image/jpeg',
@@ -320,7 +334,7 @@ async function submitChat(payload,opts={}){
       thread_id:currentThreadId,
     };
     if(opts.regenerate)body.regenerate=true;
-    const sub=await apiCall('/chat','POST',body,{timeout:60000});
+    const sub=await apiCall('/chat','POST',body,{timeout:60000,signal:ctx.abort.signal});
     if(ctx.stopped)return;
     if(!sub||!sub.job_id)throw new ApiError('Réponse inattendue du serveur.',{kind:'server'});
     ctx.jobId=sub.job_id;
@@ -415,7 +429,11 @@ function showChatError(e,ctx){
   const cb=document.getElementById('chatbox');
   const kind=ERROR_COPY[e.kind]?e.kind:'unknown';
   let [title,text]=ERROR_COPY[kind];
+  // Quand le serveur dit POURQUOI (champ detail de FastAPI, ou data.reply d'une tâche en
+  // échec), c'est son explication qui aide — la phrase générique la faisait disparaître.
+  const said=(e.kind==='server'||e.kind==='client')&&e.message&&e.message.length<400?String(e.message).trim():'';
   if(kind==='ratelimit')text=(e.message?e.message+' ':'')+'Ton message est conservé : réessaie dans un instant.';
+  else if(said)text=said+' Ton message est conservé : tu peux réessayer.';
   if(e.interrupted){title='Traitement interrompu';text=e.message||text;}
   const row=document.createElement('div');
   row.className='msg-row msg-error-row';
@@ -451,8 +469,11 @@ function retryAfterError(errorRow,ctx){
 // ═══ Annulation ═══════════════════════════════════════════════════════════
 function cancelGeneration(){
   const ctx=chatFlow.ctx;
-  if(!ctx||chatFlow.state!=='streaming')return;
+  if(!ctx||(chatFlow.state!=='streaming'&&chatFlow.state!=='sending'))return;
   ctx.stopped=true;
+  // L'envoi lui-même peut être encore en vol (jusqu'à 60 s) : on coupe la requête, sinon
+  // l'utilisateur n'avait aucun moyen de reprendre la main avant son expiration.
+  if(ctx.abort)ctx.abort.abort();
   if(ctx.jobId)apiCall('/chat/cancel/'+ctx.jobId,'POST',null,{timeout:8000}).catch(()=>{});
   _clearPendingJob();
   rmTyping();
@@ -539,7 +560,7 @@ function onChatboxClick(e){
     case 'regen': regenerateLast();break;
     case 'edit':  editLastUserMessage(row);break;
     case 'retry': {const er=act.closest('.msg-error-row');if(er&&er._retry)er._retry();break;}
-    case 'relogin': logout();break;
+    case 'relogin': forceReauth('Ta session a été refusée par le serveur. Saisis à nouveau ton token.');break;
   }
 }
 
@@ -580,6 +601,15 @@ function refreshMessageActions(){
 // Si l'onglet a été entièrement déchargé pendant qu'une tâche tournait (mise en
 // veille prolongée sur mobile), le suivi reprend au lieu de perdre la réponse.
 let _resumeTries=0;
+// loadCfg() pose TOKEN avant même l'affichage de l'écran de verrouillage : reprendre là
+// occupait le chat (busy=true, indicateur de frappe) derrière l'écran, le premier vrai
+// message de l'utilisateur était refusé en silence et la réponse reprise atterrissait
+// sans question au-dessus. On attend donc que la session soit réellement ouverte.
+function _sessionUnlocked(){
+  const lock=document.getElementById('lock');
+  return !!TOKEN&&!!lock&&lock.style.display==='none';
+}
+
 function resumePendingChatJobIfAny(){
   let parsed;
   try{
@@ -588,13 +618,22 @@ function resumePendingChatJobIfAny(){
     parsed=JSON.parse(saved);
     if(!parsed.job_id){_clearPendingJob();return;}
   }catch(e){_clearPendingJob();return;}
-  if(!TOKEN){ // pas encore connecté : on réessaie un peu plus tard (au plus ~60 s)
-    if(++_resumeTries<40)setTimeout(resumePendingChatJobIfAny,1500);
+  if(!_sessionUnlocked()){ // pas encore déverrouillé : on réessaie (au plus ~5 min, la durée de vie d'une tâche)
+    if(++_resumeTries<200)setTimeout(resumePendingChatJobIfAny,1500);
     return;
   }
   if(busy)return;
   if(parsed.thread_id)currentThreadId=parsed.thread_id;
   busy=true;
+  // Le fil est vide après un rechargement : sans la question, la réponse reprise serait
+  // une réponse à rien.
+  if(parsed.original_msg){
+    const lastUser=_findLastRow('user');
+    if(!lastUser||lastUser._src!==parsed.original_msg){
+      addMsg('user',parsed.original_msg);
+      history.push({role:'user',content:parsed.original_msg});
+    }
+  }
   const ctx={jobId:parsed.job_id,startedAt:Date.now(),stopped:false,payload:{msg:parsed.original_msg||''},opts:{}};
   chatFlow.ctx=ctx;
   pendingChatJobId=parsed.job_id;

@@ -313,10 +313,9 @@ function resizeGlobe3D(){
   three_camera.updateProjectionMatrix();
 }
 
-function renderGlobe3D(t){
+function renderGlobe3D(tSec,dt){
   if(!use3DGlobe||!three_core)return;
   const m=GMODES[gMode];
-  const tSec=t*0.016; // approx secondes, à raison de ~60 images/seconde
   const col=new THREE.Color(m.col);
 
   // ── Intensité du bruit selon le mode — le cœur "respire" toujours, mais
@@ -359,7 +358,7 @@ function renderGlobe3D(t){
   // ── Réaction au toucher — un clic/tap fait "fouetter" les tentacules,
   // plus vite et plus fort, façon symbiote qui réagit au contact. Décroît
   // ensuite tout seul vers la normale sur environ 1,4 seconde. ──────────────
-  touchReactPhase=Math.max(0,touchReactPhase-1/60/1.4);
+  touchReactPhase=Math.max(0,touchReactPhase-dt/1.4);
   const touchBoost=1+touchReactPhase*2.8;
   const touchSpeedBoost=1+touchReactPhase*2.2;
 
@@ -410,7 +409,7 @@ function renderGlobe3D(t){
   }
 
   // ── Signal d'accueil — bref éclat quand le mode vocal vient de s'ouvrir ────
-  greetPulse=Math.max(0,greetPulse-1/60*0.8);
+  greetPulse=Math.max(0,greetPulse-dt*0.8);
   const greetBoost=1+greetPulse*0.25;
 
   // ── Mouvement d'ensemble — flottement lent, jamais parfaitement figé,
@@ -505,14 +504,69 @@ function drawGlobe(t){
   gctx.fillText(m.name,cx,GH-8);
 }
 
-function loop(t){
-  drawBg(t);
-  renderGlobe3D(gT);
-  drawGlobe(gT);
-  gT++;
-  document.getElementById('htime').textContent=new Date().toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'});
-  requestAnimationFrame(loop);
+// ── BOUCLE D'ANIMATION ────────────────────────────────────────────────────
+// Elle tournait sans condition : fond plein écran, 2 450 évaluations de bruit 3D
+// et trois téléversements de tampon à chaque image, même onglet caché, même sur
+// l'écran de verrouillage, même avec le globe World ouvert par-dessus (deux
+// contextes WebGL vivants). Sur un téléphone, c'est de la batterie brûlée pour
+// rien. Elle s'arrête donc quand l'onglet est caché et se réduit au fond, à
+// cadence basse, quand l'avatar n'est pas à l'écran.
+let gLoopRaf=null, gLoopPrevMs=0, gLoopBgMs=0, gLoopClockMs=0, gSec=0;
+
+function avatarIsOnScreen(){
+  if(!gActive) return false; // avant connexion, l'avatar n'est pas monté
+  const area=document.getElementById('globe-area');
+  if(!area || area.style.display==='none') return false;
+  // Un modal 3D plein écran par-dessus a son propre rendu : l'avatar en dessous
+  // n'est plus visible et n'a aucune raison de continuer à calculer.
+  for(const id of ['world-modal','holomap-modal']){
+    const m=document.getElementById(id);
+    if(m && m.style.display!=='none' && m.style.display!=='') return false;
+  }
+  return true;
 }
+
+function loop(ms){
+  gLoopRaf=null;
+  if(document.hidden) return; // reprise par l'écouteur visibilitychange
+  // Horloge réelle : le temps d'animation était déduit du compteur d'images
+  // (t*0.016), donc deux fois trop rapide sur un écran 120 Hz et ralenti dès que
+  // l'appareil peine. Le pas est borné pour qu'un retour d'onglet caché ne
+  // produise pas un bond d'animation.
+  const dt=gLoopPrevMs?Math.min((ms-gLoopPrevMs)/1000,0.1):1/60;
+  gLoopPrevMs=ms;
+  gSec+=dt;
+
+  if(avatarIsOnScreen()){
+    drawBg(gSec*1000);
+    renderGlobe3D(gSec,dt);
+    drawGlobe(gSec*60);
+    if(ms-gLoopClockMs>1000){
+      gLoopClockMs=ms;
+      document.getElementById('htime').textContent=new Date().toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'});
+    }
+  }else if(ms-gLoopBgMs>120){
+    // Le ciel étoilé reste le fond de l'écran de verrouillage et des autres
+    // onglets : on le garde vivant, mais à ~8 images/seconde et sans l'avatar.
+    gLoopBgMs=ms;
+    drawBg(gSec*1000);
+  }
+  gLoopRaf=requestAnimationFrame(loop);
+}
+
+function startGlobeLoop(){
+  if(gLoopRaf!==null||document.hidden) return;
+  gLoopPrevMs=0; // pas de rattrapage sur le temps passé à l'arrêt
+  gLoopRaf=requestAnimationFrame(loop);
+}
+
+function stopGlobeLoop(){
+  if(gLoopRaf===null) return;
+  cancelAnimationFrame(gLoopRaf);
+  gLoopRaf=null;
+}
+
+document.addEventListener('visibilitychange',()=>{ document.hidden?stopGlobeLoop():startGlobeLoop(); });
 
 function setGlobeMode(n){
   gMode=n;

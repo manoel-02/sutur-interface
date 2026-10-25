@@ -91,23 +91,39 @@ function rdUpdateScreen(b64){
   }
 }
 
-function rdStartStream(){
-  rdStreaming = true;
-  rdConsecutiveFailures = 0;
-  const btn = document.getElementById('rd-stream-btn');
-  if(btn) btn.textContent = '⏸ PAUSE';
+// Les deux boucles sont séparées du démarrage/arrêt du stream : un onglet passé en
+// arrière-plan continuait à tirer une capture JPEG toutes les 600 ms sur les données
+// mobiles, pour un écran que personne ne regardait.
+function rdStartPolling(){
   if(rdStreamInterval) clearInterval(rdStreamInterval);
   if(rdStatusInterval) clearInterval(rdStatusInterval);
   rdLastFrameTs = Date.now();
   rdStreamInterval = setInterval(rdScreenshot, 600);
   rdStatusInterval = setInterval(checkRemoteStatus, 5000); // détecte une déconnexion en direct
+}
+
+function rdStopPolling(){
+  if(rdStreamInterval){ clearInterval(rdStreamInterval); rdStreamInterval = null; }
+  if(rdStatusInterval){ clearInterval(rdStatusInterval); rdStatusInterval = null; }
+}
+
+document.addEventListener('visibilitychange',()=>{
+  if(!rdStreaming) return;
+  if(document.hidden) rdStopPolling(); else rdStartPolling();
+});
+
+function rdStartStream(){
+  rdStreaming = true;
+  rdConsecutiveFailures = 0;
+  const btn = document.getElementById('rd-stream-btn');
+  if(btn) btn.textContent = '⏸ PAUSE';
+  if(!document.hidden) rdStartPolling(); // lancé depuis un onglet caché (mot-clé du chat) : attendre le retour
   apiCall('/remote/stream/start','POST').catch(()=>{});
 }
 
 function rdStopStream(){
   rdStreaming = false;
-  if(rdStreamInterval){ clearInterval(rdStreamInterval); rdStreamInterval = null; }
-  if(rdStatusInterval){ clearInterval(rdStatusInterval); rdStatusInterval = null; }
+  rdStopPolling();
   apiCall('/remote/stream/stop','POST').catch(()=>{});
   const btn = document.getElementById('rd-stream-btn');
   if(btn) btn.textContent = '▶ STREAM';

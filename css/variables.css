@@ -7,6 +7,16 @@
 html,body{height:100%;width:100%;background:#0a0a0f;overflow:hidden;position:fixed;inset:0}
 
 :root{
+  /* Hauteurs du bas d'écran. Elles étaient codées en dur à trois endroits avec des
+     valeurs incohérentes : le conteneur réservait 90 px alors que la barre de saisie
+     en occupe ~136, donc les derniers 46 px du message le plus récent restaient
+     cachés dessous, sans aucun moyen de les atteindre.
+     --kb est la hauteur du clavier virtuel, écrite par le JS (voir init.js). */
+  --nav-h: 76px;
+  --inp-h: 62px;
+  --kb: 0px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+
   --font-main: 'Inter', -apple-system, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Courier New', monospace;
 

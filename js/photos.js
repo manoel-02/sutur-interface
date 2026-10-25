@@ -24,31 +24,54 @@ function closePhotoModal(){
   if(modal) modal.style.display='none';
 }
 
+// Un téléphone produit des JPEG de 3 à 6 Mo ; en base64 dans un corps JSON cela faisait
+// 4 à 8 Mo et l'envoi dépassait régulièrement son délai. On réduit et ré-encode avant
+// l'envoi. L'original n'est jamais converti en base64 : il est lu via une URL d'objet,
+// libérée dès le dessin terminé, et seules deux images réduites restent en mémoire.
+const PHOTO_MAX_EDGE = 1600;
+const PHOTO_QUALITY = 0.82;
+const PHOTO_THUMB_EDGE = 160;
+
+function _photoResize(img, maxEdge, quality){
+  const ratio = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(img.naturalWidth * ratio));
+  c.height = Math.max(1, Math.round(img.naturalHeight * ratio));
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', quality);
+}
+
 function handlePhotoSelect(input){
   const file = input.files[0];
   if(!file) return;
-  currentPhotoType = file.type || 'image/jpeg';
-  const reader = new FileReader();
-  reader.onload = e => {
-    const dataUrl = e.target.result;
-    // Stocker le data URL complet pour l'affichage
-    currentPhotoB64 = dataUrl;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    const full = _photoResize(img, PHOTO_MAX_EDGE, PHOTO_QUALITY);
+    const thumb = _photoResize(img, PHOTO_THUMB_EDGE, 0.7);
+    URL.revokeObjectURL(url);
+    currentPhotoType = 'image/jpeg'; // le ré-encodage impose le type réellement envoyé
+    currentPhotoB64 = full;
     if(typeof syncSendButton==='function')syncSendButton();
     // Afficher dans le modal
-    const img = document.getElementById('photo-modal-img');
+    const modalImg = document.getElementById('photo-modal-img');
     const btn = document.getElementById('photo-validate-btn');
-    if(img){ img.src=dataUrl; img.style.display='block'; }
+    if(modalImg){ modalImg.src=full; modalImg.style.display='block'; }
     if(btn){ btn.style.opacity='1'; btn.style.pointerEvents='auto'; }
     // Ouvrir le modal si pas déjà ouvert
     const modal = document.getElementById('photo-modal');
     if(modal) modal.style.display='flex';
     // Miniature dans la barre
-    const thumb=document.getElementById('photo-thumb');
+    const thumbEl=document.getElementById('photo-thumb');
     const preview=document.getElementById('photo-preview-bar');
-    if(thumb) thumb.src=dataUrl;
+    if(thumbEl) thumbEl.src=thumb;
     if(preview) preview.style.display='flex';
   };
-  reader.readAsDataURL(file);
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    alert('Image illisible — réessaie avec un autre fichier.');
+  };
+  img.src = url;
   input.value='';
 }
 
@@ -173,6 +196,7 @@ function handlePdfSelect(input){
   const reader = new FileReader();
   reader.onload = e => {
     currentDocumentB64 = e.target.result; // data URL complet, nettoyé au moment de l'envoi
+    if(typeof syncSendButton==='function')syncSendButton(); // un document seul suffit pour envoyer
     const bar = document.getElementById('pdf-preview-bar');
     const nameEl = document.getElementById('pdf-filename');
     if(nameEl) nameEl.textContent = file.name;
@@ -187,6 +211,7 @@ function handlePdfSelect(input){
 
 function clearPdf(){
   currentDocumentB64 = null;
+  if(typeof syncSendButton==='function')syncSendButton();
   currentDocumentName = '';
   const bar = document.getElementById('pdf-preview-bar');
   if(bar) bar.style.display='none';

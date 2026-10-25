@@ -141,6 +141,54 @@ function hidePersistentMap(){
   if(wrap)wrap.style.display='none';
 }
 
+// Couches géospatiales vivantes jointes à une réponse (avions en vol, séismes, lancements) :
+// un point étiqueté par objet, posé sur la carte persistante. Une réponse sans champ
+// « points » ne passe jamais ici — l'affichage reste exactement celui d'avant.
+let mapPointLayers=[];
+const MAP_POINT_STYLE={
+  aircraft:{color:'#00d4ff',glyph:'✈'},
+  quake:{color:'#f87171',glyph:'◉'},   quakes:{color:'#f87171',glyph:'◉'},
+  launch:{color:'#c9a227',glyph:'▲'},  launches:{color:'#c9a227',glyph:'▲'},
+  default:{color:'#8b5cf6',glyph:'●'},
+};
+
+function clearMapPoints(){
+  if(persistentMapInstance)mapPointLayers.forEach(l=>persistentMapInstance.removeLayer(l));
+  mapPointLayers=[];
+}
+
+async function showMapPoints(points,layer){
+  if(!Array.isArray(points)||!points.length){clearMapPoints();return;}
+  try{ await ensureLeaflet(); }catch(e){ return; }
+  if(!persistentMapInstance)return; // carte jamais ouverte : rien à décorer
+  clearMapPoints();
+  const fallback=MAP_POINT_STYLE[layer]||MAP_POINT_STYLE.default;
+  const bounds=[];
+  for(const p of points){
+    if(!p||p.lat==null||p.lng==null)continue;
+    const st=MAP_POINT_STYLE[p.kind]||fallback;
+    // Un cap n'est appliqué que s'il est réellement numérique : il finit dans une
+    // déclaration CSS, jamais une valeur venue telle quelle de la réponse.
+    const h=Number(p.heading);
+    const spin=(p.kind==='aircraft'&&Number.isFinite(h))?';transform:rotate('+h+'deg)':'';
+    const m=L.marker([p.lat,p.lng],{
+      icon:L.divIcon({
+        className:'map-point',
+        html:'<span style="font-size:13px;line-height:1;display:inline-block;text-shadow:0 0 4px rgba(0,0,0,.9);color:'+st.color+spin+'">'+st.glyph+'</span>'
+          +(p.label?'<span style="display:block;margin-top:1px;font-size:9px;letter-spacing:.5px;color:#e8e4f8;text-shadow:0 0 4px #000;white-space:nowrap">'+escapeHtml(p.label)+'</span>':''),
+        iconSize:null,
+      }),
+      keyboard:false,
+    }).addTo(persistentMapInstance);
+    const tip=[p.label,p.detail].filter(Boolean).join(' — ');
+    if(tip)m.bindTooltip(tip,{direction:'top'});
+    mapPointLayers.push(m);
+    bounds.push([p.lat,p.lng]);
+  }
+  // Plusieurs objets : on cadre l'ensemble, sinon on garde la vue centrée du lieu.
+  if(bounds.length>1)persistentMapInstance.fitBounds(bounds,{padding:[40,40],maxZoom:9});
+}
+
 let persistentRouteLine=null, persistentRouteMarkers=[];
 
 async function showRouteOnMap(route){

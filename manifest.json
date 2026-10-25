@@ -1,17 +1,19 @@
 {
   "name": "Sutur",
   "short_name": "Sutur",
-  "description": "Assistant personnel IA — voix, vision, contrôle PC, veille autonome",
+  "description": "Assistant personnel de Manoel.",
+  "lang": "fr",
+  "dir": "ltr",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#0a0818",
-  "theme_color": "#0a0818",
   "orientation": "portrait",
+  "background_color": "#07070c",
+  "theme_color": "#7c6df2",
   "icons": [
-    { "src": "/icon-96.png", "sizes": "96x96", "type": "image/png" },
+    { "src": "/icon-96.png",  "sizes": "96x96",   "type": "image/png" },
     { "src": "/icon-152.png", "sizes": "152x152", "type": "image/png" },
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]

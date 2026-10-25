@@ -18,8 +18,17 @@ function setTheme(theme, init){
   const cmdPfx=document.getElementById('cmd-prefix');
   if(inp)inp.placeholder=theme==='terminal'?'entrer commande...':'Parle a Sutur...';
   if(cmdPfx)cmdPfx.style.display=theme==='terminal'?'flex':'none';
+  // Partage le thème avec le profil Sutur (l'île de bureau le lit) — sauf au chargement.
+  if(!init) apiCall('/profile','PUT',{ui_theme:theme}).catch(()=>{});
   // Vider le chat seulement si changement en live (pas au chargement)
   if(!init){
+    // Une réponse en cours s'écrit dans liveStream.row : vider le chat détacherait ce
+    // nœud, le texte serait perdu à l'écran tout en continuant d'alimenter l'historique
+    // — écran et contexte du modèle divergeaient. On garde le fil tel quel.
+    if(busy){
+      showToast('Thème appliqué. Le fil garde son apparence actuelle jusqu\'au prochain message.',{duration:3200});
+      return;
+    }
     const cb=document.getElementById('chatbox');
     if(cb)cb.innerHTML='';
     if(theme==='terminal'){
@@ -37,13 +46,16 @@ async function loadProfile(){
     const interests=data.interests||[];
     // Stocker le nom globalement
     currentUserName = data.name || '';
+    // Thème partagé avec l'île de bureau : le profil Sutur fait foi quand il existe.
+    if(data.ui_theme && data.ui_theme!==(localStorage.getItem('s_theme')||'default')) setTheme(data.ui_theme,true);
+    else if(!data.ui_theme && localStorage.getItem('s_theme')==='terminal') apiCall('/profile','PUT',{ui_theme:'terminal'}).catch(()=>{});
     document.getElementById('profile-display').innerHTML=`
-      <div class="prof-row"><div class="prof-lbl">Nom</div><div class="prof-val">${data.name||'-'}</div></div>
-      <div class="prof-row"><div class="prof-lbl">Profession</div><div class="prof-val">${data.profession||'-'}</div></div>
-      <div class="prof-row"><div class="prof-lbl">Localisation</div><div class="prof-val">${data.location_city||'-'}</div></div>
+      <div class="prof-row"><div class="prof-lbl">Nom</div><div class="prof-val">${escapeHtml(data.name||'-')}</div></div>
+      <div class="prof-row"><div class="prof-lbl">Profession</div><div class="prof-val">${escapeHtml(data.profession||'-')}</div></div>
+      <div class="prof-row"><div class="prof-lbl">Localisation</div><div class="prof-val">${escapeHtml(data.location_city||'-')}</div></div>
       <div class="prof-row"><div class="prof-lbl">Brief quotidien</div><div class="prof-val" style="display:flex;align-items:center;gap:8px"><span>${data.brief_enabled!==false?'Actif a '+(data.daily_brief_hour||8)+'h':'Desactive'}</span><button class="tog ${data.brief_enabled!==false?'on':'off'}" style="transform:scale(.7)" onclick="toggleBriefEnabled(this)"></button></div></div>
       <div class="prof-row" style="border:none"><div class="prof-lbl">Interets</div></div>
-      <div class="tag-list">${interests.map(i=>`<span class="tag">${i}</span>`).join('')||'<span style="color:rgba(120,80,255,.35);font-size:11px">Aucun</span>'}</div>`;
+      <div class="tag-list">${interests.map(i=>`<span class="tag">${escapeHtml(i)}</span>`).join('')||'<span style="color:rgba(120,80,255,.35);font-size:11px">Aucun</span>'}</div>`;
     if(data.profession)document.getElementById('prof-job').value=data.profession;
     if(interests.length)document.getElementById('prof-interests').value=interests.join(', ');
     if(data.location_city)document.getElementById('prof-city').value=data.location_city;
@@ -77,11 +89,45 @@ async function saveProfile(){
 }
 
 function saveConfig(){
-  const p=document.getElementById('new-pass-cfg').value.trim(),el=document.getElementById('el-cfg').value.trim(),a=document.getElementById('api-cfg').value.trim();
+  const p=document.getElementById('new-pass-cfg').value.trim(),el=document.getElementById('el-cfg').value.trim();
   if(p){localStorage.setItem('s_pass',p);PASS=p}
   if(el){localStorage.setItem('s_el',el);EL_KEY=el}
-  if(a){localStorage.setItem('s_api',a);API_URL=a}
   addMsg('ai','Configuration mise a jour.');
+}
+
+// Suivi d'une fenêtre d'autorisation OAuth.
+//
+// Deux défauts réels corrigés ici. Le fournisseur redirige vers
+// « …/?google=connected », mais cette redirection atterrit DANS la fenêtre
+// d'autorisation, qui démarre alors une deuxième copie complète de Sutur et y
+// affiche « connecté » — pendant que la fenêtre d'origine, celle que l'utilisateur
+// regarde, ne change pas. Sur téléphone, window.open donne un simple onglet : on se
+// retrouvait devant un doublon de l'application, à revenir en arrière à la main.
+// Et l'intervalle de surveillance n'était nettoyé que dans sa propre branche : avec
+// un bloqueur de fenêtres (popup === null) ou un onglet jamais refermé, il tournait
+// indéfiniment, et chaque clic sur CONNECTER en ajoutait un.
+function watchAuthPopup(popup, label, onDone){
+  if(!popup){
+    addMsg('ai','Ton navigateur a bloqué la fenêtre d\'autorisation '+label+'. Autorise les fenêtres surgissantes pour ce site, puis réessaie.',false);
+    return;
+  }
+  const started=Date.now();
+  const stop=()=>{clearInterval(timer);window.removeEventListener('message',onMessage);};
+  // La copie de Sutur chargée dans la fenêtre prévient puis se ferme (voir auth.js).
+  const onMessage=(ev)=>{
+    if(ev.origin!==window.location.origin)return;
+    if(!ev.data||ev.data.type!=='oauth-done')return;
+    stop();
+    try{popup.close();}catch(e){}
+    onDone();
+  };
+  window.addEventListener('message',onMessage);
+  const timer=setInterval(()=>{
+    if(popup.closed){stop();setTimeout(onDone,800);return;}
+    // Garde-fou : une fenêtre laissée ouverte ne doit pas faire tourner ce minuteur
+    // pour le reste de la session.
+    if(Date.now()-started>5*60*1000)stop();
+  },1000);
 }
 
 async function connectGoogle(){
@@ -90,14 +136,8 @@ async function connectGoogle(){
     const data=await apiCall('/google/auth','GET');
     if(data.auth_url){
       addMsg('ai','Ouverture de Google. Autorise l\'accès à ton compte dans la fenêtre qui s\'ouvre.',false);
-      const popup=window.open(data.auth_url,'google_auth','width=500,height=600,scrollbars=yes');
-      // Vérifier toutes les 2s si la popup s'est fermée
-      const check=setInterval(()=>{
-        if(popup&&popup.closed){
-          clearInterval(check);
-          setTimeout(()=>checkGoogleStatus(),1000);
-        }
-      },2000);
+      const popup=window.open(data.auth_url,'google_auth','width=500,height=640,scrollbars=yes');
+      watchAuthPopup(popup,'Google',()=>{checkGoogleStatus();refreshConnectorTruth();});
     }
   }catch(e){addMsg('ai','Erreur connexion Google: '+(e.message||'inconnue'),false);}
 }
@@ -108,6 +148,59 @@ async function disconnectGoogle(){
     addMsg('ai','✅ Google déconnecté.',false);
     checkGoogleStatus();
   }catch(e){addMsg('ai','Erreur déconnexion Google.',false);}
+}
+
+// Un statut qu'on n'a pas pu lire n'est pas un statut vert. Avant, chaque vérification
+// était enveloppée dans un catch vide : dès qu'une carte avait affiché « ✓ Connecté »,
+// elle le restait toute la session, même service mort.
+function connectorUnknown(ids,err){
+  for(const id of ids){
+    const el=document.getElementById(id);
+    if(!el)continue;
+    el.textContent='État inconnu — vérification impossible';
+    el.className='conn-status ko';
+    el.title=String((err&&err.message)||err||'');
+  }
+}
+
+// Ce que le serveur répond VRAIMENT : /health/connectors appelle chaque service avec
+// les identifiants de l'utilisateur au lieu de regarder si une ligne existe en base.
+// C'est la seule source qui distingue « connecté » de « connecté mais autorisation
+// expirée » — l'état qui faisait passer Sutur pour cassé sans explication.
+const CONNECTOR_CARDS={
+  google:['goog-cal-status','goog-gmail-status'],
+  spotify:['spotify-status'],
+  notion:['notion-status'],
+  canva:['canva-status'],
+};
+const CONNECTOR_LABEL={
+  ok:'✓ Connecté', degraded:'✓ Connecté', needs_reconnect:'⚠️ À reconnecter',
+  not_connected:'Non connecté', not_configured:'Non configuré', error:'Injoignable',
+};
+
+async function refreshConnectorTruth(){
+  if(!TOKEN||!API_URL)return;
+  let data;
+  try{
+    data=await apiCall('/health/connectors','GET');
+  }catch(e){
+    // Route absente = serveur pas encore déployé. On ne contredit pas les
+    // vérifications individuelles, qui elles ont répondu.
+    return;
+  }
+  for(const c of (data&&data.connectors)||[]){
+    const ids=CONNECTOR_CARDS[c.id];
+    if(!ids)continue;
+    const note=[c.detail,c.action].filter(Boolean)
+      .map(t=>'<br><span style="color:#e0c060;font-size:9px">'+escapeHtml(t)+'</span>').join('');
+    for(const id of ids){
+      const el=document.getElementById(id);
+      if(!el)continue;
+      el.innerHTML=escapeHtml(CONNECTOR_LABEL[c.state]||c.state)+note;
+      el.className='conn-status '+(c.state==='ok'||c.state==='degraded'?'ok':'ko');
+    }
+    updateStatusDot('sb-'+c.id,c.state==='ok');
+  }
 }
 
 function updateStatusDot(id,connected){
@@ -143,7 +236,7 @@ async function checkGoogleStatus(){
       gmailSt.textContent='Non connecté';gmailSt.className='conn-status ko';
       gmailBtn.textContent='CONNECTER';gmailBtn.className='conn-btn connect';gmailBtn.onclick=connectGoogle;
     }
-  }catch(e){}
+  }catch(e){connectorUnknown(['goog-cal-status','goog-gmail-status'],e);}
 }
 
 async function connectSpotify(){
@@ -152,10 +245,8 @@ async function connectSpotify(){
     const data=await apiCall('/spotify/auth','GET');
     if(data.auth_url){
       addMsg('ai','Ouverture de Spotify. Autorise l\'accès dans la fenêtre.',false);
-      const popup=window.open(data.auth_url,'spotify_auth','width=500,height=600,scrollbars=yes');
-      const check=setInterval(()=>{
-        if(popup&&popup.closed){clearInterval(check);setTimeout(()=>checkSpotifyStatus(),1000);}
-      },2000);
+      const popup=window.open(data.auth_url,'spotify_auth','width=500,height=640,scrollbars=yes');
+      watchAuthPopup(popup,'Spotify',()=>{checkSpotifyStatus();refreshConnectorTruth();});
     }
   }catch(e){addMsg('ai','Erreur connexion Spotify.',false);}
 }
@@ -186,7 +277,7 @@ async function checkSpotifyStatus(){
       st.textContent='Non connecté';st.className='conn-status ko';
       btn.textContent='CONNECTER';btn.className='conn-btn connect';btn.onclick=connectSpotify;
     }
-  }catch(e){}
+  }catch(e){connectorUnknown(['spotify-status'],e);}
 }
 
 async function connectCanva(){
@@ -195,10 +286,8 @@ async function connectCanva(){
     const data=await apiCall('/canva/auth','GET');
     if(data.auth_url){
       addMsg('ai','Ouverture de Canva. Autorise l\'accès dans la fenêtre.',false);
-      const popup=window.open(data.auth_url,'canva_auth','width=500,height=650,scrollbars=yes');
-      const check=setInterval(()=>{
-        if(popup&&popup.closed){clearInterval(check);setTimeout(()=>checkCanvaStatus(),1000);}
-      },2000);
+      const popup=window.open(data.auth_url,'canva_auth','width=500,height=640,scrollbars=yes');
+      watchAuthPopup(popup,'Canva',()=>{checkCanvaStatus();refreshConnectorTruth();});
     }
   }catch(e){addMsg('ai','Erreur connexion Canva — vérifie que CANVA_CLIENT_ID est bien configuré côté serveur.',false);}
 }
@@ -228,7 +317,7 @@ async function checkCanvaStatus(){
       st.textContent='Non connecté';st.className='conn-status ko';
       btn.textContent='CONNECTER';btn.className='conn-btn connect';btn.onclick=connectCanva;
     }
-  }catch(e){}
+  }catch(e){connectorUnknown(['canva-status'],e);}
 }
 
 async function connectNotion(){
@@ -237,10 +326,8 @@ async function connectNotion(){
     const data=await apiCall('/notion/auth','GET');
     if(data.auth_url){
       addMsg('ai','Ouverture de Notion. Autorise l\'accès dans la fenêtre.',false);
-      const popup=window.open(data.auth_url,'notion_auth','width=500,height=600,scrollbars=yes');
-      const check=setInterval(()=>{
-        if(popup&&popup.closed){clearInterval(check);setTimeout(()=>checkNotionStatus(),1000);}
-      },2000);
+      const popup=window.open(data.auth_url,'notion_auth','width=500,height=640,scrollbars=yes');
+      watchAuthPopup(popup,'Notion',()=>{checkNotionStatus();refreshConnectorTruth();});
     }
   }catch(e){addMsg('ai','Notion non configuré — ajoute NOTION_CLIENT_ID dans Railway.',false);}
 }
@@ -271,5 +358,5 @@ async function checkNotionStatus(){
       st.textContent='Non connecté';st.className='conn-status ko';
       btn.textContent='CONNECTER';btn.className='conn-btn connect';btn.onclick=connectNotion;
     }
-  }catch(e){}
+  }catch(e){connectorUnknown(['notion-status'],e);}
 }

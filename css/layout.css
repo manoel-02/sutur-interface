@@ -68,20 +68,20 @@ body.voice-mode-active .inp-bar{background:rgba(7,5,26,.6)}
 
 /* PANELS */
 .panels{flex:1;overflow:hidden;width:100%;position:relative}
-.panel{display:none;width:100%;height:100%;overflow-y:auto;padding:12px 12px 90px;position:absolute;top:0;left:0}
+.panel{display:none;width:100%;height:100%;overflow-y:auto;padding:12px 12px calc(var(--nav-h) + var(--inp-h) + var(--safe-b) + 16px);position:absolute;top:0;left:0}
 .panel::-webkit-scrollbar{width:3px}
 .panel::-webkit-scrollbar-thumb{background:var(--border)}
 .panel.active{display:block}
 
 /* ── NAVIGATION 4 ZONES ── */
-.bottom-nav{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:18;background:rgba(7,5,26,.92);border:1px solid rgba(139,92,246,.2);border-radius:20px;padding:6px 8px;backdrop-filter:blur(12px)}
+.bottom-nav{position:fixed;bottom:calc(14px + var(--kb) + var(--safe-b));left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:18;background:rgba(7,5,26,.92);border:1px solid rgba(139,92,246,.2);border-radius:20px;padding:6px 8px;backdrop-filter:blur(12px)}
 .nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:6px 14px;border-radius:14px;transition:all .2s;min-width:60px;border:1px solid transparent}
 .nav-item.active{background:rgba(139,92,246,.18);border-color:rgba(139,92,246,.35)}
 .nav-item:hover:not(.active){background:rgba(255,255,255,.04)}
 .nav-icon{font-size:20px;line-height:1}
 .nav-label{font-size:10px;color:var(--text-muted);letter-spacing:.3px;font-weight:500}
 .nav-item.active .nav-label{color:var(--text-primary)}
-.inp-bar{position:fixed;bottom:76px;left:0;right:0;padding:8px 12px;background:rgba(7,5,26,.95);border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;z-index:17;backdrop-filter:blur(8px)}
+.inp-bar{position:fixed;bottom:calc(var(--nav-h) + var(--kb) + var(--safe-b));left:0;right:0;padding:8px 12px;background:rgba(7,5,26,.95);border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:8px;align-items:center;z-index:17;backdrop-filter:blur(8px)}
 
 /* ── SUBPAGES ── */
 .subpage{position:fixed;inset:0;z-index:20;background:#07051a;transform:translateY(100%);transition:transform .35s cubic-bezier(.32,.72,0,1);display:flex;flex-direction:column;overflow:hidden}

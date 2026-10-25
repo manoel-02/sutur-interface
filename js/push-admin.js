@@ -90,7 +90,7 @@ async function loadMessages(){
     el.innerHTML=msgs.length?msgs.map(m=>`
       <div class="msg-item">
         <div class="msg-from">DE: MANOEL</div>
-        <div class="msg-body">${m.content}</div>
+        <div class="msg-body">${escapeHtml(m.content)}</div>
         <div class="msg-time">${new Date(m.created_at).toLocaleString('fr')}</div>
       </div>`).join(''):'<div style="color:rgba(120,80,255,.35);text-align:center;padding:10px">Aucun message</div>';
     if(userIsOwner)loadAdminDashboard();

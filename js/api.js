@@ -29,6 +29,12 @@ async function apiCall(path,method='GET',body=null,opts={}){
   const timeout=opts.timeout??API_DEFAULT_TIMEOUT_MS;
   const ctrl=new AbortController();
   const timer=setTimeout(()=>ctrl.abort(),timeout);
+  // Annulation venue de l'appelant (bouton « Arrêter ») : elle s'ajoute au délai maximum,
+  // pour qu'un envoi déjà parti puisse être coupé sans attendre son expiration.
+  if(opts.signal){
+    if(opts.signal.aborted)ctrl.abort();
+    else opts.signal.addEventListener('abort',()=>ctrl.abort(),{once:true});
+  }
   const fetchOpts={method,headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},signal:ctrl.signal};
   if(body)fetchOpts.body=JSON.stringify(body);
   try{

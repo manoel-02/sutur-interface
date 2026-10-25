@@ -127,34 +127,50 @@ function detectMediaCmd(msg){
   return null;
 }
 
+// Boutons d'action proposés sous une réponse. Construits en DOM, avec le message capturé
+// dans une fermeture : interpolé dans un attribut onclick, un guillemet dans le message
+// coupait l'attribut (bouton mort) et permettait d'en injecter d'autres dans la page qui
+// détient le token. Une seule barre à l'écran : les précédentes désignaient un message
+// plus ancien et n'ont plus de sens une fois la réponse suivante arrivée.
+const ACT_BTN_GREEN='padding:7px 14px;border-radius:8px;border:1px solid rgba(74,222,128,.35);background:rgba(74,222,128,.08);color:#4ade80;cursor:pointer;font-size:11px;font-family:var(--font-main)';
+const ACT_BTN_VIOLET='padding:7px 14px;border-radius:8px;border:1px solid rgba(139,92,246,.35);background:rgba(139,92,246,.08);color:#c8aaff;cursor:pointer;font-size:11px;font-family:var(--font-main)';
+const ACT_BTN_GOLD='padding:7px 14px;border-radius:8px;border:1px solid rgba(201,162,39,.35);background:rgba(201,162,39,.06);color:rgba(201,162,39,.8);cursor:pointer;font-size:11px;font-family:var(--font-main)';
+const ACT_BTN_SMALL='padding:6px 12px;border-radius:7px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.07);color:#c8aaff;cursor:pointer;font-size:10px';
+
+function appendActionBar(buttons){
+  const cb=document.getElementById('chatbox');
+  if(!cb)return;
+  cb.querySelectorAll('.msg-extra-actions').forEach(el=>el.remove());
+  const d=document.createElement('div');
+  d.className='msg-extra-actions';
+  d.style.cssText='display:flex;gap:8px;margin:4px 0 8px 44px;flex-wrap:wrap';
+  for(const b of buttons){
+    const el=document.createElement('button');
+    el.type='button';
+    el.textContent=b.label;
+    el.style.cssText=b.css;
+    el.onclick=b.run;
+    d.appendChild(el);
+  }
+  cb.appendChild(d);scrollChatToBottom(true);
+}
+
 function checkSpecialActions(message, reply){
   const msg = message.toLowerCase();
+  const btns = [];
 
   // WebTask
   const webtask_kw = ['crée-moi un compte','crée moi un compte','inscris-moi','va sur','ouvre le site',
     'comme si c','à ma place','combien d\'abonné','mes stats','crée-moi une image','crée moi un site'];
   if(webtask_kw.some(k=>msg.includes(k))){
-    setTimeout(()=>{
-      const cb=document.getElementById('chatbox');
-      const d=document.createElement('div');
-      d.style.cssText='display:flex;gap:8px;margin:4px 0 8px 44px';
-      d.innerHTML=`<button onclick="launchWebTask(${JSON.stringify(message)})" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(74,222,128,.35);background:rgba(74,222,128,.08);color:#4ade80;cursor:pointer;font-size:11px;font-family:var(--font-main)">🌐 Lancer WebTask automatiquement</button>`;
-      cb.appendChild(d);scrollChatToBottom(true);
-    },500);
+    btns.push({label:'🌐 Lancer WebTask automatiquement',css:ACT_BTN_GREEN,run:()=>launchWebTask(message)});
   }
 
   // OrbixTeam
   const team_kw = ['équipe','startup','business plan','lancer une entreprise','plusieurs agents','projet complet'];
   if(team_kw.some(k=>msg.includes(k))){
-    setTimeout(()=>{
-      const cb=document.getElementById('chatbox');
-      const d=document.createElement('div');
-      d.style.cssText='display:flex;gap:8px;margin:4px 0 8px 44px;flex-wrap:wrap';
-      d.innerHTML=`
-        <button onclick="launchTeamMission(${JSON.stringify(message)},4)" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(139,92,246,.35);background:rgba(139,92,246,.08);color:#c8aaff;cursor:pointer;font-size:11px;font-family:var(--font-main)">🤖 OrbixTeam (4 agents)</button>
-        <button onclick="launchTeamMission(${JSON.stringify(message)},6)" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(201,162,39,.35);background:rgba(201,162,39,.06);color:rgba(201,162,39,.8);cursor:pointer;font-size:11px;font-family:var(--font-main)">⚡ OrbixTeam Complet (6 agents)</button>`;
-      cb.appendChild(d);scrollChatToBottom(true);
-    },500);
+    btns.push({label:'🤖 OrbixTeam (4 agents)',css:ACT_BTN_VIOLET,run:()=>launchTeamMission(message,4)});
+    btns.push({label:'⚡ OrbixTeam Complet (6 agents)',css:ACT_BTN_GOLD,run:()=>launchTeamMission(message,6)});
   }
 
   // Code Generation
@@ -162,29 +178,18 @@ function checkSpecialActions(message, reply){
   const codeKw = ['code','programme','script','application','app','développe','crée un','fais-moi'];
   if(codeKw.some(k=>msg.includes(k)) && codeLangs.some(l=>msg.includes(l))){
     const lang = codeLangs.find(l=>msg.includes(l)) || 'python';
-    setTimeout(()=>{
-      const cb=document.getElementById('chatbox');
-      const d=document.createElement('div');
-      d.style.cssText='display:flex;gap:8px;margin:4px 0 8px 44px;flex-wrap:wrap';
-      d.innerHTML=`<button onclick="generateCode(${JSON.stringify(message)},${JSON.stringify(lang)})" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(74,222,128,.35);background:rgba(74,222,128,.08);color:#4ade80;cursor:pointer;font-size:11px;font-family:var(--font-main)">💻 Générer le code ${lang}</button>`;
-      cb.appendChild(d);scrollChatToBottom(true);
-    },500);
+    btns.push({label:`💻 Générer le code ${lang}`,css:ACT_BTN_GREEN,run:()=>generateCode(message,lang)});
   }
 
   // NotebookLM
   const notebookKw = ['analyse ce','résume ce','points clés','synthèse','plan de'];
   if(notebookKw.some(k=>msg.includes(k))){
-    setTimeout(()=>{
-      const cb=document.getElementById('chatbox');
-      const d=document.createElement('div');
-      d.style.cssText='display:flex;gap:6px;margin:4px 0 8px 44px;flex-wrap:wrap';
-      d.innerHTML=`
-        <button onclick="analyzeNotebook(${JSON.stringify(message)},'summarize')" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.07);color:#c8aaff;cursor:pointer;font-size:10px">📋 Résumé</button>
-        <button onclick="analyzeNotebook(${JSON.stringify(message)},'extract_key_points')" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.07);color:#c8aaff;cursor:pointer;font-size:10px">🎯 Points clés</button>
-        <button onclick="analyzeNotebook(${JSON.stringify(message)},'create_outline')" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.07);color:#c8aaff;cursor:pointer;font-size:10px">📑 Plan</button>`;
-      cb.appendChild(d);scrollChatToBottom(true);
-    },500);
+    btns.push({label:'📋 Résumé',css:ACT_BTN_SMALL,run:()=>analyzeNotebook(message,'summarize')});
+    btns.push({label:'🎯 Points clés',css:ACT_BTN_SMALL,run:()=>analyzeNotebook(message,'extract_key_points')});
+    btns.push({label:'📑 Plan',css:ACT_BTN_SMALL,run:()=>analyzeNotebook(message,'create_outline')});
   }
+
+  if(btns.length)setTimeout(()=>appendActionBar(btns),500);
 }
 
 async function launchWebTask(instruction){
@@ -267,7 +272,7 @@ function handleChatInputKeydown(event){
   if(event.key==='Enter' && !event.shiftKey){
     event.preventDefault(); // empêche l'insertion du retour à la ligne par défaut du navigateur
     sendMsg();
-  }else if(event.key==='Escape' && chatFlow.state==='streaming'){
+  }else if(event.key==='Escape' && (chatFlow.state==='streaming'||chatFlow.state==='sending')){
     event.preventDefault();
     cancelGeneration();
   }
@@ -276,15 +281,17 @@ function handleChatInputKeydown(event){
 
 async function sendMsg(){
   const inp=document.getElementById('cinp'),model=document.getElementById('model-sel').value,msg=inp.value.trim();
-  // Permettre envoi si photo sélectionnée même sans texte
-  if(!msg && !currentPhotoB64)return;
+  // Permettre envoi si photo ou document sélectionné même sans texte
+  if(!msg && !currentPhotoB64 && !currentDocumentB64)return;
   if(busy){hintBusy();return;} // jamais d'envoi simultané — mais jamais de « bouton mort » non plus
   if(!TOKEN){addMsg('ai','Configure ton acces dans CONFIG.');return}
   inp.value='';inp.style.height='auto';busy=true;gActive=true;
-  // Afficher le message utilisateur avec la photo si présente
-  if(currentPhotoB64){
+  // Afficher le message utilisateur avec sa pièce jointe : sans elle, le fil ne garde
+  // aucune trace de ce qui a été envoyé au serveur.
+  if(currentPhotoB64 || currentDocumentB64){
     const thumbHtml=`<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-      <img src="${currentPhotoB64}" style="max-width:200px;max-height:150px;border-radius:10px;border:1px solid var(--violet-glow);object-fit:cover"/>
+      ${currentPhotoB64?`<img src="${currentPhotoB64}" style="max-width:200px;max-height:150px;border-radius:10px;border:1px solid var(--violet-glow);object-fit:cover"/>`:''}
+      ${currentDocumentB64?`<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.28);border-radius:8px;padding:4px 9px;font-size:11px">📄 ${escapeHtml(currentDocumentName||'document')}</span>`:''}
       ${msg?`<span style="text-align:right">${escapeHtml(msg)}</span>`:''}
     </div>`;
     const cb=document.getElementById('chatbox');
@@ -416,8 +423,14 @@ function handleChatResult(data, originalMsg){
     if(data.map && data.map.route){
       showRouteOnMap(data.map.route);
     }else if(data.map && data.map.lat!=null && data.map.lng!=null){
-      showPersistentMap(data.map.lat,data.map.lng,data.map.location_name);
+      showPersistentMap(data.map.lat,data.map.lng,data.map.location_name)
+        .then(()=>showMapPoints(data.map.points,data.map.layer)); // couche vivante éventuelle, après l'ouverture de la carte
       showHolographicLocation(data.map);
+    }else if(data.map && Array.isArray(data.map.points) && data.map.points.length){
+      // Couche sans lieu nommé : la carte s'ouvre sur le premier objet, puis cadre l'ensemble.
+      const p0=data.map.points[0];
+      showPersistentMap(p0.lat,p0.lng,data.map.location_name||'')
+        .then(()=>showMapPoints(data.map.points,data.map.layer));
     }
 
     // Ouverture d'une fonctionnalité demandée par commande (texte ou vocal) — symétrique

@@ -183,6 +183,10 @@ function unlock(){
   checkNotionStatus();
   checkCanvaStatus();
   checkWebauthnStatus();
+  // Passe finale, qui fait autorité : les quatre vérifications ci-dessus se fient à
+  // la présence d'identifiants en base, ce qui reste vert quand l'autorisation est
+  // morte. refreshConnectorTruth() appelle réellement chaque service.
+  refreshConnectorTruth();
   // Afficher la nav du bas après connexion
   const nav=document.getElementById('bottom-nav');
   if(nav)nav.style.display='flex';
@@ -194,6 +198,17 @@ function unlock(){
   if(globeArea)globeArea.style.display='flex';
   // Détecte retour OAuth
   const q=window.location.search;
+  // La redirection du fournisseur atterrit DANS la fenêtre d'autorisation. Sans ce
+  // raccourci, celle-ci démarrait une deuxième copie complète de Sutur et y affichait
+  // la confirmation, pendant que la fenêtre d'origine restait inchangée — et sur
+  // téléphone l'utilisateur se retrouvait devant un doublon de l'application.
+  if(/[?&](google|spotify|notion|canva)=connected/.test(q) && window.opener && window.opener!==window){
+    try{window.opener.postMessage({type:'oauth-done'},window.location.origin);}catch(e){}
+    document.body.innerHTML='<p style="color:#c8aaff;font:15px system-ui;padding:32px;text-align:center">'
+      +'Connecté. Tu peux fermer cette fenêtre.</p>';
+    setTimeout(()=>{try{window.close();}catch(e){}},300);
+    return;
+  }
   if(q.includes('google=connected')){
     loadProfile().then(()=>{
       addMsg('ai','✅ Google Calendar et Gmail connectés ! Demande-moi ton agenda ou tes emails.',true);
@@ -332,3 +347,17 @@ async function greetUser(userName){
 }
 
 function logout(){stopVoiceLoop();document.getElementById('main').style.display='none';document.getElementById('lock').style.display='flex';gActive=false;history=[];document.getElementById('chatbox').innerHTML='';document.getElementById('pass-inp').value=''}
+
+// Jeton refusé par le serveur. Renvoyer vers l'écran de mot de passe ne sert à rien :
+// celui-ci revalide en local contre s_pass et rouvrirait la session avec le MÊME jeton
+// mort. On l'efface donc pour retomber sur sa saisie. À n'appeler que sur un vrai refus
+// d'authentification (401) : une coupure réseau est classée 'network'/'offline' et ne
+// doit surtout rien effacer.
+function forceReauth(reason){
+  try{localStorage.removeItem('s_token');}catch(_){}
+  TOKEN='';
+  logout();
+  showFirstSetup();
+  const e=document.getElementById('serr');
+  if(e)e.textContent=reason||'Ton token a été refusé par le serveur. Saisis-en un nouveau pour continuer.';
+}

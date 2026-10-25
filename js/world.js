@@ -1,13 +1,18 @@
 // ── PANNEAU WORLD — globe 3D rotatif, frontières réelles, clic pays ────────
-// Frontières issues d'un jeu de données public (Natural Earth, domaine public),
-// chargées une seule fois par session. Rendu dans le même thème holographique
-// (violet/or/lignes lumineuses) que le reste de Sutur — pas de texture
-// photographique, une vraie géométrie stylisée cohérente avec l'identité visuelle.
-const WORLD_GEOJSON_URL='https://raw.githubusercontent.com/datasets/geo-countries/main/data/countries.geojson';
+// Frontières issues de Natural Earth 1:110m (licence ISC, via world-atlas),
+// servies depuis l'application : 169 Ko au lieu des 14,6 Mo du jeu de données
+// haute définition qui était chargé depuis raw.githubusercontent à chaque
+// session — plusieurs secondes de fil d'exécution bloqué au JSON.parse et un
+// coût de data indéfendable sur un forfait mobile. Rendu dans le même thème
+// holographique (violet/or/lignes lumineuses) que le reste de Sutur.
+const WORLD_GEOJSON_URL='assets/countries-110m.geojson';
 let world_scene=null, world_camera=null, world_renderer=null, world_globeGroup=null;
 let world_earthTexture=null; // chargée une seule fois, réutilisée à chaque réouverture
 const WORLD_EARTH_TEXTURE_URL='https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg';
-let world_countriesData=null, world_animating=false;
+let world_countryIndex=null;        // géométries prémâchées (longitudes déroulées + boîtes englobantes)
+let world_borderPositions=null;     // tampon de segments de frontières, calculé une seule fois
+let world_starfield=null;           // étoiles de fond : un seul objet, jamais empilé d'une ouverture à l'autre
+let world_animating=false;
 let world_rotationY=0.4, world_rotationX=0.3;
 let world_dragging=false, world_lastX=0, world_lastY=0;
 let world_autoRotate=true;
@@ -38,6 +43,9 @@ function vector3ToLatLng(v){
   return {lat,lng};
 }
 
+// Test de parité classique. Attend des coordonnées DÉROULÉES (voir unwrapRing) :
+// sur des longitudes brutes, un anneau qui traverse l'antiméridien saute de +180
+// à -180 et le test le croit étalé sur tout le globe.
 function pointInRing(lng,lat,ring){
   let inside=false;
   for(let i=0,j=ring.length-1;i<ring.length;j=i++){
@@ -48,14 +56,70 @@ function pointInRing(lng,lat,ring){
   return inside;
 }
 
-function findCountryAt(lat,lng){
-  if(!world_countriesData) return null;
-  for(const feature of world_countriesData.features){
+// Rend les longitudes d'un anneau continues : à chaque saut de plus de 180° entre
+// deux sommets consécutifs on décale de 360°, ce qui remet la Russie, les Fidji et
+// l'Antarctique d'un seul morceau au lieu de deux moitiés qui se chevauchent.
+function unwrapRing(ring){
+  const out=new Array(ring.length);
+  out[0]=[ring[0][0],ring[0][1]];
+  let shift=0, prev=ring[0][0];
+  for(let i=1;i<ring.length;i++){
+    const lng=ring[i][0], d=lng-prev;
+    if(d>180) shift-=360; else if(d<-180) shift+=360;
+    prev=lng;
+    out[i]=[lng+shift,ring[i][1]];
+  }
+  return out;
+}
+
+function ringWithBox(pts){
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+  for(let i=0;i<pts.length;i++){
+    const x=pts[i][0], y=pts[i][1];
+    if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y;
+  }
+  return {pts,x0,x1,y0,y1};
+}
+
+// Prémâche le GeoJSON une fois pour toutes : anneaux déroulés, trous conservés à
+// part, boîte englobante par anneau pour écarter la grande majorité des pays sans
+// dérouler le test de parité.
+function buildCountryIndex(data){
+  const feats=[];
+  for(const feature of (data&&data.features)||[]){
     const geom=feature.geometry;
     if(!geom) continue;
-    const polys = geom.type==='Polygon' ? [geom.coordinates] : (geom.type==='MultiPolygon' ? geom.coordinates : []);
-    for(const poly of polys){
-      if(poly.length && pointInRing(lng,lat,poly[0])) return feature.properties;
+    const raw = geom.type==='Polygon' ? [geom.coordinates] : (geom.type==='MultiPolygon' ? geom.coordinates : []);
+    const polys=[];
+    for(const poly of raw){
+      if(!poly||!poly.length||!poly[0]||poly[0].length<4) continue;
+      const rings=poly.map(r=>ringWithBox(unwrapRing(r)));
+      polys.push({outer:rings[0],holes:rings.slice(1)});
+    }
+    if(polys.length) feats.push({props:feature.properties||{},polys});
+  }
+  return feats;
+}
+
+function findCountryAt(lat,lng){
+  if(!world_countryIndex) return null;
+  for(const feat of world_countryIndex){
+    for(const poly of feat.polys){
+      const o=poly.outer;
+      if(lat<o.y0||lat>o.y1) continue;
+      // Le point exprimé dans le repère déroulé de CET anneau : même longitude
+      // modulo 360, ramenée au plus près de l'anneau.
+      const x=lng+360*Math.round(((o.x0+o.x1)/2-lng)/360);
+      if(x<o.x0||x>o.x1) continue;
+      if(!pointInRing(x,lat,o.pts)) continue;
+      // Un point tombant dans un trou (enclave type Lesotho, grand lac) n'est PAS
+      // dans ce pays : on laisse la boucle continuer jusqu'à l'enclave elle-même,
+      // qui est une entité à part dans le jeu de données.
+      let inHole=false;
+      for(const h of poly.holes){
+        if(lat>=h.y0&&lat<=h.y1&&x>=h.x0&&x<=h.x1&&pointInRing(x,lat,h.pts)){ inHole=true; break; }
+      }
+      if(!inHole) return feat.props;
     }
   }
   return null;
@@ -72,10 +136,10 @@ async function openWorldPanel(){
     return;
   }
 
-  if(!world_countriesData){
+  if(!world_countryIndex){
     try{
       const resp=await fetch(WORLD_GEOJSON_URL);
-      world_countriesData=await resp.json();
+      world_countryIndex=buildCountryIndex(await resp.json());
     }catch(e){
       document.getElementById('world-loading').innerHTML='<div style="color:#f87171;font-size:11px">Chargement des frontières impossible — vérifie ta connexion</div>';
       return;
@@ -93,6 +157,21 @@ async function openWorldPanel(){
   setupWorldControls();
 }
 
+// Détacher un objet de la scène ne libère RIEN côté GPU : sans dispose(), chaque
+// réouverture du globe laissait derrière elle sphère, halo, frontières et étoiles,
+// et trois ou quatre cycles suffisaient à saturer la mémoire d'un téléphone.
+// La texture Terre est volontairement épargnée : elle est mise en cache exprès
+// pour ne pas être retéléchargée (material.dispose() ne touche pas aux textures).
+function disposeWorldNode(node){
+  if(!node) return;
+  node.traverse(o=>{
+    if(o.geometry) o.geometry.dispose();
+    const m=o.material;
+    if(m) (Array.isArray(m)?m:[m]).forEach(x=>x&&x.dispose());
+  });
+  if(node.parent) node.parent.remove(node);
+}
+
 async function initWorldGlobe(){
   const canvas=document.getElementById('world-canvas');
   const w=canvas.clientWidth||400, h=canvas.clientHeight||400;
@@ -108,15 +187,19 @@ async function initWorldGlobe(){
   world_camera.updateProjectionMatrix();
   world_camera.position.set(0,0,7);
 
-  if(world_globeGroup){ world_scene.remove(world_globeGroup); }
+  disposeWorldNode(world_globeGroup);
   world_globeGroup=new THREE.Group();
 
-  // Étoiles de fond
-  const starPos=[];
-  for(let i=0;i<600;i++) starPos.push((Math.random()-0.5)*80,(Math.random()-0.5)*80,(Math.random()-0.5)*80);
-  const starGeo=new THREE.BufferGeometry();
-  starGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(starPos),3));
-  world_scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xffffff,size:0.06,transparent:true,opacity:0.5})));
+  // Étoiles de fond — un seul objet par ouverture. Elles restent dans la scène et
+  // non dans le groupe pour ne pas tourner avec le globe.
+  if(!world_starfield){
+    const starPos=[];
+    for(let i=0;i<600;i++) starPos.push((Math.random()-0.5)*80,(Math.random()-0.5)*80,(Math.random()-0.5)*80);
+    const starGeo=new THREE.BufferGeometry();
+    starGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(starPos),3));
+    world_starfield=new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xffffff,size:0.06,transparent:true,opacity:0.5}));
+    world_scene.add(world_starfield);
+  }
 
   // Vraie texture Terre — chargée une seule fois puis mise en cache. Repli sur le
   // style filaire précédent si le chargement échoue (réseau coupé, etc.), pour ne
@@ -149,22 +232,35 @@ async function initWorldGlobe(){
 }
 
 function buildCountryBorders(){
-  const RADIUS=2.5;
-  for(const feature of world_countriesData.features){
-    const geom=feature.geometry;
-    if(!geom) continue;
-    const polys = geom.type==='Polygon' ? [geom.coordinates] : (geom.type==='MultiPolygon' ? geom.coordinates : []);
-    for(const poly of polys){
-      const ring=poly[0]; // anneau extérieur uniquement — suffisant pour un tracé de frontière lisible
-      if(!ring || ring.length<2) continue;
-      const pts=ring.map(([lng,lat])=>latLngToVector3(lat,lng,RADIUS+0.01));
-      const geo=new THREE.BufferGeometry().setFromPoints(pts);
-      // Contour doré, net et bien visible par-dessus la texture réelle — cohérent avec
-      // le reste de l'identité visuelle de Sutur sans dénaturer les vraies couleurs du globe.
-      const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xffd966,transparent:true,opacity:0.85}));
-      world_globeGroup.add(line);
+  const RADIUS=2.51;
+  if(!world_borderPositions){
+    // TOUTES les frontières dans un seul tampon de segments : un THREE.Line par
+    // anneau, c'était des milliers d'appels de rendu à chaque image, pour un
+    // résultat visuel identique. Les trous sont tracés aussi — sans eux, le
+    // contour des enclaves et des grands lacs manquait à l'écran.
+    const seg=[];
+    for(const feat of world_countryIndex){
+      for(const poly of feat.polys){
+        for(const ring of [poly.outer].concat(poly.holes)){
+          const pts=ring.pts;
+          let prev=latLngToVector3(pts[0][1],pts[0][0],RADIUS);
+          for(let i=1;i<pts.length;i++){
+            const cur=latLngToVector3(pts[i][1],pts[i][0],RADIUS);
+            seg.push(prev.x,prev.y,prev.z,cur.x,cur.y,cur.z);
+            prev=cur;
+          }
+        }
+      }
     }
+    world_borderPositions=new Float32Array(seg);
   }
+  // Contour doré, net et bien visible par-dessus la texture réelle — cohérent avec
+  // le reste de l'identité visuelle de Sutur sans dénaturer les vraies couleurs du globe.
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(world_borderPositions,3));
+  const borders=new THREE.LineSegments(geo,new THREE.LineBasicMaterial({color:0xffd966,transparent:true,opacity:0.85}));
+  borders.name='world-borders';
+  world_globeGroup.add(borders);
 }
 
 function setupWorldControls(){
@@ -264,7 +360,10 @@ function handleWorldClick(clientX,clientY){
 
   const props=findCountryAt(lat,lng);
   if(props){
-    const isoCode = props['ISO3166-1-Alpha-3'] || props['ISO3166-1-Alpha-2'] || props.ISO_A3 || props.ISO_A2 || null;
+    // `iso` est le code numérique ISO 3166-1 du jeu de données Natural Earth (204
+    // pour le Bénin) ; restcountries.com/v3.1/alpha l'accepte tel quel, et le
+    // backend retombe sur la recherche par nom si le code ne donne rien.
+    const isoCode = props.iso || props['ISO3166-1-Alpha-3'] || props['ISO3166-1-Alpha-2'] || props.ISO_A3 || props.ISO_A2 || null;
     const countryLabel = props.name || props.ADMIN || props.NAME || 'Pays';
     showWorldCountryInfo(countryLabel, (isoCode && isoCode !== '-99') ? isoCode : null);
   }
@@ -337,4 +436,10 @@ async function showCapitalBuildings(){
 
 function closeWorldPanel(){
   document.getElementById('world-modal').style.display='none';
+  // Libération immédiate de la mémoire GPU à la fermeture : le panneau peut être
+  // réouvert des dizaines de fois dans une session, et tout est reconstruit à
+  // l'ouverture de toute façon (les sommets des frontières, eux, restent en cache).
+  disposeWorldNode(world_globeGroup); world_globeGroup=null;
+  disposeWorldNode(world_starfield); world_starfield=null;
+  if(world_renderer) world_renderer.renderLists.dispose();
 }
