@@ -22,6 +22,27 @@ let world_holdTimer=null;           // minuteur de pression longue (souris/tacti
 let world_holdCanceledByMove=false; // un vrai geste de glisser annule l'arrêt programmé
 let world_keyHoldTimer=null;        // minuteur de pression longue (clavier)
 
+// Zoom : la molette, le pincement et le clavier ne déplacent que la CIBLE, et la
+// boucle de rendu rapproche la distance réelle par amorti. Sans ça, chaque cran de
+// molette était un saut sec, et le pincement tactile un tremblement.
+const WORLD_RADIUS=2.5;
+const WORLD_CAM_DEFAULT=7;
+const WORLD_CAM_MIN=WORLD_RADIUS*1.2;  // au plus près : la Terre déborde largement du cadre
+const WORLD_CAM_MAX=WORLD_RADIUS*8;    // au plus loin : le globe reste assez gros pour être visé du doigt
+let world_camDist=WORLD_CAM_DEFAULT, world_camDistTarget=WORLD_CAM_DEFAULT;
+let world_pinchStartDist=null;      // écart entre les deux doigts au début du pincement
+let world_pinchStartCam=0;          // distance caméra au même instant, base du rapport
+
+// Couches planétaires vivantes (avions, séismes, lancements) posées sur le globe.
+let world_markerGroup=null;         // UN seul groupe, deux objets fusionnés dedans — jamais un Mesh par objet
+let world_markerPoints=null;        // le nuage de marqueurs, cible du raycasting
+let world_markerMaterial=null;      // gardé à part : l'échelle en pixels dépend de la taille du canvas
+let world_markerData=[];            // index aligné sur les sommets du nuage -> point + item d'origine
+let world_activeLayer=null;         // couche affichée, ou null
+let world_layerBusy=false;          // un appel /geo/* en cours : pas deux en parallèle
+let world_selectedMarker=-1;        // marqueur dont le panneau est ouvert, pour le bouton « pays en dessous »
+let world_pendingChatLayer=null;    // points venus d'une réponse de chat, en attente d'un geste de sa part
+
 function latLngToVector3(lat,lng,radius){
   const phi=(90-lat)*Math.PI/180;
   const theta=(lng+180)*Math.PI/180;
@@ -185,8 +206,14 @@ async function initWorldGlobe(){
   world_renderer.setSize(w,h,false);
   world_camera.aspect=w/h;
   world_camera.updateProjectionMatrix();
-  world_camera.position.set(0,0,7);
+  // Chaque ouverture repart de la vue d'ensemble : retrouver le globe au niveau de
+  // zoom où on l'avait laissé, sans savoir sur quoi il est centré, désoriente.
+  world_camDist=world_camDistTarget=WORLD_CAM_DEFAULT;
+  world_camera.position.set(0,0,world_camDist);
 
+  // Les marqueurs vivent DANS le groupe qui va être détruit juste après : les libérer
+  // ici évite de garder des références vers des objets déjà déposés côté GPU.
+  disposeGlobeMarkers();
   disposeWorldNode(world_globeGroup);
   world_globeGroup=new THREE.Group();
 
@@ -263,6 +290,487 @@ function buildCountryBorders(){
   world_globeGroup.add(borders);
 }
 
+// ── COUCHES PLANÉTAIRES VIVANTES SUR LE GLOBE ──────────────────────────────
+// Les mêmes points que la carte plate recevait déjà (voir showMapPoints), posés
+// cette fois à leur lat/lng sur la sphère. Tout tient dans deux objets : un nuage
+// de points pour les marqueurs, un tampon de segments pour les caps. Une version
+// antérieure créait un Mesh par objet — 4 274 objets, autant d'appels de rendu par
+// image, et un téléphone de milieu de gamme à genoux.
+const WORLD_MARKER_RADIUS=2.53; // juste au-dessus de la surface, sous les frontières dorées
+const WORLD_LAYER_STYLE={
+  aircraft:{color:[0.00,0.83,1.00], size:0.055},
+  quakes:  {color:[0.97,0.44,0.44], size:0.065},
+  launches:{color:[0.79,0.64,0.15], size:0.075},
+  default: {color:[0.55,0.36,0.96], size:0.055},
+};
+
+// Le backend nomme ses couches au pluriel ; une réponse plus ancienne pouvait
+// envoyer « quake » ou « launch » au singulier dans point.kind.
+function normalizeGlobeLayer(layer){
+  const k=String(layer||'').toLowerCase();
+  if(k==='quake') return 'quakes';
+  if(k==='launch') return 'launches';
+  return k;
+}
+
+// Un marqueur sur la face cachée du globe ne doit PAS se voir : vu de l'extérieur,
+// un point qui traverse la Terre casse immédiatement l'illusion. Le test est le même
+// dans les deux nuanceurs : la normale du marqueur — sa position, le globe étant
+// centré sur l'origine — contre la direction vers la caméra, qui est à l'origine en
+// espace vue. Le faire sur le GPU évite de reparcourir les marqueurs à chaque image.
+const WORLD_FACING_GLSL=[
+  'float worldFacing(vec3 localPos,vec3 viewPos){',
+  '  vec3 n=normalize(normalMatrix*normalize(localPos));',
+  '  return dot(n,normalize(-viewPos));',
+  '}',
+].join('\n');
+
+function makeGlobeMarkerMaterial(pixelScale){
+  return new THREE.ShaderMaterial({
+    uniforms:{
+      uScale:{value:pixelScale},
+      // Bornes en pixels : assez gros pour être visé au doigt même quand le globe
+      // est loin, assez petit pour ne pas devenir une tache une fois zoomé à fond.
+      uMinPx:{value:7},
+      uMaxPx:{value:34},
+    },
+    vertexShader:[
+      'attribute vec3 aColor;',
+      'attribute float aSize;',
+      'uniform float uScale;',
+      'uniform float uMinPx;',
+      'uniform float uMaxPx;',
+      'varying vec3 vColor;',
+      'varying float vOn;',
+      WORLD_FACING_GLSL,
+      'void main(){',
+      '  vColor=aColor;',
+      '  vec4 mv=modelViewMatrix*vec4(position,1.0);',
+      '  vOn=worldFacing(position,mv.xyz)>0.0?1.0:0.0;',
+      '  gl_Position=projectionMatrix*mv;',
+      // Même atténuation en perspective que PointsMaterial de Three (taille en
+      // unités monde divisée par la profondeur), pour que le zoom grossisse
+      // naturellement les marqueurs avec le globe.
+      '  gl_PointSize=vOn*clamp(aSize*uScale/max(0.001,-mv.z),uMinPx,uMaxPx);',
+      '}',
+    ].join('\n'),
+    fragmentShader:[
+      'varying vec3 vColor;',
+      'varying float vOn;',
+      'void main(){',
+      '  if(vOn<0.5) discard;',
+      '  float r=length(gl_PointCoord-vec2(0.5))*2.0;',
+      '  if(r>1.0) discard;',
+      // Noyau clair cerné d'un halo qui s'éteint : lisible aussi bien sur l'océan
+      // sombre que sur une zone claire de la texture, sans contour tracé à part.
+      '  float core=1.0-smoothstep(0.30,0.52,r);',
+      '  float halo=1.0-smoothstep(0.52,1.0,r);',
+      '  gl_FragColor=vec4(mix(vColor,vec3(1.0),core*0.6),max(core,halo*0.42));',
+      '}',
+    ].join('\n'),
+    transparent:true,
+    depthTest:true,
+    depthWrite:false, // un marqueur ne doit jamais masquer celui qui est derrière lui
+  });
+}
+
+function makeGlobeHeadingMaterial(color){
+  return new THREE.ShaderMaterial({
+    uniforms:{uColor:{value:new THREE.Color(color[0],color[1],color[2])}},
+    vertexShader:[
+      // Le test de face cachée porte sur l'ANCRE du trait (le marqueur), pas sur
+      // chaque sommet : sinon la pointe du cap disparaît avant sa base quand
+      // l'avion passe le limbe, et le trait semble se couper en deux.
+      'attribute vec3 aAnchor;',
+      'varying float vOn;',
+      WORLD_FACING_GLSL,
+      'void main(){',
+      '  vec4 anchorMv=modelViewMatrix*vec4(aAnchor,1.0);',
+      '  vOn=worldFacing(aAnchor,anchorMv.xyz)>0.0?1.0:0.0;',
+      '  gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);',
+      '}',
+    ].join('\n'),
+    fragmentShader:[
+      'uniform vec3 uColor;',
+      'varying float vOn;',
+      'void main(){',
+      '  if(vOn<0.5) discard;',
+      '  gl_FragColor=vec4(uColor,0.85);',
+      '}',
+    ].join('\n'),
+    transparent:true,
+    depthWrite:false,
+  });
+}
+
+// Les items d'une réponse /geo/* portent le détail complet (vitesse, profondeur,
+// pas de tir) que les points n'ont pas. Les deux listes ne sont pas forcément de
+// même longueur — un lancement sans coordonnées de pas de tir est compté dans les
+// items et absent des points — donc l'appariement se fait sur les coordonnées,
+// seul lien fiable entre elles.
+function indexGeoItems(items){
+  if(!Array.isArray(items)) return null;
+  const index={};
+  for(const it of items){
+    if(!it||it.lat==null||it.lng==null) continue;
+    index[Number(it.lat).toFixed(4)+','+Number(it.lng).toFixed(4)]=it;
+  }
+  return index;
+}
+
+// Vecteurs de travail réutilisés plutôt que réalloués : ce test tourne à chaque
+// clic et pour chaque marqueur. Ils ne peuvent pas être créés au chargement du
+// fichier — Three.js n'est téléchargé qu'à la première ouverture du globe.
+let worldScratchA=null, worldScratchB=null;
+
+function disposeGlobeMarkers(){
+  disposeWorldNode(world_markerGroup);
+  world_markerGroup=null;
+  world_markerPoints=null;
+  world_markerMaterial=null;
+  world_markerData=[];
+  world_selectedMarker=-1;
+}
+
+function showGlobePoints(points,layer,items){
+  disposeGlobeMarkers();
+  if(!world_globeGroup||!Array.isArray(points)) return 0;
+  const kind=normalizeGlobeLayer(layer);
+  const style=WORLD_LAYER_STYLE[kind]||WORLD_LAYER_STYLE.default;
+  const byCoord=indexGeoItems(items);
+
+  const usable=[];
+  for(const p of points){
+    if(!p||p.lat==null||p.lng==null) continue;
+    const lat=Number(p.lat), lng=Number(p.lng);
+    if(!Number.isFinite(lat)||!Number.isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180) continue;
+    const item=byCoord?byCoord[lat.toFixed(4)+','+lng.toFixed(4)]:null;
+    usable.push({lat,lng,kind:normalizeGlobeLayer(p.kind)||kind,label:p.label,detail:p.detail,heading:p.heading,item:item||null});
+  }
+  if(!usable.length) return 0;
+
+  const n=usable.length;
+  const pos=new Float32Array(n*3), col=new Float32Array(n*3), siz=new Float32Array(n);
+  const headPos=[], headAnchor=[];
+  for(let i=0;i<n;i++){
+    const d=usable[i];
+    const st=WORLD_LAYER_STYLE[d.kind]||style;
+    const v=latLngToVector3(d.lat,d.lng,WORLD_MARKER_RADIUS);
+    pos[i*3]=v.x; pos[i*3+1]=v.y; pos[i*3+2]=v.z;
+    col[i*3]=st.color[0]; col[i*3+1]=st.color[1]; col[i*3+2]=st.color[2];
+    // Un séisme plus fort est un marqueur plus gros : la magnitude est l'information
+    // principale de cette couche, elle doit se lire sans ouvrir le panneau.
+    const mag=d.item?Number(d.item.magnitude):Number(String(d.label||'').replace(/^M/,''));
+    siz[i]=(d.kind==='quakes'&&Number.isFinite(mag))?st.size*(0.7+Math.min(mag,8)/8):st.size;
+
+    // Number(null) vaut 0 : sans ce garde-fou, un cap ABSENT passait pour un cap
+    // plein nord et chaque séisme se retrouvait fléché.
+    const h=(d.heading==null||d.heading==='')?NaN:Number(d.heading);
+    if(Number.isFinite(h)){
+      // Cap tracé comme un court trait tangent à la sphère : nord et est locaux
+      // obtenus par différence finie, ce qui évite de redériver la convention de
+      // latLngToVector3 à la main et de se tromper de signe.
+      const latSafe=Math.max(-89.5,Math.min(89.5,d.lat));
+      const north=latLngToVector3(latSafe+0.3,d.lng,WORLD_MARKER_RADIUS).sub(v).normalize();
+      const east=latLngToVector3(latSafe,d.lng+0.3,WORLD_MARKER_RADIUS).sub(v).normalize();
+      const rad=h*Math.PI/180;
+      const dir=north.multiplyScalar(Math.cos(rad)).add(east.multiplyScalar(Math.sin(rad))).normalize();
+      const tip=v.clone().add(dir.multiplyScalar(0.095));
+      headPos.push(v.x,v.y,v.z,tip.x,tip.y,tip.z);
+      headAnchor.push(v.x,v.y,v.z,v.x,v.y,v.z);
+    }
+  }
+
+  world_markerGroup=new THREE.Group();
+  world_markerGroup.name='world-markers';
+
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('aColor',new THREE.BufferAttribute(col,3));
+  geo.setAttribute('aSize',new THREE.BufferAttribute(siz,1));
+  // L'échelle en pixels de Three dépend de la hauteur du tampon de dessin ; elle est
+  // lue ici, après que le rendu a été dimensionné pour cette ouverture.
+  const bufferHeight=(world_renderer&&world_renderer.domElement&&world_renderer.domElement.height)||600;
+  world_markerMaterial=makeGlobeMarkerMaterial(bufferHeight*0.5);
+  world_markerPoints=new THREE.Points(geo,world_markerMaterial);
+  world_markerPoints.name='world-marker-points';
+  world_markerGroup.add(world_markerPoints);
+
+  if(headPos.length){
+    const hg=new THREE.BufferGeometry();
+    hg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(headPos),3));
+    hg.setAttribute('aAnchor',new THREE.BufferAttribute(new Float32Array(headAnchor),3));
+    world_markerGroup.add(new THREE.LineSegments(hg,makeGlobeHeadingMaterial(style.color)));
+  }
+
+  world_globeGroup.add(world_markerGroup);
+  world_markerData=usable;
+  return n;
+}
+
+// Même règle que le nuanceur, côté JavaScript : elle sert au clic (un marqueur
+// caché derrière la Terre ne doit pas être cliquable non plus).
+function globeMarkerFacesCamera(i){
+  if(!world_markerPoints||!world_globeGroup||!world_camera) return false;
+  const attr=world_markerPoints.geometry.attributes.position;
+  if(i<0||i>=attr.count) return false;
+  if(!worldScratchA){ worldScratchA=new THREE.Vector3(); worldScratchB=new THREE.Vector3(); }
+  const p=worldScratchA.fromBufferAttribute(attr,i);
+  const cam=worldScratchB.copy(world_camera.position);
+  world_globeGroup.worldToLocal(cam);
+  return p.dot(cam.sub(p))>0;
+}
+
+// ── Panneau d'un objet de couche ───────────────────────────────────────────
+
+function globeInfoRow(icon,text){
+  return '<div>'+icon+' '+escapeHtml(text)+'</div>';
+}
+
+function globeWhenLabel(value){
+  const t=typeof value==='number'?value:Date.parse(value||'');
+  if(!Number.isFinite(t)) return '';
+  return new Date(t).toLocaleString('fr',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+
+function showGlobeMarkerInfo(i){
+  const d=world_markerData[i];
+  if(!d) return;
+  world_selectedMarker=i;
+  const panel=document.getElementById('world-info-panel');
+  const title=document.getElementById('world-info-title');
+  const body=document.getElementById('world-info-body');
+  world_currentCountryData=null; // ce panneau ne décrit plus un pays : le bouton capitale n'a plus de sens
+  const it=d.item||{};
+  let html='';
+  if(d.kind==='aircraft'){
+    title.textContent='✈ '+(d.label||it.callsign||it.registration||'Avion');
+    if(it.model) html+=globeInfoRow('🛩️',it.model+(it.registration?' · '+it.registration:''));
+    if(it.on_ground) html+=globeInfoRow('🛬','Au sol');
+    else if(it.altitude_m!=null) html+=globeInfoRow('📏',it.altitude_m+' m d\'altitude');
+    else if(d.detail) html+=globeInfoRow('📏',d.detail);
+    if(it.speed_kmh!=null) html+=globeInfoRow('💨',it.speed_kmh+' km/h');
+    const head=(d.heading==null||d.heading==='')?NaN:Number(d.heading);
+    if(Number.isFinite(head)) html+=globeInfoRow('🧭','Cap '+Math.round(head)+'°');
+    if(it.distance_km!=null) html+=globeInfoRow('📍',it.distance_km+' km'+(it.direction?' au '+it.direction:''));
+    if(it.emergency&&it.emergency!=='none') html+='<div style="color:#f87171;margin-top:6px">⚠️ Urgence déclarée : '+escapeHtml(it.emergency)+'</div>';
+  }else if(d.kind==='quakes'){
+    title.textContent='◉ Séisme '+(d.label||'');
+    if(it.magnitude!=null) html+=globeInfoRow('📊','Magnitude '+it.magnitude);
+    html+=globeInfoRow('📍',it.place||d.detail||'lieu inconnu');
+    if(it.depth_km!=null) html+=globeInfoRow('⬇️',it.depth_km+' km de profondeur');
+    const when=globeWhenLabel(it.time_ms!=null?it.time_ms:it.time);
+    if(when) html+=globeInfoRow('🕒',when);
+    if(it.distance_km!=null) html+=globeInfoRow('📏',it.distance_km+' km de toi');
+  }else if(d.kind==='launches'){
+    title.textContent='▲ '+(d.label||it.name||'Lancement');
+    if(it.provider) html+=globeInfoRow('🏢',it.provider);
+    if(it.pad) html+=globeInfoRow('🚀','Pas de tir : '+it.pad);
+    if(it.location||d.detail) html+=globeInfoRow('📍',it.location||d.detail);
+    const when=globeWhenLabel(it.net);
+    if(when) html+=globeInfoRow('🕒',when);
+    if(it.status) html+=globeInfoRow('📋',it.status);
+  }else{
+    title.textContent=d.label||'Objet';
+    if(d.detail) html+=globeInfoRow('📍',d.detail);
+  }
+  html+='<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(139,92,246,.15);font-size:11px;color:rgba(160,151,196,.6)">'
+    +escapeHtml(d.lat.toFixed(3)+'°, '+d.lng.toFixed(3)+'°')+'</div>';
+  // Le pays sous l'objet passe par le chemin pays existant, celui du clic sur la
+  // carte : même requête, même panneau, rien de parallèle à maintenir.
+  html+='<button onclick="showCountryUnderGlobeMarker()" class="access-btn" style="width:100%;margin-top:10px;font-size:11px">🌍 Le pays en dessous</button>';
+  panel.style.display='block';
+  body.innerHTML=html;
+}
+
+function showCountryUnderGlobeMarker(){
+  const d=world_markerData[world_selectedMarker];
+  if(!d) return;
+  const props=findCountryAt(d.lat,d.lng);
+  if(!props){
+    document.getElementById('world-info-body').innerHTML=
+      '<div style="color:rgba(160,151,196,.75)">Cet objet est au-dessus de l\'eau ou d\'une zone sans pays — rien à ouvrir en dessous.</div>';
+    return;
+  }
+  const isoCode=props.iso||props['ISO3166-1-Alpha-3']||props['ISO3166-1-Alpha-2']||props.ISO_A3||props.ISO_A2||null;
+  showWorldCountryInfo(props.name||props.ADMIN||props.NAME||'Pays',(isoCode&&isoCode!=='-99')?isoCode:null);
+}
+
+// ── Contrôle de couches ────────────────────────────────────────────────────
+// Une seule couche à la fois : le backend répond par couche, et superposer avions
+// et séismes sur une sphère de 2,5 unités donne un amas illisible sur un écran de
+// 360 px. Retoucher la couche active l'enlève.
+const GLOBE_LAYERS={
+  aircraft:{
+    label:'Avions',
+    // La couche suit le dernier pays ouvert quand il y en a un : l'ADS-B est borné à
+    // 463 km de rayon, « les avions du monde » n'existe pas côté source.
+    query:()=>{
+      const c=world_currentCountryData;
+      if(c&&c.capital_lat!=null&&c.capital_lng!=null){
+        return '/geo/aircraft?lat='+c.capital_lat+'&lng='+c.capital_lng
+          +'&place='+encodeURIComponent(c.capital||'')+'&radius_km=400&limit=40';
+      }
+      return '/geo/aircraft?radius_km=400&limit=40';
+    },
+    count:(n,data)=>n+(n>1?' avions':' avion')+(data.location_name?' autour de '+data.location_name:''),
+    nothing:(data)=>'Aucun avion capté autour de '+(data.location_name||'ce point')
+      +' — la couverture ADS-B est mince par ici, ce n\'est pas une panne.',
+  },
+  quakes:{
+    label:'Séismes',
+    query:()=>'/geo/quakes?min_magnitude=2.5&limit=50',
+    count:(n)=>n+(n>1?' séismes':' séisme')+' sur 24 h',
+    nothing:()=>'Aucun séisme au-dessus de M2.5 depuis 24 h. Rien à afficher, rien de cassé.',
+  },
+  launches:{
+    label:'Lancements',
+    query:()=>'/geo/launches?limit=20',
+    count:(n)=>n+(n>1?' lancements à venir':' lancement à venir'),
+    nothing:(data)=>(data.count>0)
+      ? data.count+' lancement(s) annoncé(s), aucun avec un pas de tir localisé.'
+      : 'Aucun lancement orbital annoncé pour le moment.',
+  },
+};
+
+const GLOBE_STATUS_COLOR={load:'rgba(160,151,196,.75)',ok:'rgba(201,162,39,.9)',empty:'rgba(160,151,196,.75)',err:'#f87171'};
+
+function setGlobeLayerStatus(text,tone){
+  const el=document.getElementById('world-layer-status');
+  if(!el) return;
+  if(!text){ el.style.display='none'; el.textContent=''; return; }
+  el.style.display='block';
+  el.style.color=GLOBE_STATUS_COLOR[tone]||GLOBE_STATUS_COLOR.load;
+  el.textContent=text; // textContent et non innerHTML : ce texte contient des noms de lieux venus du réseau
+}
+
+function paintGlobeLayerButtons(){
+  for(const id of Object.keys(GLOBE_LAYERS)){
+    const btn=document.getElementById('world-layer-'+id);
+    if(btn) btn.classList.toggle('on',world_activeLayer===id);
+  }
+}
+
+function nowHHMM(){
+  return new Date().toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'});
+}
+
+async function toggleGlobeLayer(layer){
+  if(world_activeLayer===layer&&!world_layerBusy){
+    world_activeLayer=null;
+    disposeGlobeMarkers();
+    paintGlobeLayerButtons();
+    setGlobeLayerStatus('');
+    return;
+  }
+  await loadGlobeLayer(layer);
+}
+
+async function refreshGlobeLayer(){
+  if(!world_activeLayer){
+    setGlobeLayerStatus('Choisis d\'abord une couche à afficher.','load');
+    return;
+  }
+  await loadGlobeLayer(world_activeLayer);
+}
+
+async function loadGlobeLayer(layer){
+  const def=GLOBE_LAYERS[layer];
+  if(!def||world_layerBusy) return;
+  world_layerBusy=true;
+  world_activeLayer=layer;
+  world_pendingChatLayer=null; // une lecture directe remplace ce qui venait du chat
+  paintGlobeLayerButtons();
+  setGlobeLayerStatus(def.label+' — lecture en cours...','load');
+  try{
+    const data=await apiCall(def.query());
+    if(world_activeLayer!==layer) return; // il a changé de couche pendant l'appel : sa dernière intention gagne
+    const n=showGlobePoints(data.points||[],layer,data.items||null);
+    // Zéro objet n'est pas une erreur : la source peut honnêtement n'avoir rien vu.
+    // Le dire tel quel, sinon un globe vide passe pour une panne.
+    setGlobeLayerStatus(n?(def.count(n,data)+' · lu à '+nowHHMM()):def.nothing(data),n?'ok':'empty');
+  }catch(e){
+    showGlobePoints([],layer);
+    // Les routes /geo/* renvoient une raison précise (« adsb.lol a répondu 503 »),
+    // nettement plus utile que le « problème côté serveur » générique : on la montre
+    // quand il y en a une, et on retombe sur la classification commune sinon.
+    const why=(e&&e.kind==='server'&&e.message&&e.message.length<140)?e.message:describeApiError(e);
+    setGlobeLayerStatus(def.label+' : '+why,'err');
+  }finally{
+    world_layerBusy=false;
+  }
+}
+
+// ── Couche venue d'une réponse de chat ─────────────────────────────────────
+// Elle n'ouvre PAS le globe d'autorité. Sur téléphone, le modal couvre tout
+// l'écran : le faire surgir au milieu d'une conversation, c'est la lui voler. Les
+// points sont déjà posés sur la carte plate dans le fil (comportement d'avant,
+// inchangé), et le globe reste à un geste près. Seule exception : s'il a déjà le
+// globe ouvert, c'est qu'il regarde le globe — on y pose les objets directement.
+const GLOBE_CHAT_LAYERS=['aircraft','quakes','launches'];
+
+function worldModalIsOpen(){
+  const m=document.getElementById('world-modal');
+  return !!(m&&m.style.display!=='none'&&m.style.display!=='');
+}
+
+function offerGlobeForChatLayer(map){
+  const btn=document.getElementById('persistent-map-globe-btn');
+  const layer=normalizeGlobeLayer(map&&map.layer);
+  const points=(map&&Array.isArray(map.points))?map.points:[];
+  if(!points.length||GLOBE_CHAT_LAYERS.indexOf(layer)<0){
+    if(btn) btn.style.display='none';
+    world_pendingChatLayer=null;
+    return;
+  }
+  world_pendingChatLayer={points,layer,name:map.location_name||''};
+  if(worldModalIsOpen()&&world_globeGroup){
+    applyPendingChatLayer();
+    if(btn) btn.style.display='none';
+    return;
+  }
+  if(btn) btn.style.display='block';
+}
+
+function applyPendingChatLayer(){
+  const pending=world_pendingChatLayer;
+  if(!pending) return;
+  const n=showGlobePoints(pending.points,pending.layer);
+  world_activeLayer=pending.layer;
+  paintGlobeLayerButtons();
+  const def=GLOBE_LAYERS[pending.layer];
+  setGlobeLayerStatus(n?((def?def.count(n,{location_name:pending.name,count:n}):n+' objets')+' · de ta question')
+    :'Rien à poser sur le globe pour cette réponse.',n?'ok':'empty');
+}
+
+async function showPendingChatLayerOnGlobe(){
+  if(!world_pendingChatLayer) return;
+  const btn=document.getElementById('persistent-map-globe-btn');
+  if(btn) btn.style.display='none';
+  await openWorldPanel();
+  if(!world_globeGroup) return; // l'ouverture a échoué : son propre message est déjà à l'écran
+  applyPendingChatLayer();
+}
+
+// ── Zoom ───────────────────────────────────────────────────────────────────
+
+function worldZoomBy(factor){
+  const d=world_camDistTarget*factor;
+  world_camDistTarget=Math.max(WORLD_CAM_MIN,Math.min(WORLD_CAM_MAX,d));
+}
+
+// Zoomé, un même glissement doit couvrir moins de longitude, sinon le globe fuit
+// sous le doigt ; dézoomé, il en couvre plus, puisqu'il paraît plus petit.
+function worldDragScale(){
+  return Math.max(0.3,Math.min(2.5,world_camDist/WORLD_CAM_DEFAULT));
+}
+
+function worldTouchSpread(touches){
+  const dx=touches[0].clientX-touches[1].clientX;
+  const dy=touches[0].clientY-touches[1].clientY;
+  return Math.hypot(dx,dy);
+}
+
 function setupWorldControls(){
   const canvas=document.getElementById('world-canvas');
   if(canvas._worldControlsBound) return; // éviter d'attacher les écouteurs plusieurs fois
@@ -298,8 +806,9 @@ function setupWorldControls(){
       world_holdCanceledByMove=true; // un vrai geste de glisser annule l'arrêt programmé
       cancelHoldTimer();
     }
-    world_rotationY+=dx*0.005;
-    world_rotationX=Math.max(-1.3,Math.min(1.3,world_rotationX+dy*0.005));
+    const k=worldDragScale();
+    world_rotationY+=dx*0.005*k;
+    world_rotationX=Math.max(-1.3,Math.min(1.3,world_rotationX+dy*0.005*k));
     world_lastX=x; world_lastY=y;
     world_velocityHistory.push({x,t:performance.now()});
     if(world_velocityHistory.length>8) world_velocityHistory.shift();
@@ -317,7 +826,7 @@ function setupWorldControls(){
       const first=world_velocityHistory[0], last=world_velocityHistory[world_velocityHistory.length-1];
       const dt=(last.t-first.t)||16;
       const dx=last.x-first.x;
-      let v=(dx/dt)*16*0.005;
+      let v=(dx/dt)*16*0.005*worldDragScale();
       world_spinVelocityY=Math.max(-0.15,Math.min(0.15,v)); // borne raisonnable, évite un flick délirant
       world_autoRotate=false; // le contrôle passe définitivement à la vélocité de spin
     }
@@ -327,12 +836,54 @@ function setupWorldControls(){
   canvas.addEventListener('mousemove',e=>onMove(e.clientX,e.clientY));
   window.addEventListener('mouseup',e=>{ if(world_dragging) onUp(e.clientX,e.clientY); });
 
-  canvas.addEventListener('touchstart',e=>{ const t=e.touches[0]; onDown(t.clientX,t.clientY); },{passive:true});
-  canvas.addEventListener('touchmove',e=>{ const t=e.touches[0]; onMove(t.clientX,t.clientY); },{passive:true});
-  canvas.addEventListener('touchend',e=>{ const t=e.changedTouches[0]; if(world_dragging) onUp(t.clientX,t.clientY); });
+  // Deux doigts = pincement, jamais un glissement : on coupe le glisser en cours et
+  // l'arrêt programmé, sinon poser le second doigt faisait tourner le globe d'un
+  // coup sec et pouvait déclencher la pression longue.
+  const beginPinch=(e)=>{
+    world_dragging=false; moved=true; cancelHoldTimer();
+    world_holdCanceledByMove=true;
+    world_pinchStartDist=worldTouchSpread(e.touches)||null;
+    world_pinchStartCam=world_camDistTarget;
+  };
+  const updatePinch=(e)=>{
+    const d=worldTouchSpread(e.touches);
+    if(!d||!world_pinchStartDist) return;
+    // Doigts qui s'écartent -> rapport > 1 -> caméra plus proche.
+    world_camDistTarget=Math.max(WORLD_CAM_MIN,Math.min(WORLD_CAM_MAX,world_pinchStartCam*(world_pinchStartDist/d)));
+  };
+
+  canvas.addEventListener('touchstart',e=>{
+    if(e.touches.length>=2){ beginPinch(e); return; }
+    const t=e.touches[0]; onDown(t.clientX,t.clientY);
+  },{passive:true});
+  canvas.addEventListener('touchmove',e=>{
+    if(world_pinchStartDist!==null&&e.touches.length>=2){ updatePinch(e); return; }
+    const t=e.touches[0]; if(t) onMove(t.clientX,t.clientY);
+  },{passive:true});
+  canvas.addEventListener('touchend',e=>{
+    if(world_pinchStartDist!==null){
+      // Le doigt restant n'a pas déclenché de touchstart : il ne doit pas se mettre
+      // à faire tourner le globe au milieu du geste, ni compter comme un tap.
+      if(e.touches.length<2) world_pinchStartDist=null;
+      return;
+    }
+    const t=e.changedTouches[0]; if(world_dragging) onUp(t.clientX,t.clientY);
+  });
+
+  // Molette de souris. Le pavé tactile envoie son pincement comme une molette avec
+  // Ctrl enfoncé : même geste, même effet, mais un cran plus franc puisqu'il est
+  // explicitement un zoom. preventDefault empêche le navigateur de zoomer la page.
+  canvas.addEventListener('wheel',e=>{
+    e.preventDefault();
+    worldZoomBy(Math.exp(e.deltaY*(e.ctrlKey?0.004:0.0016)));
+  },{passive:false});
 
   // Clavier — n'importe quelle touche maintenue 2 secondes arrête aussi la rotation
-  canvas.addEventListener('keydown',()=>{
+  canvas.addEventListener('keydown',e=>{
+    // Les touches de zoom sont exclues de cet arrêt : on les maintient justement
+    // pour zoomer, ça ne doit pas figer la toupie au passage.
+    if(e.key==='+'||e.key==='='){ worldZoomBy(0.93); return; }
+    if(e.key==='-'||e.key==='_'){ worldZoomBy(1.075); return; }
     if(world_keyHoldTimer) return; // déjà en cours (répétition automatique du navigateur sur touche maintenue)
     world_keyHoldTimer=setTimeout(()=>{ world_spinVelocityY=0; world_autoRotate=false; },2000);
   });
@@ -348,6 +899,20 @@ function handleWorldClick(clientX,clientY){
   );
   const raycaster=new THREE.Raycaster();
   raycaster.setFromCamera(mouse,world_camera);
+
+  // Les marqueurs d'abord : un objet posé sur un pays doit répondre à sa place, pas
+  // ouvrir la fiche du pays. La tolérance de visée suit le zoom pour rester à peu
+  // près constante à l'écran — un marqueur reste visable au doigt de loin comme de près.
+  if(world_markerPoints){
+    raycaster.params.Points.threshold=0.05*worldDragScale();
+    const markerHits=raycaster.intersectObject(world_markerPoints);
+    for(const hit of markerHits){
+      // Trié par distance, donc le premier marqueur tourné vers la caméra est bien
+      // celui du dessus ; ceux de la face cachée sont invisibles, donc injoignables.
+      if(hit.index!=null&&globeMarkerFacesCamera(hit.index)){ showGlobeMarkerInfo(hit.index); return; }
+    }
+  }
+
   const hitSphere=world_globeGroup.getObjectByName('world-hit-sphere');
   const intersects=raycaster.intersectObject(hitSphere);
   if(!intersects.length) return;
@@ -411,6 +976,13 @@ function worldLoop(){
     world_rotationY+=world_spinVelocityY;
   }
   if(world_globeGroup){ world_globeGroup.rotation.y=world_rotationY; world_globeGroup.rotation.x=world_rotationX; }
+  // Amorti exponentiel vers la distance visée : molette, pincement et clavier ne
+  // touchent qu'à la cible, ce qui donne un zoom qui glisse au lieu de sauter, sans
+  // interférer avec la rotation (qui, elle, reste pilotée par le glissement).
+  if(world_camera && Math.abs(world_camDistTarget-world_camDist)>0.0008){
+    world_camDist+=(world_camDistTarget-world_camDist)*0.18;
+    world_camera.position.z=world_camDist;
+  }
   if(world_renderer && world_scene && world_camera) world_renderer.render(world_scene,world_camera);
   requestAnimationFrame(worldLoop);
 }
@@ -436,6 +1008,14 @@ async function showCapitalBuildings(){
 
 function closeWorldPanel(){
   document.getElementById('world-modal').style.display='none';
+  // La couche affichée n'a aucune raison de survivre au panneau : ses données sont
+  // périssables (un avion de la minute passée ne vaut rien) et sa géométrie occupe
+  // de la mémoire vidéo. L'état du contrôle est remis à zéro avec elle.
+  disposeGlobeMarkers();
+  world_activeLayer=null;
+  world_layerBusy=false;
+  paintGlobeLayerButtons();
+  setGlobeLayerStatus('');
   // Libération immédiate de la mémoire GPU à la fermeture : le panneau peut être
   // réouvert des dizaines de fois dans une session, et tout est reconstruit à
   // l'ouverture de toute façon (les sommets des frontières, eux, restent en cache).

@@ -113,3 +113,15 @@ select.finp option,select.cinp option,select.sinp option{
   background:#13103a;
   color:var(--text-primary);
 }
+
+/* ── COUCHES VIVANTES DU GLOBE ──
+   Contrôle volontairement minuscule et semi-transparent : il se superpose au globe,
+   qui reste l'objet principal de l'écran. Les pastilles se replient d'elles-mêmes
+   sur plusieurs lignes en 360 px de large, sans jamais recouvrir plus du quart de
+   la surface du globe. */
+#world-layers{position:absolute;top:10px;right:10px;z-index:2;display:flex;flex-direction:column;align-items:flex-end;gap:6px;max-width:58%}
+.world-layer-row{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+.world-layer-btn{background:rgba(10,8,24,.8);backdrop-filter:blur(6px);border:1px solid rgba(139,92,246,.3);color:rgba(220,215,240,.8);font-family:var(--font-main);font-size:11px;line-height:1;padding:9px 10px;border-radius:9px;cursor:pointer;transition:all .15s}
+.world-layer-btn:hover{border-color:rgba(201,162,39,.5);color:#e8e4f8}
+.world-layer-btn.on{background:rgba(201,162,39,.16);border-color:rgba(201,162,39,.65);color:#f0e6c8}
+#world-layer-status{max-width:100%;text-align:right;font-size:10px;line-height:1.5;background:rgba(10,8,24,.82);backdrop-filter:blur(6px);border:1px solid rgba(139,92,246,.2);border-radius:8px;padding:5px 8px}

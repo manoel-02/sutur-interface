@@ -432,6 +432,10 @@ function handleChatResult(data, originalMsg){
       showPersistentMap(p0.lat,p0.lng,data.map.location_name||'')
         .then(()=>showMapPoints(data.map.points,data.map.layer));
     }
+    // Couche planétaire vivante (avions, séismes, lancements) : les objets viennent
+    // d'être posés sur la carte plate, et le globe 3D est PROPOSÉ à côté plutôt
+    // qu'ouvert de force — voir offerGlobeForChatLayer dans world.js.
+    if(data.map && !data.map.route && typeof offerGlobeForChatLayer==='function') offerGlobeForChatLayer(data.map);
 
     // Ouverture d'une fonctionnalité demandée par commande (texte ou vocal) — symétrique
     // du dispatch de fermeture ci-dessous, volontairement limité aux fonctionnalités

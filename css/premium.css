@@ -1,0 +1,196 @@
+/* ── FINITION ───────────────────────────────────────────────────────────────
+   Chargé en dernier : icônes dessinées, réponse au toucher, séquence de
+   démarrage. Rien ici n'est décoratif — chaque animation répond à une action de
+   l'utilisateur ou annonce un état réel du système.
+──────────────────────────────────────────────────────────────────────────── */
+
+/* ── Icônes ───────────────────────────────────────────────────────────────── */
+
+.i {
+  display: block;
+  flex: none;
+  color: inherit;          /* l'icône prend la couleur du texte qui l'entoure */
+  vertical-align: middle;
+}
+
+.brand { display: block; flex: none; transition: color .25s ease, opacity .25s ease; }
+/* Une marque non connectée reste grise : la couleur est réservée à l'état actif,
+   ce qui rend l'écran des connexions lisible sans y ajouter de pastilles. */
+.brand:not(.on) { opacity: .45; }
+
+/* Les boutons à icône n'ont plus de taille de police à régler : l'icône est un
+   dessin, pas un caractère. */
+.micbtn, .sbtn { display: flex; align-items: center; justify-content: center; }
+
+.nav-icon { display: flex; align-items: center; justify-content: center; height: 22px; }
+.nav-item { transition: background .18s ease, border-color .18s ease; }
+.nav-item .i { color: var(--text-muted); transition: color .18s ease, transform .18s ease; }
+.nav-item.active .i { color: var(--accent); }
+
+.world-layer-btn { display: inline-flex; align-items: center; gap: 7px; }
+
+/* ── Réponse au toucher ───────────────────────────────────────────────────────
+   Un bouton doit accuser réception. Sur un téléphone il n'y a pas de survol :
+   c'est l'appui qui porte toute la rétroaction, et il doit être instantané. */
+
+button, .nav-item, .media-card, .conn-btn {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+button:active, .nav-item:active, .media-card:active, .conn-btn:active {
+  transform: scale(.955);
+  transition: transform .07s ease-out;
+}
+button { transition: transform .18s cubic-bezier(.2, .8, .3, 1), background .18s ease, border-color .18s ease; }
+
+/* Le bouton d'envoi est le seul à célébrer : il confirme que le message est parti. */
+@keyframes send-pulse {
+  from { box-shadow: 0 0 0 0 rgba(124, 109, 242, .5); }
+  to   { box-shadow: 0 0 0 14px rgba(124, 109, 242, 0); }
+}
+.send-btn[data-state="sending"] { animation: send-pulse .55s ease-out; }
+
+/* Focus clavier visible partout, sans l'imposer à la souris. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ── Séquence de démarrage ───────────────────────────────────────────────────
+   Ce n'est pas un écran de chargement décoratif : chaque ligne est une vraie
+   vérification du système, et sa valeur à droite est la latence mesurée. Si un
+   service est en panne, ça se voit ici, à la seconde où Sutur s'ouvre. */
+
+#boot {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;   /* au-dessus de l'écran de verrouillage et des sous-pages */
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  padding: 32px 24px calc(32px + var(--safe-b));
+  opacity: 1;
+  transition: opacity .5s ease;
+}
+#boot.done { opacity: 0; pointer-events: none; }
+
+/* Le repère : un noyau et son orbite, le logo de Sutur en train de se composer. */
+#boot-mark { position: relative; width: 108px; height: 108px; flex: none; }
+#boot-mark .ring {
+  position: absolute; inset: 0;
+  border: 1.5px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: boot-spin 1.5s cubic-bezier(.5, .1, .4, .9) infinite;
+}
+#boot-mark .ring:nth-child(2) { inset: 13px; animation-duration: 2.1s; animation-direction: reverse; border-top-color: var(--accent-2, #a99cf7); }
+#boot-mark .core {
+  position: absolute; left: 50%; top: 50%;
+  width: 26px; height: 26px; margin: -13px 0 0 -13px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 26px 5px rgba(124, 109, 242, .45);
+  animation: boot-breathe 2.4s ease-in-out infinite;
+}
+@keyframes boot-spin { to { transform: rotate(360deg); } }
+@keyframes boot-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.16); } }
+
+#boot-list {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.boot-row {
+  display: grid;
+  grid-template-columns: 14px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 2px;
+  font: 500 12.5px var(--font-main);
+  color: var(--text-muted);
+  border-bottom: 1px solid transparent;
+  opacity: 0;
+  transform: translateY(4px);
+  animation: boot-in .32s ease-out forwards;
+}
+@keyframes boot-in { to { opacity: 1; transform: none; } }
+
+.boot-row .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--border-strong);
+  justify-self: center;
+  transition: background .3s ease, box-shadow .3s ease;
+}
+.boot-row .val {
+  font: 400 11px var(--font-mono);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* Les trois états parlent d'eux-mêmes : en cours, réussi, à regarder. */
+.boot-row.live .dot { background: var(--accent); box-shadow: 0 0 9px 1px rgba(124, 109, 242, .55); }
+.boot-row.ok   { color: var(--text-secondary); }
+.boot-row.ok   .dot { background: var(--success); }
+.boot-row.warn { color: #f5a524; }
+.boot-row.warn .dot { background: #f5a524; box-shadow: 0 0 9px 1px rgba(245, 165, 36, .4); }
+.boot-row.bad  { color: var(--danger); }
+.boot-row.bad  .dot { background: var(--danger); box-shadow: 0 0 9px 1px rgba(248, 113, 113, .4); }
+
+#boot-name {
+  font: 600 15px var(--font-main);
+  letter-spacing: .34em;
+  color: var(--text-secondary);
+  text-indent: .34em;        /* compense le pistage sur la dernière lettre */
+}
+#boot-note {
+  min-height: 16px;
+  font: 400 11.5px var(--font-main);
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 320px;
+}
+#boot-skip {
+  position: absolute;
+  bottom: calc(18px + var(--safe-b));
+  background: none;
+  border: 0;
+  color: var(--text-muted);
+  font: 500 11.5px var(--font-main);
+  padding: 8px 14px;
+  cursor: pointer;
+}
+#boot-skip:hover { color: var(--text-secondary); }
+
+/* Quelqu'un qui a demandé moins d'animation reçoit l'information, pas le spectacle. */
+@media (prefers-reduced-motion: reduce) {
+  #boot-mark .ring, #boot-mark .core { animation: none; }
+  .boot-row { animation: none; opacity: 1; transform: none; }
+  button:active, .nav-item:active, .media-card:active, .conn-btn:active { transform: none; }
+  .send-btn[data-state="sending"] { animation: none; }
+}
+
+/* ── Bandeau des connexions ─────────────────────────────────────────────────
+   La marque porte elle-même l'état : grise au repos, dans sa couleur une fois
+   connectée. La pastille rouge qui l'accompagnait n'ajoutait rien à lire. */
+
+#conn-statusbar {
+  width: 100%;
+  display: flex; align-items: center; justify-content: center;
+  gap: 18px; padding: 6px 10px;
+  background: rgba(7, 5, 26, .75);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0; cursor: pointer;
+}
+.conn-chip {
+  display: flex; align-items: center; gap: 6px;
+  font: 500 10px var(--font-main);
+  letter-spacing: .4px;
+  color: var(--text-muted);
+  transition: color .25s ease;
+}
+.conn-chip.on { color: var(--text-secondary); }

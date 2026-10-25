@@ -203,9 +203,20 @@ async function refreshConnectorTruth(){
   }
 }
 
+const BRAND_COLORS={'sb-google':'#4285F4','sb-spotify':'#1DB954','sb-notion':'#ffffff',
+                    'sb-canva':'#00C4CC','sb-whatsapp':'#25D366'};
 function updateStatusDot(id,connected){
-  const dot=document.getElementById(id);
-  if(dot)dot.className='statusdot '+(connected?'ok':'ko');
+  const chip=document.getElementById(id);
+  if(!chip)return;
+  // Rétro-compatible : les anciens appels visaient une pastille, les nouveaux une
+  // puce portant la marque.
+  if(chip.classList.contains('statusdot')){chip.className='statusdot '+(connected?'ok':'ko');return;}
+  chip.classList.toggle('on',!!connected);
+  const mark=chip.querySelector('.brand');
+  if(mark){
+    mark.classList.toggle('on',!!connected);
+    mark.style.color=connected?(BRAND_COLORS[id]||'currentColor'):'';
+  }
 }
 
 async function checkGoogleStatus(){

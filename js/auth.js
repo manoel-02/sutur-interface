@@ -173,6 +173,14 @@ function unlock(){
   document.getElementById('lock').style.display='none';
   const ms=document.getElementById('main');ms.style.display='flex';
   gActive=true;
+  // La séquence de démarrage interroge réellement le serveur, la base, le
+  // planificateur et chaque connecteur. Elle s'efface dès que les réponses sont
+  // revenues : aucune attente n'est ajoutée, et elle reste passable.
+  const boot=document.getElementById('boot');
+  if(boot && typeof runBootSequence==='function'){
+    boot.style.display='flex';
+    runBootSequence();
+  }
   // Charger genre sauvegardé
   const sg=localStorage.getItem('s_gender');
   if(sg)userGender=sg;

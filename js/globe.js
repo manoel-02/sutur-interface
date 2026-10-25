@@ -45,9 +45,14 @@ function drawBg(t){
 function ensureThreeJS(){
   if(threeLoaded && window.THREE)return Promise.resolve();
   if(threeLoadingPromise)return threeLoadingPromise;
+  // Servi depuis le même domaine en premier. L'avatar ET le globe en dépendent
+  // entièrement : les faire reposer sur un CDN tiers, c'est accepter que toute
+  // l'identité visuelle de Sutur disparaisse dès qu'un réseau le filtre — ce qui
+  // arrive réellement. Les CDN restent en secours si le fichier local manque.
   const sources=[
+    'assets/three.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
-    'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js', // secours si le premier CDN est bloqué/indisponible
+    'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js',
   ];
   const tryLoad=(i)=>new Promise((resolve,reject)=>{
     if(i>=sources.length){reject(new Error('Three.js indisponible (tous les CDN ont échoué)'));return;}
@@ -200,11 +205,63 @@ function buildStarfield(n,spread){
   return pts;
 }
 
+// Chaque point était un carré plein : à 1 900 exemplaires, l'avatar lisait comme
+// du bruit granuleux plutôt que comme une matière. Un dégradé radial transforme
+// chacun en halo doux, et c'est ce seul changement qui lui donne de la substance.
+let _pointSprite=null;
+function pointSprite(){
+  if(_pointSprite)return _pointSprite;
+  const s=64,c=document.createElement('canvas');c.width=c.height=s;
+  const g=c.getContext('2d');
+  const grad=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+  grad.addColorStop(0,'rgba(255,255,255,1)');
+  grad.addColorStop(.3,'rgba(255,255,255,.6)');
+  grad.addColorStop(.7,'rgba(255,255,255,.12)');
+  grad.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle=grad;g.fillRect(0,0,s,s);
+  _pointSprite=new THREE.CanvasTexture(c);
+  return _pointSprite;
+}
+
+// Coque translucide. C'est elle qui donne une silhouette à l'avatar : sans bord,
+// un nuage de points n'a pas de forme. Le rebord s'allume là où la surface fuit le
+// regard (fresnel), comme sur du verre épais.
+function buildGlassShell(radius,colorHex,power,strength,invert){
+  const mat=new THREE.ShaderMaterial({
+    uniforms:{
+      uColor:{value:new THREE.Color(colorHex)},
+      uPower:{value:power},
+      uStrength:{value:strength},
+      uInvert:{value:invert?1.0:0.0},
+    },
+    vertexShader:[
+      'varying vec3 vN;varying vec3 vP;',
+      'void main(){',
+      '  vN=normalize(normalMatrix*normal);',
+      '  vec4 mv=modelViewMatrix*vec4(position,1.0);',
+      '  vP=mv.xyz;',
+      '  gl_Position=projectionMatrix*mv;',
+      '}',
+    ].join('\n'),
+    fragmentShader:[
+      'uniform vec3 uColor;uniform float uPower;uniform float uStrength;uniform float uInvert;',
+      'varying vec3 vN;varying vec3 vP;',
+      'void main(){',
+      '  float d=abs(dot(normalize(vN),normalize(-vP)));',
+      '  float f=pow(mix(1.0-d,d,uInvert),uPower);',
+      '  gl_FragColor=vec4(uColor,f*uStrength);',
+      '}',
+    ].join('\n'),
+    transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,
+  });
+  return new THREE.Mesh(new THREE.SphereGeometry(radius,40,28),mat);
+}
+
 function makePoints(positionsArray,color,size,opacity,vertexColorsArray){
   const geo=new THREE.BufferGeometry();
   geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(positionsArray),3));
   const matOpts={
-    color,size,transparent:true,opacity,
+    color,size,transparent:true,opacity,map:pointSprite(),
     sizeAttenuation:true,blending:THREE.AdditiveBlending,depthWrite:false
   };
   if(vertexColorsArray){
@@ -247,17 +304,20 @@ async function initGlobe3D(){
 
     // Masse organique centrale — cœur en mouvement perpétuel, jamais figée,
     // densifiée et éclaircie pour une vraie sensation de matière/substance.
-    const core=buildOrganicCore(1900);
+    // Sur un téléphone, 1 900 points évalués au bruit simplex à chaque image sont
+    // le principal poste de dépense de la page, et l'écran est plus petit : la
+    // différence ne s'y voit pas.
+    const core=buildOrganicCore(window.innerWidth<520?1150:1900);
     coreOrigins=core.origins;
     coreDirs=core.dirs;
-    three_core=makePoints(core.positions,0x8b5cf6,0.038,0.92,core.colors);
+    three_core=makePoints(core.positions,0xa294ff,0.052,1.0,core.colors);
 
     // Reflets lumineux quasi-blancs près de la surface — aspect "brillant,
     // presque humide" façon matière organique vivante plutôt qu'un dégradé plat.
     const highlights=buildHighlights(260);
     highlightOrigins=highlights.origins;
     highlightDirs=highlights.dirs;
-    three_highlights=makePoints(highlights.positions,0xffffff,0.022,0.55,highlights.colors);
+    three_highlights=makePoints(highlights.positions,0xffffff,0.030,0.75,highlights.colors);
 
     // Tentacules — s'étendent depuis la surface, ondulent en continu, réagissent
     // à l'écoute (s'étendent), à la réflexion (s'agitent) et au toucher (fouettent).
@@ -273,7 +333,10 @@ async function initGlobe3D(){
     three_burstVelocities=burstData.velocities;
     three_burst=makePoints(burstData.positions,0xffffff,0.032,0);
 
-    three_group.add(three_core,three_highlights,three_tendrils);
+    // La coque est ajoutée avant les points : son rebord doit se lire derrière eux.
+    three_shell=buildGlassShell(1.02,0x8f80ff,3.2,0.70,false);
+    three_innerGlow=buildGlassShell(0.78,0x7c6df2,2.2,0.42,true);
+    three_group.add(three_innerGlow,three_shell,three_core,three_highlights,three_tendrils);
     three_scene.add(three_group);
     three_scene.add(three_stars); // hors du groupe : tourne indépendamment (parallaxe)
     three_scene.add(three_burst); // hors du groupe : l'explosion ne doit pas hériter de sa rotation

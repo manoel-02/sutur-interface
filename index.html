@@ -25,8 +25,20 @@
   <link rel="stylesheet" href="css/tab-ambiances.css">
   <link rel="stylesheet" href="css/remote-desktop.css">
 <link rel="stylesheet" href="css/chat-ux.css">
+  <link rel="stylesheet" href="css/premium.css">
 </head>
 <body>
+
+<!-- Séquence de démarrage : voir js/boot.js. Masquée tant qu'aucune session n'est
+     ouverte — il n'y a alors aucun système réel à interroger. -->
+<div id="boot" style="display:none" role="status" aria-live="polite">
+  <div id="boot-mark"><div class="ring"></div><div class="ring"></div><div class="core"></div></div>
+  <div id="boot-list"></div>
+  <div id="boot-note"></div>
+  <div id="boot-name">SUTUR</div>
+  <button type="button" id="boot-skip">Passer</button>
+</div>
+
 <div id="app">
 <canvas id="bgc"></canvas>
 
@@ -86,10 +98,10 @@
   </div>
 
   <!-- BARRE DE STATUT DES Connexions — toujours visible -->
-  <div id="conn-statusbar" onclick="sw('cfg')" style="width:100%;display:flex;align-items:center;justify-content:center;gap:16px;padding:5px 10px;background:rgba(7,5,26,.75);border-bottom:1px solid var(--border);flex-shrink:0;cursor:pointer">
-    <span style="display:flex;align-items:center;gap:4px;font-size:9px;letter-spacing:.5px;color:var(--text-muted)"><span class="statusdot ko" id="sb-google"></span>Google</span>
-    <span style="display:flex;align-items:center;gap:4px;font-size:9px;letter-spacing:.5px;color:var(--text-muted)"><span class="statusdot ko" id="sb-spotify"></span>Spotify</span>
-    <span style="display:flex;align-items:center;gap:4px;font-size:9px;letter-spacing:.5px;color:var(--text-muted)"><span class="statusdot ko" id="sb-notion"></span>Notion</span>
+  <div id="conn-statusbar" onclick="sw('cfg')" title="Voir l'état des connexions" role="button" tabindex="0">
+    <span class="conn-chip" id="sb-google"><svg class="brand" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><use href="#b-google"/></svg>Google</span>
+    <span class="conn-chip" id="sb-spotify"><svg class="brand" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><use href="#b-spotify"/></svg>Spotify</span>
+    <span class="conn-chip" id="sb-notion"><svg class="brand" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><use href="#b-notion"/></svg>Notion</span>
   </div>
 
   <!-- ZONE CHAT (panel actif par défaut) -->
@@ -109,6 +121,9 @@
       <div id="persistent-map" style="height:190px;width:100%;border-radius:14px;overflow:hidden;border:1px solid var(--border)"></div>
       <div id="persistent-map-label" style="position:absolute;top:8px;left:20px;background:rgba(10,8,24,.75);backdrop-filter:blur(6px);padding:4px 10px;border-radius:8px;font-size:11px;color:#e8e4f8;border:1px solid rgba(139,92,246,.25);max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
       <button onclick="hidePersistentMap()" style="position:absolute;top:8px;right:20px;background:rgba(10,8,24,.75);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);width:24px;height:24px;border-radius:8px;font-size:12px;cursor:pointer;line-height:1">✕</button>
+      <!-- Proposé, pas imposé : une couche vivante arrive avec la réponse, mais le globe
+           est un modal plein écran qu'on n'ouvre pas de force au milieu d'une conversation. -->
+      <button type="button" id="persistent-map-globe-btn" onclick="showPendingChatLayerOnGlobe()" style="display:none;position:absolute;bottom:16px;left:20px;background:rgba(10,8,24,.85);backdrop-filter:blur(6px);border:1px solid rgba(201,162,39,.4);color:#e8e4f8;padding:7px 11px;border-radius:9px;font-size:11px;cursor:pointer;line-height:1;font-family:var(--font-main)">🌍 Sur le globe</button>
     </div>
 
     <!-- Panels de contenu -->
@@ -882,26 +897,26 @@
   <!-- BARRE SAISIE CHAT -->
   <div class="inp-bar" id="inp-bar" style="display:none">
     <span id="cmd-prefix" style="display:none;font-size:11px;color:rgba(0,200,255,.5);letter-spacing:1px;font-family:'Courier New',monospace;white-space:nowrap;flex-shrink:0">CMD›</span>
-    <button class="micbtn" id="micbtn" onclick="toggleMic()" aria-label="Dicter un message" title="Dicter un message">&#127908;</button>
-    <button class="micbtn" id="photobtn" onclick="openPhotoModal()" aria-label="Analyser une photo" title="Analyser une photo" style="font-size:16px">📷</button>
+    <button class="micbtn" id="micbtn" onclick="toggleMic()" aria-label="Dicter un message" title="Dicter un message"><svg class="i" width="19" height="19" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-mic"/></svg></button>
+    <button class="micbtn" id="photobtn" onclick="openPhotoModal()" aria-label="Analyser une photo" title="Analyser une photo"><svg class="i" width="19" height="19" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg></button>
     <input type="file" id="photo-input" accept="image/*" style="display:none" onchange="handlePhotoSelect(this)"/>
-    <button class="micbtn" id="pdfbtn" onclick="document.getElementById('pdf-input').click()" aria-label="Joindre un document (PDF, CSV, Excel)" title="Envoyer un PDF, CSV ou Excel (instructions/code/données)" style="font-size:15px">📄</button>
+    <button class="micbtn" id="pdfbtn" onclick="document.getElementById('pdf-input').click()" aria-label="Joindre un document (PDF, CSV, Excel)" title="Envoyer un PDF, CSV ou Excel (instructions/code/données)" ><svg class="i" width="19" height="19" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-document"/></svg></button>
     <input type="file" id="pdf-input" accept="application/pdf,.csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none" onchange="handlePdfSelect(this)"/>
     <div id="pdf-preview-bar" style="display:none;align-items:center;gap:6px;flex-shrink:0;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.25);border-radius:8px;padding:4px 8px">
-      <span style="font-size:14px">📄</span>
+      <svg class="i" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-document"/></svg>
       <span id="pdf-filename" style="font-size:10px;color:rgba(220,215,240,.8);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-      <button onclick="clearPdf()" style="background:none;border:none;color:rgba(248,113,113,.6);cursor:pointer;font-size:13px;flex-shrink:0">✕</button>
+      <button onclick="clearPdf()" aria-label="Retirer le document" style="background:none;border:none;color:rgba(248,113,113,.7);cursor:pointer;flex-shrink:0;padding:0;display:flex"><svg class="i" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-close"/></svg></button>
     </div>
     <textarea class="cinp" id="cinp" placeholder="Parle à Sutur…" rows="1" aria-label="Message à Sutur" enterkeyhint="send" oninput="autoResizeChatInput(this);syncSendButton()" onkeydown="handleChatInputKeydown(event)"></textarea>
     <div id="photo-preview-bar" style="display:none;align-items:center;gap:6px;flex-shrink:0">
       <img id="photo-thumb" style="width:32px;height:32px;border-radius:6px;object-fit:cover;border:1px solid var(--violet-glow)"/>
-      <button onclick="sendPhotoNow()" style="background:rgba(74,222,128,.15);border:1px solid rgba(74,222,128,.3);border-radius:6px;color:#4ade80;cursor:pointer;font-size:11px;padding:4px 8px;font-weight:600;white-space:nowrap;flex-shrink:0">✓ Analyser</button>
-      <button onclick="clearPhoto()" style="background:none;border:none;color:rgba(248,113,113,.6);cursor:pointer;font-size:14px;flex-shrink:0">✕</button>
+      <button onclick="sendPhotoNow()" style="background:rgba(74,222,128,.15);border:1px solid rgba(74,222,128,.3);border-radius:6px;color:#4ade80;cursor:pointer;font-size:11px;padding:4px 8px;font-weight:600;white-space:nowrap;flex-shrink:0;display:flex;align-items:center;gap:5px"><svg class="i" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg>Analyser</button>
+      <button onclick="clearPhoto()" aria-label="Retirer la photo" style="background:none;border:none;color:rgba(248,113,113,.7);cursor:pointer;flex-shrink:0;padding:0;display:flex"><svg class="i" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-close"/></svg></button>
     </div>
     <button class="sbtn" id="stopbtn" onclick="stopSpeech()" style="display:none;background:rgba(248,113,113,.15);border-color:rgba(248,113,113,.35);color:#f87171">&#9646;&#9646;</button>
     <button class="sbtn" id="meet-stop-bar" onclick="stopMeetingFromBar()" style="display:none;background:rgba(248,113,113,.15);border-color:rgba(248,113,113,.35);color:#f87171;font-size:10px;width:auto;padding:0 10px;border-radius:10px">⏹ RÉU</button>
     <button class="sbtn send-btn" id="send-btn" type="button" data-state="idle" onclick="onSendClick()" aria-label="Envoyer" aria-disabled="true">
-      <svg class="ico ico-send" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+      <svg class="ico ico-send" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19.4V5.2"/><path d="m6.4 10.8 5.6-5.6 5.6 5.6"/></svg>
       <svg class="ico ico-spin" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/></svg>
       <svg class="ico ico-stop" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>
       <svg class="ico ico-check" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
@@ -912,19 +927,19 @@
   <!-- NAV 4 ZONES -->
   <nav class="bottom-nav" id="bottom-nav" style="display:none">
     <div class="nav-item active" id="nav-home" onclick="navTo('home')">
-      <div class="nav-icon">🏠</div>
+      <div class="nav-icon"><svg class="i" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-home"/></svg></div>
       <div class="nav-label">Accueil</div>
     </div>
     <div class="nav-item" id="nav-ia" onclick="navTo('ia')">
-      <div class="nav-icon">🤖</div>
+      <div class="nav-icon"><svg class="i" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-ai"/></svg></div>
       <div class="nav-label">IA</div>
     </div>
     <div class="nav-item" id="nav-gestion" onclick="navTo('gestion')">
-      <div class="nav-icon">📊</div>
+      <div class="nav-icon"><svg class="i" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-manage"/></svg></div>
       <div class="nav-label">Gestion</div>
     </div>
     <div class="nav-item" id="nav-moi" onclick="navTo('moi')">
-      <div class="nav-icon">👤</div>
+      <div class="nav-icon"><svg class="i" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-me"/></svg></div>
       <div class="nav-label">Moi</div>
     </div>
   </nav>
@@ -1068,7 +1083,16 @@
       <div style="font-size:28px">🌌</div>
       <div style="font-size:11px;letter-spacing:1px">Chargement des frontières du monde...</div>
     </div>
-    <div id="world-hint" style="position:absolute;top:12px;left:12px;font-size:10px;color:rgba(160,151,196,.4);letter-spacing:.5px;pointer-events:none">Glisse pour tourner · Touche un pays</div>
+    <div id="world-hint" style="position:absolute;top:12px;left:12px;font-size:10px;color:rgba(160,151,196,.4);letter-spacing:.5px;pointer-events:none;max-width:38%;line-height:1.5">Glisse pour tourner · Pince ou molette pour zoomer · Touche un pays ou un objet</div>
+    <div id="world-layers">
+      <div class="world-layer-row">
+        <button type="button" id="world-layer-aircraft" class="world-layer-btn" onclick="toggleGlobeLayer('aircraft')"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-plane"/></svg><span>Avions</span></button>
+        <button type="button" id="world-layer-quakes" class="world-layer-btn" onclick="toggleGlobeLayer('quakes')"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-quake"/></svg><span>Séismes</span></button>
+        <button type="button" id="world-layer-launches" class="world-layer-btn" onclick="toggleGlobeLayer('launches')"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-launch"/></svg><span>Lancements</span></button>
+        <button type="button" id="world-layer-refresh" class="world-layer-btn" onclick="refreshGlobeLayer()" aria-label="Relire la couche affichée" title="Relire la couche affichée"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-refresh"/></svg></button>
+      </div>
+      <div id="world-layer-status" style="display:none"></div>
+    </div>
     <div id="world-info-panel" style="display:none;position:absolute;bottom:0;left:0;right:0;max-height:55%;overflow-y:auto;background:rgba(10,8,24,.95);backdrop-filter:blur(20px);border-top:1px solid rgba(139,92,246,.25);padding:16px;box-sizing:border-box">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
         <div id="world-info-title" style="font-size:16px;font-weight:700;color:#e8e4f8"></div>
@@ -1336,6 +1360,7 @@
     </div>
   </div>
 </div>
+  <script src="js/icons.js"></script>
   <script src="js/state.js"></script>
   <script src="js/markdown.js"></script>
   <script src="js/api.js"></script>
@@ -1360,6 +1385,7 @@
   <script src="js/world.js"></script>
   <script src="js/push-admin.js"></script>
   <script src="js/profile-integrations.js"></script>
+  <script src="js/boot.js"></script>
   <script src="js/app.js"></script>
   <script src="js/init.js"></script>
 </body></html>
