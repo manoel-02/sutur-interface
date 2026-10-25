@@ -148,6 +148,8 @@ function findCountryAt(lat,lng){
 
 async function openWorldPanel(){
   document.getElementById('world-modal').style.display='flex';
+  const hint=document.getElementById('world-hint');
+  if(hint) hint.classList.remove('gone');
   document.getElementById('world-info-panel').style.display='none';
 
   try{
@@ -256,6 +258,59 @@ async function initWorldGlobe(){
   world_globeGroup.add(new THREE.Mesh(glowGeo,new THREE.MeshBasicMaterial({color:0x8b5cf6,transparent:true,opacity:0.04,side:THREE.BackSide})));
 
   world_scene.add(world_globeGroup);
+}
+
+// ── Surlignage ──────────────────────────────────────────────────────────────
+// Sélectionner un pays sans le voir se détacher, c'est deviner si on a touché le
+// bon : le contour du pays choisi (ou de tout un continent) passe en violet, au
+// ras de la surface.
+
+let world_highlight=null;
+
+function worldFeatureSegments(feats,radius){
+  const seg=[];
+  for(const feat of feats){
+    for(const poly of feat.polys){
+      for(const ring of [poly.outer].concat(poly.holes)){
+        const pts=ring.pts;
+        let prev=latLngToVector3(pts[0][1],pts[0][0],radius);
+        for(let i=1;i<pts.length;i++){
+          const cur=latLngToVector3(pts[i][1],pts[i][0],radius);
+          seg.push(prev.x,prev.y,prev.z,cur.x,cur.y,cur.z);
+          prev=cur;
+        }
+      }
+    }
+  }
+  return new Float32Array(seg);
+}
+
+function worldClearHighlight(){
+  if(!world_highlight) return;
+  if(world_globeGroup) world_globeGroup.remove(world_highlight);
+  disposeWorldNode(world_highlight);
+  world_highlight=null;
+}
+
+/** Surligne un ou plusieurs pays. `names` : noms tels qu'ils figurent dans le jeu de données. */
+function worldHighlightCountries(names){
+  worldClearHighlight();
+  if(!names||!names.length||!world_countryIndex||!world_globeGroup) return 0;
+  const want=new Set(names.map(n=>String(n).toLowerCase()));
+  const feats=world_countryIndex.filter(f=>{
+    const n=(f.props.name||f.props.ADMIN||f.props.NAME||'').toLowerCase();
+    return want.has(n);
+  });
+  if(!feats.length) return 0;
+  // 2,515 contre 2,51 pour les frontières : juste assez pour passer devant sans
+  // se détacher visiblement de la surface.
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(worldFeatureSegments(feats,2.515),3));
+  world_highlight=new THREE.LineSegments(geo,new THREE.LineBasicMaterial({
+    color:0xa294ff,transparent:true,opacity:0.95,depthTest:true,
+  }));
+  world_globeGroup.add(world_highlight);
+  return feats.length;
 }
 
 function buildCountryBorders(){
@@ -771,123 +826,242 @@ function worldTouchSpread(touches){
   return Math.hypot(dx,dy);
 }
 
+// ── Manipulation du globe ───────────────────────────────────────────────────
+//
+// Un seul système d'événements (Pointer Events) pour la souris, le doigt et le
+// stylet : avant, deux jeux d'écouteurs séparés se marchaient dessus dès qu'un
+// second doigt arrivait. Et `touch-action:none` sur le canevas est ce qui empêche
+// la page de défiler pendant qu'on fait tourner le globe au doigt — c'était le
+// défaut le plus agaçant sur téléphone.
+//
+// L'inertie est AMORTIE. Avant, la rotation lancée ne s'arrêtait jamais d'elle-même
+// et il fallait maintenir l'appui deux secondes pour la figer : impossible de lire
+// un pays tranquillement, et personne ne devine ce geste. Elle ralentit maintenant
+// toute seule, et le moindre contact l'arrête net — c'est ce que fait n'importe
+// quel globe qu'on a déjà manipulé.
+
+const WORLD_FRICTION = 0.935;        // ~1,5 s pour s'immobiliser après un lancer franc
+const WORLD_SPIN_FLOOR = 0.00012;    // en dessous, on considère le globe arrêté
+const WORLD_TAP_SLOP = 5;            // px : au-delà c'est un glissement, pas un tap
+const WORLD_DOUBLE_MS = 300;
+
+let world_pointers = new Map();      // pointeurs actifs, pour distinguer glisser et pincer
+let world_lastTapAt = 0;
+let world_hoverIso = null;
+
+function worldZoomBy(factor){
+  const d=world_camDistTarget*factor;
+  world_camDistTarget=Math.max(WORLD_CAM_MIN,Math.min(WORLD_CAM_MAX,d));
+}
+
+// Zoomé, un même glissement doit couvrir moins de longitude, sinon le globe fuit
+// sous le doigt ; dézoomé, il en couvre plus, puisqu'il paraît plus petit.
+function worldDragScale(){
+  return Math.max(0.3,Math.min(2.5,world_camDist/WORLD_CAM_DEFAULT));
+}
+
+/** Arrête net la rotation en cours. Tout contact le fait : c'est le geste attendu. */
+function worldHalt(){
+  world_spinVelocityY=0;
+  world_autoRotate=false;
+}
+
+function worldPinchSpread(){
+  const pts=[...world_pointers.values()];
+  if(pts.length<2) return 0;
+  return Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+}
+
+/** L'aide a rempli son rôle dès le premier geste ; ensuite elle couvre le globe. */
+function worldDismissHint(){
+  const el=document.getElementById('world-hint');
+  if(el && !el.classList.contains('gone')) el.classList.add('gone');
+}
+
 function setupWorldControls(){
   const canvas=document.getElementById('world-canvas');
-  if(canvas._worldControlsBound) return; // éviter d'attacher les écouteurs plusieurs fois
+  if(canvas._worldControlsBound) return;
   canvas._worldControlsBound=true;
-  canvas.setAttribute('tabindex','0'); // rend le canvas focusable, nécessaire pour capter le clavier
+  canvas.setAttribute('tabindex','0');
+  canvas.style.touchAction='none';   // le navigateur ne vole plus le geste
+  canvas.style.cursor='grab';
 
-  let moved=false, downX=0, downY=0;
+  let moved=false, downX=0, downY=0, downAt=0;
 
-  const startHoldTimer=()=>{
-    world_holdCanceledByMove=false;
-    clearTimeout(world_holdTimer);
-    world_holdTimer=setTimeout(()=>{
-      if(!world_holdCanceledByMove){
-        // Pression longue de 2 secondes sans glisser -> arrêt volontaire, comme on
-        // poserait la main sur une vraie toupie pour l'arrêter.
-        world_spinVelocityY=0; world_autoRotate=false;
-      }
-    },2000);
-  };
-  const cancelHoldTimer=()=>{ clearTimeout(world_holdTimer); world_holdTimer=null; };
-
-  const onDown=(x,y)=>{
-    world_dragging=true; world_lastX=x; world_lastY=y; downX=x; downY=y; moved=false;
-    world_velocityHistory=[{x,t:performance.now()}];
-    canvas.style.cursor='grabbing';
-    startHoldTimer();
-  };
-  const onMove=(x,y)=>{
-    if(!world_dragging)return;
-    const dx=x-world_lastX, dy=y-world_lastY;
-    if(Math.abs(x-downX)>4||Math.abs(y-downY)>4){
-      moved=true;
-      world_holdCanceledByMove=true; // un vrai geste de glisser annule l'arrêt programmé
-      cancelHoldTimer();
-    }
-    const k=worldDragScale();
-    world_rotationY+=dx*0.005*k;
-    world_rotationX=Math.max(-1.3,Math.min(1.3,world_rotationX+dy*0.005*k));
-    world_lastX=x; world_lastY=y;
-    world_velocityHistory.push({x,t:performance.now()});
-    if(world_velocityHistory.length>8) world_velocityHistory.shift();
-  };
-  const onUp=(clientX,clientY)=>{
-    world_dragging=false; canvas.style.cursor='grab';
-    cancelHoldTimer();
-    if(!moved){
-      // Un simple tap ne touche JAMAIS à la rotation en cours — ni pour l'arrêter, ni
-      // pour la relancer — il ne fait que vérifier si un pays a été touché.
-      handleWorldClick(clientX,clientY);
-    }else if(world_velocityHistory.length>=2){
-      // Vélocité calculée sur les derniers échantillons -> effet toupie, le globe
-      // continue sur sa lancée après le relâchement, sans ralentir de lui-même.
-      const first=world_velocityHistory[0], last=world_velocityHistory[world_velocityHistory.length-1];
-      const dt=(last.t-first.t)||16;
-      const dx=last.x-first.x;
-      let v=(dx/dt)*16*0.005*worldDragScale();
-      world_spinVelocityY=Math.max(-0.15,Math.min(0.15,v)); // borne raisonnable, évite un flick délirant
-      world_autoRotate=false; // le contrôle passe définitivement à la vélocité de spin
-    }
-  };
-
-  canvas.addEventListener('mousedown',e=>onDown(e.clientX,e.clientY));
-  canvas.addEventListener('mousemove',e=>onMove(e.clientX,e.clientY));
-  window.addEventListener('mouseup',e=>{ if(world_dragging) onUp(e.clientX,e.clientY); });
-
-  // Deux doigts = pincement, jamais un glissement : on coupe le glisser en cours et
-  // l'arrêt programmé, sinon poser le second doigt faisait tourner le globe d'un
-  // coup sec et pouvait déclencher la pression longue.
-  const beginPinch=(e)=>{
-    world_dragging=false; moved=true; cancelHoldTimer();
-    world_holdCanceledByMove=true;
-    world_pinchStartDist=worldTouchSpread(e.touches)||null;
-    world_pinchStartCam=world_camDistTarget;
-  };
-  const updatePinch=(e)=>{
-    const d=worldTouchSpread(e.touches);
-    if(!d||!world_pinchStartDist) return;
-    // Doigts qui s'écartent -> rapport > 1 -> caméra plus proche.
-    world_camDistTarget=Math.max(WORLD_CAM_MIN,Math.min(WORLD_CAM_MAX,world_pinchStartCam*(world_pinchStartDist/d)));
-  };
-
-  canvas.addEventListener('touchstart',e=>{
-    if(e.touches.length>=2){ beginPinch(e); return; }
-    const t=e.touches[0]; onDown(t.clientX,t.clientY);
-  },{passive:true});
-  canvas.addEventListener('touchmove',e=>{
-    if(world_pinchStartDist!==null&&e.touches.length>=2){ updatePinch(e); return; }
-    const t=e.touches[0]; if(t) onMove(t.clientX,t.clientY);
-  },{passive:true});
-  canvas.addEventListener('touchend',e=>{
-    if(world_pinchStartDist!==null){
-      // Le doigt restant n'a pas déclenché de touchstart : il ne doit pas se mettre
-      // à faire tourner le globe au milieu du geste, ni compter comme un tap.
-      if(e.touches.length<2) world_pinchStartDist=null;
+  const onDown=(e)=>{
+    world_pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(world_pointers.size===2){
+      // Deuxième doigt : on passe en pincement et on abandonne le glissement en cours,
+      // sinon poser le doigt fait sauter le globe d'un coup sec.
+      world_dragging=false;
+      world_pinchStartDist=worldPinchSpread()||null;
+      world_pinchStartCam=world_camDistTarget;
       return;
     }
-    const t=e.changedTouches[0]; if(world_dragging) onUp(t.clientX,t.clientY);
-  });
+    if(world_pointers.size>2) return;
+    try{ canvas.setPointerCapture(e.pointerId); }catch(err){}
+    worldHalt();                      // toucher le globe l'arrête, toujours
+    worldDismissHint();
+    world_dragging=true;
+    world_lastX=e.clientX; world_lastY=e.clientY;
+    downX=e.clientX; downY=e.clientY; downAt=performance.now(); moved=false;
+    world_velocityHistory=[{x:e.clientX,t:downAt}];
+    canvas.style.cursor='grabbing';
+  };
 
-  // Molette de souris. Le pavé tactile envoie son pincement comme une molette avec
-  // Ctrl enfoncé : même geste, même effet, mais un cran plus franc puisqu'il est
-  // explicitement un zoom. preventDefault empêche le navigateur de zoomer la page.
+  const onMove=(e)=>{
+    if(world_pointers.has(e.pointerId)) world_pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+
+    if(world_pinchStartDist!==null && world_pointers.size>=2){
+      const d=worldPinchSpread();
+      if(d) world_camDistTarget=Math.max(WORLD_CAM_MIN,
+        Math.min(WORLD_CAM_MAX,world_pinchStartCam*(world_pinchStartDist/d)));
+      return;
+    }
+    if(!world_dragging){
+      // Sans bouton enfoncé, la souris sert seulement à montrer ce qui est cliquable.
+      if(e.pointerType==='mouse') worldHover(e.clientX,e.clientY);
+      return;
+    }
+    const dx=e.clientX-world_lastX, dy=e.clientY-world_lastY;
+    if(Math.abs(e.clientX-downX)>WORLD_TAP_SLOP||Math.abs(e.clientY-downY)>WORLD_TAP_SLOP) moved=true;
+    const k=worldDragScale();
+    world_rotationY+=dx*0.005*k;
+    // Bridé avant les pôles : au-delà le globe se retourne et on perd le nord,
+    // littéralement.
+    world_rotationX=Math.max(-1.25,Math.min(1.25,world_rotationX+dy*0.005*k));
+    world_lastX=e.clientX; world_lastY=e.clientY;
+    world_velocityHistory.push({x:e.clientX,t:performance.now()});
+    if(world_velocityHistory.length>6) world_velocityHistory.shift();
+  };
+
+  const onUp=(e)=>{
+    world_pointers.delete(e.pointerId);
+    try{ canvas.releasePointerCapture(e.pointerId); }catch(err){}
+    if(world_pointers.size<2) world_pinchStartDist=null;
+    if(world_pointers.size>0) return;   // encore un doigt posé : le geste continue
+    if(!world_dragging) return;
+    world_dragging=false;
+    canvas.style.cursor='grab';
+
+    if(!moved){
+      const now=performance.now();
+      if(now-world_lastTapAt<WORLD_DOUBLE_MS){
+        // Double appui : on se rapproche, centré sur l'endroit visé.
+        world_lastTapAt=0;
+        worldZoomToward(e.clientX,e.clientY,0.6);
+        return;
+      }
+      world_lastTapAt=now;
+      handleWorldClick(e.clientX,e.clientY);
+      return;
+    }
+    // Lancer : vélocité moyenne des derniers échantillons, puis l'amortissement
+    // de worldLoop s'en occupe.
+    if(world_velocityHistory.length>=2){
+      const first=world_velocityHistory[0], last=world_velocityHistory[world_velocityHistory.length-1];
+      const dt=(last.t-first.t)||16;
+      const v=((last.x-first.x)/dt)*16*0.005*worldDragScale();
+      world_spinVelocityY=Math.max(-0.14,Math.min(0.14,v));
+    }
+  };
+
+  canvas.addEventListener('pointerdown',onDown);
+  canvas.addEventListener('pointermove',onMove);
+  canvas.addEventListener('pointerup',onUp);
+  canvas.addEventListener('pointercancel',e=>{
+    world_pointers.delete(e.pointerId);
+    if(world_pointers.size<2) world_pinchStartDist=null;
+    if(world_pointers.size===0){ world_dragging=false; canvas.style.cursor='grab'; }
+  });
+  canvas.addEventListener('pointerleave',()=>{ worldSetHover(null); });
+  canvas.addEventListener('dblclick',e=>e.preventDefault()); // le double-clic est géré au pointeur
+
+  // Molette. Le pavé tactile envoie son pincement comme une molette avec Ctrl :
+  // même geste, effet plus franc puisqu'il est explicitement un zoom.
   canvas.addEventListener('wheel',e=>{
     e.preventDefault();
-    worldZoomBy(Math.exp(e.deltaY*(e.ctrlKey?0.004:0.0016)));
+    worldDismissHint();
+    worldZoomToward(e.clientX,e.clientY,Math.exp(e.deltaY*(e.ctrlKey?0.004:0.0016)));
   },{passive:false});
 
-  // Clavier — n'importe quelle touche maintenue 2 secondes arrête aussi la rotation
+  // Clavier. Avant, la seule touche utile était « n'importe laquelle, maintenue
+  // deux secondes, pour arrêter » — ce qui n'aide personne à explorer un globe.
   canvas.addEventListener('keydown',e=>{
-    // Les touches de zoom sont exclues de cet arrêt : on les maintient justement
-    // pour zoomer, ça ne doit pas figer la toupie au passage.
-    if(e.key==='+'||e.key==='='){ worldZoomBy(0.93); return; }
-    if(e.key==='-'||e.key==='_'){ worldZoomBy(1.075); return; }
-    if(world_keyHoldTimer) return; // déjà en cours (répétition automatique du navigateur sur touche maintenue)
-    world_keyHoldTimer=setTimeout(()=>{ world_spinVelocityY=0; world_autoRotate=false; },2000);
+    const step=0.09*worldDragScale();
+    switch(e.key){
+      case 'ArrowLeft':  worldHalt(); world_rotationY-=step; break;
+      case 'ArrowRight': worldHalt(); world_rotationY+=step; break;
+      case 'ArrowUp':    worldHalt(); world_rotationX=Math.max(-1.25,world_rotationX-step); break;
+      case 'ArrowDown':  worldHalt(); world_rotationX=Math.min(1.25,world_rotationX+step); break;
+      case '+': case '=': worldZoomBy(0.88); break;
+      case '-': case '_': worldZoomBy(1.14); break;
+      case 'Home': worldResetView(); break;
+      case ' ': case 'Spacebar': worldHalt(); break;
+      default: return;
+    }
+    e.preventDefault();
   });
-  canvas.addEventListener('keyup',()=>{ clearTimeout(world_keyHoldTimer); world_keyHoldTimer=null; });
+}
+
+/** Zoom en gardant sous le curseur le point visé, plutôt qu'en se contentant du centre. */
+function worldZoomToward(clientX,clientY,factor){
+  const before=worldPointAt(clientX,clientY);
+  worldZoomBy(factor);
+  if(!before) return;
+  // Le point visé a glissé : on recale la rotation pour le ramener sous le curseur.
+  // Sans ça, zoomer sur un pays le fait sortir du cadre.
+  const after=worldPointAt(clientX,clientY,world_camDistTarget);
+  if(!after) return;
+  world_rotationY+=(before.lng-after.lng)*Math.PI/180;
+  world_rotationX=Math.max(-1.25,Math.min(1.25,world_rotationX-(before.lat-after.lat)*Math.PI/180));
+}
+
+function worldResetView(){
+  worldHalt();
+  world_rotationX=0.3; world_rotationY=0.4;
+  world_camDistTarget=WORLD_CAM_DEFAULT;
+}
+
+/** Latitude/longitude sous un point de l'écran, ou null si on vise le vide. */
+function worldPointAt(clientX,clientY,camDistOverride){
+  if(!world_camera||!world_globeGroup) return null;
+  const canvas=document.getElementById('world-canvas');
+  if(!canvas) return null;
+  const rect=canvas.getBoundingClientRect();
+  const saved=world_camera.position.z;
+  if(camDistOverride){ world_camera.position.z=camDistOverride; world_camera.updateMatrixWorld(); }
+  const ray=new THREE.Raycaster();
+  ray.setFromCamera(new THREE.Vector2(
+    ((clientX-rect.left)/rect.width)*2-1,
+    -((clientY-rect.top)/rect.height)*2+1
+  ),world_camera);
+  const sphere=world_globeGroup.getObjectByName('world-hit-sphere');
+  const hit=sphere?ray.intersectObject(sphere,false):[];
+  if(camDistOverride){ world_camera.position.z=saved; world_camera.updateMatrixWorld(); }
+  if(!hit.length) return null;
+  return vector3ToLatLng(world_globeGroup.worldToLocal(hit[0].point.clone()));
+}
+
+/** Survol souris : indique ce qui est cliquable, sans rien charger. */
+function worldHover(clientX,clientY){
+  const canvas=document.getElementById('world-canvas');
+  const p=worldPointAt(clientX,clientY);
+  if(!p){ worldSetHover(null); if(canvas) canvas.style.cursor='grab'; return; }
+  const props=findCountryAt(p.lat,p.lng);
+  worldSetHover(props);
+  if(canvas) canvas.style.cursor=props?'pointer':'grab';
+}
+
+function worldSetHover(props){
+  const iso=props?(props.iso||props.ISO_A3||props.ISO_A2||null):null;
+  const name=props?(props.name||props.ADMIN||props.NAME||''):'';
+  if(iso===world_hoverIso) return;
+  world_hoverIso=iso;
+  const el=document.getElementById('world-hover');
+  if(!el) return;
+  el.textContent=name;
+  el.style.opacity=name?'1':'0';
 }
 
 function handleWorldClick(clientX,clientY){
@@ -942,22 +1116,32 @@ async function showWorldCountryInfo(countryName, isoCode){
   const body=document.getElementById('world-info-body');
   panel.style.display='block';
   title.textContent=countryName;
-  body.innerHTML='<div style="color:rgba(139,92,246,.4)">Chargement...</div>';
+  body.innerHTML='<div class="world-loading">Chargement…</div>';
   world_currentCountryData=null;
+  // Le contour du pays choisi passe en violet : sans ça, on ne sait pas si on a
+  // touché celui qu'on visait.
+  worldHighlightCountries([countryName]);
 
   try{
     const isoParam = isoCode ? `?iso=${encodeURIComponent(isoCode)}` : '';
     const data=await apiCall('/country/'+encodeURIComponent(countryName)+isoParam);
     world_currentCountryData=data;
     let html='';
-    if(data.population) html+=`<div>👥 <b>${data.population.toLocaleString('fr')}</b> habitants</div>`;
-    if(data.capital) html+=`<div>🏛️ Capitale : <b>${data.capital}</b></div>`;
-    if(data.region) html+=`<div>🌍 ${data.region}${data.subregion?' — '+data.subregion:''}</div>`;
-    if(data.languages && data.languages.length) html+=`<div>🗣️ ${data.languages.join(', ')}</div>`;
-    if(data.current_weather) html+=`<div style="margin-top:8px">🌤️ ${data.current_weather}</div>`;
+    if(data.population) html+=`<div class="wi-row">${icon('me',{size:14})}<span><b>${data.population.toLocaleString('fr')}</b> habitants</span></div>`;
+    if(data.capital) html+=`<div class="wi-row">${icon('manage',{size:14})}<span>Capitale : <b>${escapeHtml(data.capital)}</b></span></div>`;
+    if(data.region){
+      html+=`<div class="wi-row">${icon('globe',{size:14})}<span>${escapeHtml(data.region)}`
+        +`${data.subregion?' — '+escapeHtml(data.subregion):''}</span></div>`;
+    }
+    if(data.languages && data.languages.length) html+=`<div class="wi-row">${icon('chat',{size:14})}<span>${escapeHtml(data.languages.join(', '))}</span></div>`;
+    if(data.current_weather) html+=`<div style="margin-top:8px">🌤️ ${escapeHtml(data.current_weather)}</span></div>`;
     if(data.recent_activity) html+=`<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(139,92,246,.15)">${data.recent_activity}</div>`;
     if(data.capital_lat!=null && data.capital_lng!=null){
-      html+=`<button onclick="showCapitalBuildings()" class="access-btn" style="width:100%;margin-top:10px;font-size:11px">🏙️ Voir les bâtiments de la capitale</button>`;
+      html+=`<button onclick="showCapitalBuildings()" class="world-act">Voir les bâtiments de la capitale</button>`;
+    }
+    if(data.region){
+      html+=`<button onclick="showWorldRegionInfo('${escapeHtml(data.region).replace(/'/g,"\\'")}')"`
+        +` class="world-act ghost">Voir tout le continent</button>`;
     }
     body.innerHTML=html || '<div style="color:rgba(139,92,246,.4)">Aucune information disponible.</div>';
   }catch(e){
@@ -965,22 +1149,75 @@ async function showWorldCountryInfo(countryName, isoCode){
   }
 }
 
-function worldLoop(){
+/** Vue d'ensemble d'un continent, avec tous ses pays surlignés d'un coup. */
+async function showWorldRegionInfo(region){
+  const panel=document.getElementById('world-info-panel');
+  const title=document.getElementById('world-info-title');
+  const body=document.getElementById('world-info-body');
+  panel.style.display='block';
+  title.textContent=region;
+  body.innerHTML='<div class="world-loading">Chargement…</div>';
+  try{
+    const d=await apiCall('/geo/region/'+encodeURIComponent(region));
+    const t=d.totals||{};
+    const names=(d.countries||[]).map(c=>c.name);
+    const shown=worldHighlightCountries(names);
+    const fr=n=>Number(n||0).toLocaleString('fr-FR');
+    let html='';
+    html+=`<div class="wi-row">${icon('globe',{size:14})}<span><b>${fr(t.countries)}</b> pays</span></div>`;
+    html+=`<div class="wi-row">${icon('me',{size:14})}<span><b>${fr(t.population)}</b> habitants</span></div>`;
+    html+=`<div class="wi-row">${icon('manage',{size:14})}<span><b>${fr(t.area_km2)}</b> km²</span></div>`;
+    const top=(d.countries||[]).slice(0,5);
+    if(top.length){
+      html+='<div class="wi-sep">Les plus peuplés</div><div class="wi-list">';
+      for(const c of top){
+        html+=`<button class="wi-item" onclick="showWorldCountryInfo('${escapeHtml(c.name).replace(/'/g,"\\'")}','${escapeHtml(c.iso||'')}')">`
+          +`<span>${escapeHtml(c.name)}</span><span class="n">${fr(c.population)}</span></button>`;
+      }
+      html+='</div>';
+    }
+    // Les noms de REST Countries et ceux du fond de carte ne coïncident pas toujours :
+    // le dire plutôt que de laisser croire que le continent est incomplet.
+    if(shown && shown<(names.length||0)){
+      html+=`<div class="wi-note">${shown} pays sur ${names.length} tracés sur le globe `
+        +`(certains noms diffèrent entre les deux sources).</div>`;
+    }
+    body.innerHTML=html;
+  }catch(e){
+    body.innerHTML='<div class="world-err">Informations indisponibles pour ce continent.</div>';
+  }
+}
+
+let world_lastFrameAt=0;
+
+function worldLoop(now){
   const modal=document.getElementById('world-modal');
-  if(!modal || modal.style.display==='none'){ world_animating=false; return; }
+  if(!modal || modal.style.display==='none'){ world_animating=false; world_lastFrameAt=0; return; }
+  // Tout est rapporté à une image de 60 Hz. Sans ça, la rotation et son
+  // amortissement dépendent de la fréquence de l'écran : deux fois plus rapides sur
+  // un téléphone à 120 Hz, au ralenti sur une machine chargée.
+  const t=now||performance.now();
+  const dt=world_lastFrameAt?Math.min(100,t-world_lastFrameAt):16.67;
+  world_lastFrameAt=t;
+  const f=dt/16.67;
+
   if(world_autoRotate){
-    world_rotationY+=0.0008;
-  }else if(Math.abs(world_spinVelocityY)>0.00005){
-    // Pas de frottement volontaire — "comme une toupie", continue indéfiniment
-    // jusqu'à l'arrêt explicite par pression longue (souris/tactile/clavier).
-    world_rotationY+=world_spinVelocityY;
+    world_rotationY+=0.0008*f;
+  }else if(Math.abs(world_spinVelocityY)>WORLD_SPIN_FLOOR){
+    // Inertie amortie : le lancer se poursuit puis s'éteint en une seconde et demie.
+    // Sans frottement, le globe ne s'arrêtait jamais seul et il fallait connaître un
+    // appui long de deux secondes pour le figer — on ne pouvait pas lire un pays.
+    world_rotationY+=world_spinVelocityY*f;
+    world_spinVelocityY*=Math.pow(WORLD_FRICTION,f);
+  }else{
+    world_spinVelocityY=0;
   }
   if(world_globeGroup){ world_globeGroup.rotation.y=world_rotationY; world_globeGroup.rotation.x=world_rotationX; }
   // Amorti exponentiel vers la distance visée : molette, pincement et clavier ne
   // touchent qu'à la cible, ce qui donne un zoom qui glisse au lieu de sauter, sans
   // interférer avec la rotation (qui, elle, reste pilotée par le glissement).
   if(world_camera && Math.abs(world_camDistTarget-world_camDist)>0.0008){
-    world_camDist+=(world_camDistTarget-world_camDist)*0.18;
+    world_camDist+=(world_camDistTarget-world_camDist)*Math.min(1,0.18*f);
     world_camera.position.z=world_camDist;
   }
   if(world_renderer && world_scene && world_camera) world_renderer.render(world_scene,world_camera);
@@ -1012,6 +1249,10 @@ function closeWorldPanel(){
   // périssables (un avion de la minute passée ne vaut rien) et sa géométrie occupe
   // de la mémoire vidéo. L'état du contrôle est remis à zéro avec elle.
   disposeGlobeMarkers();
+  worldClearHighlight();
+  worldSetHover(null);
+  world_pointers.clear();
+  world_pinchStartDist=null;
   world_activeLayer=null;
   world_layerBusy=false;
   paintGlobeLayerButtons();
@@ -1019,6 +1260,7 @@ function closeWorldPanel(){
   // Libération immédiate de la mémoire GPU à la fermeture : le panneau peut être
   // réouvert des dizaines de fois dans une session, et tout est reconstruit à
   // l'ouverture de toute façon (les sommets des frontières, eux, restent en cache).
+  world_highlight=null; // appartenait au groupe, détruit juste en dessous
   disposeWorldNode(world_globeGroup); world_globeGroup=null;
   disposeWorldNode(world_starfield); world_starfield=null;
   if(world_renderer) world_renderer.renderLists.dispose();
